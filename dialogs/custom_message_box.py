@@ -24,26 +24,19 @@ class CustomMessageBox(QDialog):
 
         self.setWindowFlags(Qt.WindowType.FramelessWindowHint | Qt.WindowType.Dialog)
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
-        self.setObjectName("CustomMessageBox")
         self.setModal(True)
         
         self._setup_ui()
 
     def _setup_ui(self):
-        self.container = QWidget(self)
-        self.container.setObjectName("Container")
         main_layout = QVBoxLayout(self)
-        main_layout.setContentsMargins(0, 0, 0, 0)
-        main_layout.addWidget(self.container)
-
-        self.layout = QVBoxLayout(self.container)
-        self.layout.setContentsMargins(1, 1, 1, 1) # Small margin for the border
-        self.layout.setSpacing(0)
+        main_layout.setContentsMargins(1, 1, 1, 1)  # Small margin for the border
+        main_layout.setSpacing(0)
 
         # --- Custom Title Bar ---
-        title_bar_widget = QWidget()
-        title_bar_widget.setObjectName("TitleBar")
-        title_bar_layout = QHBoxLayout(title_bar_widget)
+        self.title_bar = QWidget()
+        self.title_bar.setObjectName("TitleBar")
+        title_bar_layout = QHBoxLayout(self.title_bar)
         title_bar_layout.setContentsMargins(10, 5, 5, 5)
         
         self.title_label = QLabel()
@@ -52,18 +45,17 @@ class CustomMessageBox(QDialog):
         self.close_button = QPushButton(IconManager.create_icon('fa5s.times'), "")
         self.close_button.setObjectName("CloseButton")
         self.close_button.clicked.connect(self._on_cancel)
-        
+
         title_bar_layout.addWidget(self.title_label)
         title_bar_layout.addStretch()
         title_bar_layout.addWidget(self.close_button)
-        self.layout.addWidget(title_bar_widget)
+        main_layout.addWidget(self.title_bar)
 
         # --- Content Area ---
-        content_widget = QWidget()
-        content_layout = QVBoxLayout(content_widget)
+        content_layout = QVBoxLayout()
         content_layout.setContentsMargins(15, 15, 15, 15)
         content_layout.setSpacing(15)
-        self.layout.addWidget(content_widget)
+        main_layout.addLayout(content_layout)
 
         top_layout = QHBoxLayout()
         top_layout.setSpacing(15)
@@ -82,7 +74,6 @@ class CustomMessageBox(QDialog):
         button_layout.addStretch()
         
         self.save_button = QPushButton("Save")
-        self.save_button.setObjectName("SaveButton")
         self.save_button.clicked.connect(self._on_save)
         
         self.discard_button = QPushButton("Discard")

@@ -19,21 +19,11 @@ class CustomDialog(QDialog):
         # Make the dialog frameless and transparent to draw our own frame
         self.setWindowFlags(Qt.WindowType.FramelessWindowHint | Qt.WindowType.Dialog)
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
-        self.setObjectName("CustomDialogBase")
 
-        # Main container that holds the border and background
-        self.container = QWidget(self)
-        self.container.setObjectName("DialogContainer")
-        
         # Main layout for the entire dialog window
         main_layout = QVBoxLayout(self)
-        main_layout.setContentsMargins(0, 0, 0, 0)
-        main_layout.addWidget(self.container)
-
-        # Internal layout for the container (title bar + content)
-        container_layout = QVBoxLayout(self.container)
-        container_layout.setContentsMargins(1, 1, 1, 1)
-        container_layout.setSpacing(0)
+        main_layout.setContentsMargins(1, 1, 1, 1)
+        main_layout.setSpacing(0)
 
         # --- Custom Title Bar ---
         self.title_bar = QWidget()
@@ -52,24 +42,18 @@ class CustomDialog(QDialog):
         title_bar_layout.addWidget(self.title_label)
         title_bar_layout.addStretch()
         title_bar_layout.addWidget(self.close_button)
-        container_layout.addWidget(self.title_bar)
+        main_layout.addWidget(self.title_bar)
 
         # --- Content Area ---
-        # Subclasses will add their widgets to this content_widget
-        self.content_widget = QWidget()
-        container_layout.addWidget(self.content_widget)
+        # Subclasses will add their widgets to this layout
+        self.content_layout = QVBoxLayout()
+        self.content_layout.setContentsMargins(15, 15, 15, 15)
+        self.content_layout.setSpacing(10)
+        main_layout.addLayout(self.content_layout)
 
     def get_content_layout(self):
-        """
-        Returns the layout of the content area, so subclasses can add widgets.
-        If the layout doesn't exist, it creates one.
-        """
-        if not self.content_widget.layout():
-            # Use a QVBoxLayout by default for the content area
-            content_layout = QVBoxLayout(self.content_widget)
-            content_layout.setContentsMargins(15, 15, 15, 15)
-            content_layout.setSpacing(10)
-        return self.content_widget.layout()
+        """Returns the layout of the content area for subclass widgets."""
+        return self.content_layout
 
     def setWindowTitle(self, title):
         """Overrides the default setWindowTitle to update our custom label."""
