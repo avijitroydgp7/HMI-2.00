@@ -1,12 +1,11 @@
 # main_window/project_actions.py
 import os
 import copy
-from PyQt6.QtWidgets import QFileDialog
+from PyQt6.QtWidgets import QFileDialog, QMessageBox
 from services.project_service import project_service
 from services.command_history_service import command_history_service
 from services.commands import UpdateProjectInfoCommand
 from dialogs import ProjectInfoDialog
-from dialogs.custom_message_box import CustomMessageBox
 from services.settings_service import settings_service
 
 def new_project(win):
@@ -34,9 +33,10 @@ def open_project(win):
             if project_service.project_file_path != current_path:
                 tabs._close_all_tabs(win)
         except Exception as e:
-            msg_box = CustomMessageBox(win)
+            msg_box = QMessageBox(win)
             msg_box.setWindowTitle("Error Loading Project")
             msg_box.setText(f"Could not load project file:\n{e}")
+            msg_box.setIcon(QMessageBox.Icon.Critical)
             msg_box.exec()
 
 def load_project(win, path):
@@ -59,9 +59,10 @@ def save_project(win):
         project_service.save_project(project_service.project_file_path)
         return True
     except Exception as e:
-        msg_box = CustomMessageBox(win)
+        msg_box = QMessageBox(win)
         msg_box.setWindowTitle("Error Saving Project")
         msg_box.setText(f"Could not save project file:\n{e}")
+        msg_box.setIcon(QMessageBox.Icon.Critical)
         msg_box.exec()
         return False
 
@@ -78,9 +79,10 @@ def save_project_as(win):
             project_service.save_project(file_path)
             return True
         except Exception as e:
-            msg_box = CustomMessageBox(win)
+            msg_box = QMessageBox(win)
             msg_box.setWindowTitle("Error Saving Project")
             msg_box.setText(f"Could not save project file:\n{e}")
+            msg_box.setIcon(QMessageBox.Icon.Critical)
             msg_box.exec()
     return False
 
@@ -89,15 +91,20 @@ def prompt_to_save_if_dirty(win):
     if not project_service.is_dirty:
         return True
     
-    msg_box = CustomMessageBox(win)
+    msg_box = QMessageBox(win)
     msg_box.setWindowTitle("Unsaved Changes")
     msg_box.setText("The current project has been modified.\nDo you want to save your changes?")
-    
+    msg_box.setStandardButtons(
+        QMessageBox.StandardButton.Save
+        | QMessageBox.StandardButton.Discard
+        | QMessageBox.StandardButton.Cancel
+    )
+
     reply = msg_box.exec()
 
-    if reply == CustomMessageBox.Save:
+    if reply == QMessageBox.StandardButton.Save:
         return save_project(win)
-    if reply == CustomMessageBox.Cancel:
+    if reply == QMessageBox.StandardButton.Cancel:
         return False
     return True
 
