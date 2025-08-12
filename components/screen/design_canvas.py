@@ -87,14 +87,15 @@ class DesignCanvas(QGraphicsView):
 
     def _update_shadow_for_zoom(self):
         """Toggle shadow based on zoom level and preferences."""
-        if not self._shadow_enabled:
-            self.page_item.setGraphicsEffect(None)
-            return
+        use_shadow = self._shadow_enabled and self.transform().m11() <= self._shadow_disable_threshold
 
-        if self.transform().m11() > self._shadow_disable_threshold:
-            self.page_item.setGraphicsEffect(None)
+        if use_shadow:
+            if self.page_item.graphicsEffect() is not self._shadow_effect:
+                self.page_item.setGraphicsEffect(self._shadow_effect)
+            self._shadow_effect.setEnabled(True)
         else:
-            self.page_item.setGraphicsEffect(self._shadow_effect)
+            if self.page_item.graphicsEffect() is self._shadow_effect:
+                self._shadow_effect.setEnabled(False)
 
     def drawForeground(self, painter: QPainter, rect):
         super().drawForeground(painter, rect)
