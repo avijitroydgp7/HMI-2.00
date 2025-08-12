@@ -50,11 +50,19 @@ class DesignCanvas(QGraphicsView):
         self.setScene(self.scene)
 
         self.page_item = QGraphicsRectItem()
-        shadow = QGraphicsDropShadowEffect()
-        shadow.setBlurRadius(20)
-        shadow.setColor(QColor(0, 0, 0, 160))
-        shadow.setOffset(0, 0)
-        self.page_item.setGraphicsEffect(shadow)
+
+        # Cache a lighter drop shadow effect for better performance
+        self._shadow_effect = QGraphicsDropShadowEffect()
+        self._shadow_effect.setBlurRadius(10)
+        self._shadow_effect.setColor(QColor(0, 0, 0, 80))
+        self._shadow_effect.setOffset(0, 0)
+
+        # Allow turning shadows off and auto-disabling at high zoom levels
+        self._shadow_enabled = True
+        self._shadow_disable_threshold = 2.0
+        if self._shadow_enabled:
+            self.page_item.setGraphicsEffect(self._shadow_effect)
+
         self.page_item.setZValue(-1)
         self.scene.addItem(self.page_item)
 
@@ -68,8 +76,25 @@ class DesignCanvas(QGraphicsView):
         self.setBackgroundBrush(QColor("#1f1f1f"))
 
         self.scene.selectionChanged.connect(self._on_selection_changed)
-        
+
         self.update_screen_data()
+        self._update_shadow_for_zoom()
+
+    def set_shadow_enabled(self, enabled: bool):
+        """Enable or disable page shadows dynamically."""
+        self._shadow_enabled = enabled
+        self._update_shadow_for_zoom()
+
+    def _update_shadow_for_zoom(self):
+        """Toggle shadow based on zoom level and preferences."""
+        if not self._shadow_enabled:
+            self.page_item.setGraphicsEffect(None)
+            return
+
+        if self.transform().m11() > self._shadow_disable_threshold:
+            self.page_item.setGraphicsEffect(None)
+        else:
+            self.page_item.setGraphicsEffect(self._shadow_effect)
 
     def drawForeground(self, painter: QPainter, rect):
         super().drawForeground(painter, rect)
@@ -427,10 +452,11 @@ class DesignCanvas(QGraphicsView):
         if event.modifiers() == Qt.KeyboardModifier.ControlModifier:
             factor = 1.1 if event.angleDelta().y() > 0 else 1 / 1.1
             self.scale(factor, factor)
-            
+
             zoom_level = self.transform().m11()
             self.view_zoomed.emit(f"{int(zoom_level * 100)}%")
-            
+            self._update_shadow_for_zoom()
+
             event.accept()
         else:
             super().wheelEvent(event)
@@ -453,9 +479,10 @@ class DesignCanvas(QGraphicsView):
         else:
             color = style.get('color1', "#FFFFFF")
             self.page_item.setBrush(QBrush(QColor(color)))
-        
+
         self._sync_scene_items()
         self.update()
+        self._update_shadow_for_zoom()
 
     def update_theme_colors(self, theme_name):
         """Update canvas colors based on the current theme."""
