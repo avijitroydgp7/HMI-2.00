@@ -1,45 +1,32 @@
 # components/button/button_properties_dialog.py
 from PyQt6.QtWidgets import (
-    QTabWidget, QWidget, QDialogButtonBox, QLabel, QFormLayout, 
-    QLineEdit, QTableWidget, QTableWidgetItem, QHeaderView, 
+    QTabWidget, QWidget, QDialogButtonBox, QLabel, QFormLayout,
+    QLineEdit, QTableWidget, QTableWidgetItem, QHeaderView,
     QPushButton, QHBoxLayout, QAbstractItemView, QVBoxLayout,
-    QScrollArea, QSplitter, QGroupBox, QStackedWidget
+    QSplitter, QGroupBox, QStackedWidget, QDialog
 )
 from PyQt6.QtCore import Qt
 from typing import Dict, Any, Optional
 import copy
 
-from tools import button_styles
 from dialogs.actions.select_action_type_dialog import SelectActionTypeDialog
 from dialogs.actions.bit_action_dialog import BitActionDialog
 from dialogs.actions.word_action_dialog import WordActionDialog
-from services.tag_data_service import tag_data_service
-from dialogs.base_dialog import CustomDialog
 
-class ButtonPropertiesDialog(CustomDialog):
+
+class ButtonPropertiesDialog(QDialog):
     def __init__(self, properties: Dict[str, Any], parent=None):
         super().__init__(parent)
         self.properties = copy.deepcopy(properties)
         if 'actions' not in self.properties:
             self.properties['actions'] = []
         
-        # Store reference to button item and canvas
-        self.button_item = None
-        self.canvas = None
-        
-        # Try to get button item and canvas from parent
-        if parent:
-            if hasattr(parent, 'button_item'):
-                self.button_item = parent.button_item
-            if hasattr(parent, 'canvas'):
-                self.canvas = parent.canvas
-        
         self.setWindowTitle("Button Properties")
         self.setMinimumWidth(1000)  # Increased width for better layout
         self.setMaximumHeight(700)  # Increased height
         self.resize(1000, 700)  # Set initial size
 
-        content_layout = self.get_content_layout()
+        content_layout = QVBoxLayout(self)
         
         self.tab_widget = QTabWidget()
         content_layout.addWidget(self.tab_widget)
