@@ -1,0 +1,95 @@
+/* styles/specific.qss */
+/* Styles for specific, named widgets. */
+
+/* WelcomeWidget */
+#WelcomeWidget QLabel {
+    color: #dbe0e8;
+}
+#WelcomeWidget #SubtitleLabel {
+    color: #9da5b4;
+}
+#WelcomeWidget QPushButton {
+    background-color: #383e4a;
+    border: 1px solid #454c5a;
+    border-radius: 5px;
+    color: #dbe0e8;
+    text-align: center;
+}
+#WelcomeWidget QPushButton:hover {
+    background-color: #4a5263;
+    border: 1px solid #528bff;
+}
+#WelcomeWidget QPushButton:pressed {
+    background-color: #528bff;
+}
+
+/* MODIFIED: This rule is now removed, as the background color is handled
+   programmatically in DesignCanvas. The viewport will now use the main window
+   background color, which provides good contrast. */
+/*
+QGraphicsView#DesignCanvas {
+    background-color: #2c313c; 
+    border: none;
+}
+*/
+
+/* TagEditorWidget */
+#TagEditorWidget QPushButton#TagButton {
+    background-color: #383e4a;
+    color: #dbe0e8;
+    border: 1px solid #454c5a;
+    padding: 2px 5px;
+    font-size: 9pt;
+    border-radius: 4px;
+}
+#TagEditorWidget QPushButton#TagButton:hover {
+    background-color: #4a5263;
+    border: 1px solid #528bff;
+}
+#TagEditorWidget QPushButton#TagButton:pressed {
+    background-color: #528bff;
+}
+#TagEditorWidget QPushButton#TagButton:disabled {
+    background-color: #2c313c;
+    color: #7a828e;
+    border-color: #454c5a;
+}
+
+/* StatusBar */
+QPushButton#StatusBarButton {
+    background-color: transparent;
+    border: none;
+    padding: 2px;
+}
+QPushButton#StatusBarButton:pressed {
+    background-color: #528bff;
+}
+QPushButton#StatusBarButton:hover {
+    background-color: #4a5263;
+}
+
+/* Dock Widget Tabs */
+QMainWindow::separator {
+    background: #2c313c;
+    width: 4px; /* H */
+    height: 4px; /* V */
+}
+
+QDockWidget QTabBar::tab {
+    padding: 4px 10px; 
+    color: #9da5b4;
+    background-color: #2c313c;
+    border: 1px solid #2c313c;
+    border-bottom: none;
+}
+
+QDockWidget QTabBar::tab:selected {
+    background-color: #383e4a;
+    color: #dbe0e8;
+    border: 1px solid #454c5a;
+    border-bottom: 1px solid #383e4a;
+}
+
+QDockWidget QTabBar::tab:hover {
+    background-color: #4a5263;
+}

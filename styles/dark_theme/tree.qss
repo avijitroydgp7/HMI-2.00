@@ -1,0 +1,58 @@
+/* Tree widget styling for dark theme - matching default theme behavior */
+
+QTreeWidget {
+    background-color: #1e1e1e;
+    color: #cccccc;
+    border: none;
+    font-size: 10pt;
+    alternate-background-color: #252526;
+}
+
+QTreeWidget::item {
+    padding: 1px 4px;
+    /* Set a minimum height to ensure a large clickable area. */
+    min-height: 16px;
+}
+
+QTreeWidget::item:hover {
+    background-color: #094771;
+}
+
+QTreeWidget::item:selected, QTreeWidget::item:selected:active {
+    background-color: #2d2d30;
+    color: white;
+}
+
+QTreeWidget::item:selected:!active {
+    background-color: #094771;
+    color: #cccccc;
+    outline: none;
+}
+
+QHeaderView::section {
+    background-color: #252526;
+    color: #cccccc;
+    padding: 4px;
+    border: 1px solid #3e3e42;
+    font-weight: bold;
+}
+
+/* Style for the branch indicators (tracking lines) */
+QTreeView::branch {
+    background: transparent;
+}
+
+QTreeView::branch:has-siblings:!adjoins-item {
+    border-image: none;
+    image: url(:/qt-project.org/styles/commonstyle/images/vline.png);
+}
+
+QTreeView::branch:has-siblings:adjoins-item {
+    border-image: none;
+    image: url(:/qt-project.org/styles/commonstyle/images/branch-more.png);
+}
+
+QTreeView::branch:!has-children:!has-siblings:adjoins-item {
+    border-image: none;
+    image: url(:/qt-project.org/styles/commonstyle/images/branch-end.png);
+}

@@ -1,0 +1,216 @@
+/* Global fixes for dark theme - modern dark with popup visibility fixes */
+
+/* Fix for QSplitter handle */
+QSplitter::handle {
+    background-color: #3e3e42;
+}
+
+QSplitter::handle:horizontal {
+    width: 1px;
+}
+
+QSplitter::handle:vertical {
+    height: 1px;
+}
+
+/* Fix for scroll bars */
+QScrollBar:vertical {
+    background-color: #252526;
+    width: 12px;
+    border: 1px solid #3e3e42;
+}
+
+QScrollBar::handle:vertical {
+    background-color: #656565;
+    min-height: 20px;
+    border-radius: 6px;
+}
+
+QScrollBar::handle:vertical:hover {
+    background-color: #9d9d9d;
+}
+
+QScrollBar:horizontal {
+    background-color: #252526;
+    height: 12px;
+    border: 1px solid #3e3e42;
+}
+
+QScrollBar::handle:horizontal {
+    background-color: #656565;
+    min-width: 20px;
+    border-radius: 6px;
+}
+
+QScrollBar::handle:horizontal:hover {
+    background-color: #9d9d9d;
+}
+
+/* Fix for combo box dropdown */
+QComboBox {
+    background-color: #1e1e1e;
+    color: #cccccc;
+    border: 1px solid #3e3e42;
+    border-radius: 4px;
+    padding: 5px;
+}
+
+QComboBox:hover {
+    border: 1px solid #2d2d30;
+}
+
+QComboBox:focus {
+    border: 1px solid #2d2d30;
+}
+
+QComboBox::drop-down {
+    background-color: #252526;
+    border-left: 1px solid #3e3e42;
+    width: 20px;
+}
+
+QComboBox::drop-down:hover {
+    background-color: #2d2d30;
+}
+
+QComboBox::down-arrow {
+    image: none;
+    border-left: 3px solid transparent;
+    border-right: 3px solid transparent;
+    border-top: 3px solid #cccccc;
+}
+
+/* Fix for spin box buttons */
+QSpinBox::up-button, QSpinBox::down-button {
+    background-color: #252526;
+    border: 1px solid #3e3e42;
+    width: 16px;
+}
+
+QSpinBox::up-button:hover, QSpinBox::down-button:hover {
+    background-color: #2d2d30;
+}
+
+QSpinBox::up-button:pressed, QSpinBox::down-button:pressed {
+    background-color: #094771;
+}
+
+QSpinBox::up-arrow {
+    image: none;
+    border-left: 3px solid transparent;
+    border-right: 3px solid transparent;
+    border-bottom: 3px solid #cccccc;
+}
+
+QSpinBox::down-arrow {
+    image: none;
+    border-left: 3px solid transparent;
+    border-right: 3px solid transparent;
+    border-top: 3px solid #cccccc;
+}
+
+/* Fix for table headers */
+QHeaderView::section {
+    background-color: #252526;
+    color: #cccccc;
+    padding: 4px;
+    border: 1px solid #3e3e42;
+    font-weight: bold;
+}
+
+QHeaderView::section:hover {
+    background-color: #094771;
+}
+
+QHeaderView::section:pressed {
+    background-color: #2d2d30;
+}
+
+/* Fix for progress bars */
+QProgressBar {
+    background-color: #1e1e1e;
+    border: 1px solid #3e3e42;
+    border-radius: 4px;
+    text-align: center;
+    color: #cccccc;
+}
+
+QProgressBar::chunk {
+    background-color: #2d2d30;
+    border-radius: 3px;
+}
+
+/* Fix for sliders */
+QSlider::groove:horizontal {
+    background-color: #3e3e42;
+    height: 4px;
+    border-radius: 2px;
+}
+
+QSlider::handle:horizontal {
+    background-color: #2d2d30;
+    width: 12px;
+    height: 12px;
+    border-radius: 6px;
+    margin: -4px 0;
+}
+
+QSlider::groove:vertical {
+    background-color: #3e3e42;
+    width: 4px;
+    border-radius: 2px;
+}
+
+QSlider::handle:vertical {
+    background-color: #2d2d30;
+    width: 12px;
+    height: 12px;
+    border-radius: 6px;
+    margin: 0 -4px;
+}
+
+/* Fix for popup windows and dialogs */
+QWidget {
+    background-color: #252526;
+    color: #cccccc;
+}
+
+/* Ensure all popup windows have proper background */
+QDialog, QMessageBox, QInputDialog, QFileDialog, QColorDialog, QFontDialog {
+    background-color: #252526;
+    color: #cccccc;
+    border: 1px solid #3e3e42;
+}
+
+/* Ensure title bars are visible */
+QWidget#TitleBar {
+    background-color: #2d2d30;
+    color: #cccccc;
+    border-bottom: 1px solid #3e3e42;
+}
+
+/* Ensure popup menus have proper background */
+QMenu {
+    background-color: #252526;
+    color: #cccccc;
+    border: 1px solid #3e3e42;
+}
+
+QMenu::item {
+    background-color: transparent;
+    color: #cccccc;
+}
+
+QMenu::item:selected {
+    background-color: #2d2d30;
+    color: #ffffff;
+}
+
+/* Ensure tooltips are visible */
+QToolTip {
+    background-color: #252526;
+    color: #cccccc;
+    border: 1px solid #3e3e42;
+    border-radius: 4px;
+    padding: 5px;
+}

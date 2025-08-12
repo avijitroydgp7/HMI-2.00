@@ -1,0 +1,182 @@
+/* General styling for light theme */
+
+/* Scroll bars */
+QScrollBar:vertical {
+    background-color: #f0f0f0;
+    width: 12px;
+    border: none;
+}
+
+QScrollBar::handle:vertical {
+    background-color: #cccccc;
+    min-height: 20px;
+    border-radius: 6px;
+}
+
+QScrollBar::handle:vertical:hover {
+    background-color: #999999;
+}
+
+QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
+    height: 0px;
+}
+
+QScrollBar:horizontal {
+    background-color: #f0f0f0;
+    height: 12px;
+    border: none;
+}
+
+QScrollBar::handle:horizontal {
+    background-color: #cccccc;
+    min-width: 20px;
+    border-radius: 6px;
+}
+
+QScrollBar::handle:horizontal:hover {
+    background-color: #999999;
+}
+
+QScrollBar::add-line:horizontal, QScrollBar::sub-line:horizontal {
+    width: 0px;
+}
+
+/* Splitter styling */
+QSplitter::handle {
+    background-color: #cccccc;
+}
+
+QSplitter::handle:horizontal {
+    width: 2px;
+}
+
+QSplitter::handle:vertical {
+    height: 2px;
+}
+
+/* Tab bar styling */
+QTabBar::tab {
+    background-color: #e6e6e6;
+    color: #333333;
+    padding: 8px 16px;
+    border: 1px solid #cccccc;
+    border-bottom: none;
+}
+
+QTabBar::tab:selected {
+    background-color: #ffffff;
+    border-color: #cccccc;
+    border-bottom: 2px solid #0078d4;
+}
+
+QTabBar::tab:hover:!selected {
+    background-color: #f0f0f0;
+}
+
+/* Tab widget styling */
+QTabWidget::pane {
+    border: 1px solid #cccccc;
+    background-color: #ffffff;
+}
+
+/* Group box styling */
+QGroupBox {
+    color: #333333;
+    border: 1px solid #cccccc;
+    margin-top: 8px;
+    padding-top: 8px;
+}
+
+QGroupBox::title {
+    subcontrol-origin: margin;
+    left: 8px;
+    padding: 0 4px 0 4px;
+}
+
+/* Label styling */
+QLabel {
+    color: #333333;
+}
+
+/* Line edit styling */
+QLineEdit {
+    background-color: #ffffff;
+    color: #333333;
+    border: 1px solid #cccccc;
+    padding: 4px;
+    border-radius: 2px;
+}
+
+QLineEdit:focus {
+    border: 1px solid #0078d4;
+}
+
+/* Text edit styling */
+QTextEdit {
+    background-color: #ffffff;
+    color: #333333;
+    border: 1px solid #cccccc;
+}
+
+/* Combo box styling */
+QComboBox {
+    background-color: #ffffff;
+    color: #333333;
+    border: 1px solid #cccccc;
+    padding: 4px;
+    border-radius: 2px;
+}
+
+QComboBox:hover {
+    border: 1px solid #999999;
+}
+
+QComboBox::drop-down {
+    border: none;
+    width: 20px;
+}
+
+QComboBox::down-arrow {
+    image: url(none);
+    border-left: 5px solid transparent;
+    border-right: 5px solid transparent;
+    border-top: 5px solid #666666;
+}
+
+/* Push button styling */
+QPushButton {
+    background-color: #e6e6e6;
+    color: #333333;
+    border: 1px solid #cccccc;
+    padding: 6px 12px;
+    border-radius: 2px;
+}
+
+QPushButton:hover {
+    background-color: #d9d9d9;
+    border-color: #999999;
+}
+
+QPushButton:pressed {
+    background-color: #cccccc;
+}
+
+QPushButton:disabled {
+    background-color: #f0f0f0;
+    color: #999999;
+}
+
+/* Primary button styling */
+QPushButton[primary="true"] {
+    background-color: #0078d4;
+    color: #ffffff;
+    border-color: #0078d4;
+}
+
+QPushButton[primary="true"]:hover {
+    background-color: #106ebe;
+}
+
+QPushButton[primary="true"]:pressed {
+    background-color: #005a9e;
+}

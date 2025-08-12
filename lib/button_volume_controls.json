@@ -1,0 +1,17 @@
+[
+  {
+    "id": "volume_01",
+    "name": "Volume Up",
+    "description": "Increase volume button"
+  },
+  {
+    "id": "volume_02",
+    "name": "Volume Down",
+    "description": "Decrease volume button"
+  },
+  {
+    "id": "volume_03",
+    "name": "Mute",
+    "description": "Mute volume button"
+  }
+]

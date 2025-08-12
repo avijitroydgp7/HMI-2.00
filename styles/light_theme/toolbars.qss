@@ -1,0 +1,78 @@
+/* Toolbar styling for light theme */
+
+QToolBar {
+    background-color: #f5f5f5;
+    border: none;
+    spacing: 2px;
+}
+
+QToolBar::handle {
+    background-color: #cccccc;
+    width: 2px;
+}
+
+QToolBar::separator {
+    background-color: #cccccc;
+    width: 2px;
+}
+
+QToolBar::extension {
+    background-color: #f5f5f5;
+    border: 1px solid #cccccc;
+}
+
+QToolBar QToolButton {
+    background-color: transparent;
+    color: #333333;
+    border: none;
+    padding: 4px;
+    border-radius: 2px;
+}
+
+QToolBar QToolButton:hover {
+    background-color: #e6e6e6;
+}
+
+QToolBar QToolButton:pressed {
+    background-color: #d9d9d9;
+}
+
+QToolBar QToolButton:checked {
+    background-color: #0078d4;
+    color: #ffffff;
+}
+
+QToolBar QToolButton:checked:hover {
+    background-color: #106ebe;
+}
+
+QToolBar QToolButton:disabled {
+    color: #999999;
+}
+
+/* Tool button with menu */
+QToolButton[popupMode="1"] {
+    padding-right: 12px;
+}
+
+QToolButton::menu-button {
+    background-color: transparent;
+    border: none;
+    width: 12px;
+}
+
+QToolButton::menu-button:hover {
+    background-color: #e6e6e6;
+}
+
+QToolButton::menu-arrow {
+    image: none;
+    border-left: 3px solid transparent;
+    border-right: 3px solid transparent;
+    border-top: 3px solid #666666;
+}
+
+QToolButton::menu-arrow:open {
+    border-top: none;
+    border-bottom: 3px solid #666666;
+}

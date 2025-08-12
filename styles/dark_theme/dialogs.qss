@@ -1,0 +1,214 @@
+/* Dialog styling for dark theme - modern dark with proper popup backgrounds */
+
+/* Base dialog styling */
+QDialog {
+    background-color: #252526;
+    color: #cccccc;
+}
+
+/* Custom dialog container styling */
+QWidget#DialogContainer {
+    background-color: #252526;
+    border: 1px solid #3e3e42;
+    border-radius: 8px;
+}
+
+/* Title bar styling */
+QWidget#TitleBar {
+    background-color: #2d2d30;
+    border-top-left-radius: 8px;
+    border-top-right-radius: 8px;
+    border-bottom: 1px solid #3e3e42;
+    min-height: 30px;
+}
+
+QLabel#TitleLabel {
+    color: #cccccc;
+    font-weight: bold;
+    font-size: 10pt;
+}
+
+QPushButton#CloseButton {
+    background-color: transparent;
+    border: none;
+    color: #cccccc;
+    font-size: 14px;
+    padding: 5px;
+    min-width: 20px;
+    min-height: 20px;
+}
+
+QPushButton#CloseButton:hover {
+    background-color: #f85149;
+    color: #ffffff;
+    border-radius: 4px;
+}
+
+/* Content area styling */
+QWidget {
+    background-color: #252526;
+    color: #cccccc;
+}
+
+/* Button styling */
+QPushButton {
+    background-color: #2d2d30;
+    color: #cccccc;
+    border: 1px solid #3e3e42;
+    padding: 8px 16px;
+    border-radius: 4px;
+    font-weight: bold;
+}
+
+QPushButton:hover {
+    background-color: #3e3e42;
+    border-color: #4a4a4a;
+}
+
+QPushButton:pressed {
+    background-color: #094771;
+    border-color: #094771;
+}
+
+QPushButton:disabled {
+    background-color: #1e1e1e;
+    color: #656565;
+    border-color: #3e3e42;
+}
+
+/* Input fields styling */
+QLineEdit, QTextEdit, QSpinBox, QComboBox {
+    background-color: #1e1e1e;
+    color: #cccccc;
+    border: 1px solid #3e3e42;
+    border-radius: 4px;
+    padding: 5px;
+}
+
+QLineEdit:focus, QTextEdit:focus, QSpinBox:focus, QComboBox:focus {
+    border: 1px solid #2d2d30;
+}
+
+/* Labels styling */
+QLabel {
+    color: #cccccc;
+}
+
+/* Group box styling */
+QGroupBox {
+    background-color: #252526;
+    color: #cccccc;
+    border: 1px solid #3e3e42;
+    border-radius: 4px;
+    margin-top: 10px;
+    padding-top: 10px;
+}
+
+QGroupBox::title {
+    subcontrol-origin: margin;
+    left: 10px;
+    padding: 0 5px 0 5px;
+    color: #cccccc;
+}
+
+/* Checkbox and radio button styling */
+QCheckBox, QRadioButton {
+    color: #cccccc;
+    spacing: 5px;
+}
+
+QCheckBox::indicator, QRadioButton::indicator {
+    width: 13px;
+    height: 13px;
+}
+
+QCheckBox::indicator:unchecked, QRadioButton::indicator:unchecked {
+    border: 1px solid #3e3e42;
+    background-color: #1e1e1e;
+}
+
+QCheckBox::indicator:checked, QRadioButton::indicator:checked {
+    border: 1px solid #2d2d30;
+    background-color: #2d2d30;
+}
+
+/* Scroll bar styling */
+QScrollBar:vertical {
+    background-color: #252526;
+    width: 12px;
+    border: 1px solid #3e3e42;
+}
+
+QScrollBar::handle:vertical {
+    background-color: #656565;
+    min-height: 20px;
+    border-radius: 6px;
+}
+
+QScrollBar::handle:vertical:hover {
+    background-color: #9d9d9d;
+}
+
+QScrollBar:horizontal {
+    background-color: #252526;
+    height: 12px;
+    border: 1px solid #3e3e42;
+}
+
+QScrollBar::handle:horizontal {
+    background-color: #656565;
+    min-width: 20px;
+    border-radius: 6px;
+}
+
+QScrollBar::handle:horizontal:hover {
+    background-color: #9d9d9d;
+}
+
+/* Message box specific styling */
+QMessageBox {
+    background-color: #252526;
+    color: #cccccc;
+}
+
+QMessageBox QPushButton {
+    background-color: #2d2d30;
+    color: #cccccc;
+    border: 1px solid #3e3e42;
+    padding: 8px 16px;
+    border-radius: 4px;
+    font-weight: bold;
+    min-width: 75px;
+}
+
+QMessageBox QPushButton:hover {
+    background-color: #3e3e42;
+}
+
+QMessageBox QPushButton:pressed {
+    background-color: #094771;
+}
+
+QMessageBox QLabel {
+    color: #cccccc;
+}
+
+QMessageBox QCheckBox {
+    color: #cccccc;
+    spacing: 5px;
+}
+
+QMessageBox QCheckBox::indicator {
+    width: 13px;
+    height: 13px;
+}
+
+QMessageBox QCheckBox::indicator:unchecked {
+    border: 1px solid #3e3e42;
+    background-color: #1e1e1e;
+}
+
+QMessageBox QCheckBox::indicator:checked {
+    border: 1px solid #2d2d30;
+    background-color: #2d2d30;
+}

@@ -1,0 +1,139 @@
+/* Global fixes for light theme */
+
+/* Fix for QToolButton arrows */
+QToolButton::menu-indicator {
+    image: none;
+}
+
+QToolButton::menu-indicator:pressed, QToolButton::menu-indicator:open {
+    top: 1px;
+    left: 1px;
+}
+
+/* Fix for QComboBox arrows */
+QComboBox::down-arrow {
+    image: none;
+}
+
+/* Fix for QScrollBar arrows */
+QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical,
+QScrollBar::add-line:horizontal, QScrollBar::sub-line:horizontal {
+    border: none;
+    background: none;
+}
+
+/* Fix for QSplitter handle */
+QSplitter::handle:pressed {
+    background-color: #999999;
+}
+
+/* Fix for QTabBar tear indicator */
+QTabBar::tear {
+    image: none;
+}
+
+/* Fix for QTabBar scroll buttons */
+QTabBar::scroller {
+    width: 0px;
+}
+
+/* Fix for QTabBar tab close button */
+QTabBar::close-button {
+    image: none;
+}
+
+/* Fix for QDockWidget title bar buttons */
+QDockWidget::float-button, QDockWidget::close-button {
+    background: transparent;
+    border: none;
+}
+
+/* Fix for QToolBar separator */
+QToolBar::separator {
+    background-color: #cccccc;
+    width: 2px;
+}
+
+/* Fix for QToolBar extension button */
+QToolBar::extension {
+    background-color: transparent;
+}
+
+/* Fix for QMenu separator */
+QMenu::separator {
+    height: 1px;
+    background-color: #cccccc;
+    margin: 4px 0px;
+}
+
+/* Fix for QMenu indicator */
+QMenu::indicator {
+    width: 0px;
+    height: 0px;
+}
+
+/* Fix for QCheckBox indicator */
+QCheckBox::indicator {
+    width: 16px;
+    height: 16px;
+}
+
+/* Fix for QRadioButton indicator */
+QRadioButton::indicator {
+    width: 16px;
+    height: 16px;
+}
+
+/* Fix for QGroupBox title */
+QGroupBox::title {
+    subcontrol-origin: margin;
+    left: 8px;
+    padding: 0 4px 0 4px;
+}
+
+/* Fix for QProgressBar */
+QProgressBar {
+    border: 1px solid #cccccc;
+    border-radius: 2px;
+    text-align: center;
+    background-color: #f0f0f0;
+    color: #333333;
+}
+
+QProgressBar::chunk {
+    background-color: #0078d4;
+    border-radius: 1px;
+}
+
+/* Fix for QSlider */
+QSlider::groove:horizontal {
+    border: 1px solid #cccccc;
+    height: 4px;
+    background-color: #f0f0f0;
+    border-radius: 2px;
+}
+
+QSlider::handle:horizontal {
+    background-color: #0078d4;
+    border: 1px solid #0078d4;
+    width: 16px;
+    height: 16px;
+    margin: -6px 0;
+    border-radius: 8px;
+}
+
+QSlider::groove:vertical {
+    border: 1px solid #cccccc;
+    width: 4px;
+    background-color: #f0f0f0;
+    border-radius: 2px;
+}
+
+QSlider::handle:vertical {
+    background-color: #0078d4;
+    border: 1px solid #0078d4;
+    width: 16px;
+    height: 16px;
+    margin: 0 -6px;
+    border-radius: 8px;
+}

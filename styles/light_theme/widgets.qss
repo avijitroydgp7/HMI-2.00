@@ -1,0 +1,246 @@
+/* General widget styling for light theme */
+
+/* Frame styling */
+QFrame {
+    background-color: transparent;
+    color: #333333;
+}
+
+QFrame[frameShape="1"] { /* Box */
+    border: 1px solid #cccccc;
+    border-radius: 2px;
+}
+
+QFrame[frameShape="2"] { /* Panel */
+    border: 1px solid #cccccc;
+    background-color: #f5f5f5;
+}
+
+QFrame[frameShape="3"] { /* WinPanel */
+    border: 1px solid #cccccc;
+    background-color: #e6e6e6;
+}
+
+QFrame[frameShape="4"] { /* HLine */
+    border: none;
+    border-top: 1px solid #cccccc;
+}
+
+QFrame[frameShape="5"] { /* VLine */
+    border: none;
+    border-left: 1px solid #cccccc;
+}
+
+/* Stack widget styling */
+QStackedWidget {
+    background-color: #ffffff;
+    color: #333333;
+}
+
+/* Tab widget styling */
+QTabWidget::pane {
+    border: 1px solid #cccccc;
+    background-color: #ffffff;
+}
+
+QTabWidget::tab-bar {
+    background-color: #f5f5f5;
+}
+
+/* Wizard styling */
+QWizard {
+    background-color: #ffffff;
+    color: #333333;
+}
+
+QWizard QPushButton {
+    background-color: #e6e6e6;
+    color: #333333;
+    border: 1px solid #cccccc;
+    padding: 6px 12px;
+    border-radius: 2px;
+}
+
+QWizard QPushButton:hover {
+    background-color: #d9d9d9;
+}
+
+QWizard QPushButton:pressed {
+    background-color: #cccccc;
+}
+
+/* Calendar widget styling */
+QCalendarWidget {
+    background-color: #ffffff;
+    color: #333333;
+}
+
+QCalendarWidget QToolButton {
+    background-color: #f5f5f5;
+    color: #333333;
+    border: 1px solid #cccccc;
+    padding: 4px;
+}
+
+QCalendarWidget QToolButton:hover {
+    background-color: #e6e6e6;
+}
+
+QCalendarWidget QToolButton:pressed {
+    background-color: #d9d9d9;
+}
+
+QCalendarWidget QMenu {
+    background-color: #ffffff;
+    color: #333333;
+    border: 1px solid #cccccc;
+}
+
+QCalendarWidget QSpinBox {
+    background-color: #ffffff;
+    color: #333333;
+    border: 1px solid #cccccc;
+    padding: 4px;
+}
+
+QCalendarWidget QSpinBox::up-button, QCalendarWidget QSpinBox::down-button {
+    background-color: #f5f5f5;
+    border: 1px solid #cccccc;
+}
+
+QCalendarWidget QSpinBox::up-button:hover, QCalendarWidget QSpinBox::down-button:hover {
+    background-color: #e6e6e6;
+}
+
+QCalendarWidget QSpinBox::up-button:pressed, QCalendarWidget QSpinBox::down-button:pressed {
+    background-color: #d9d9d9;
+}
+
+QCalendarWidget QTableView {
+    background-color: #ffffff;
+    color: #333333;
+    border: 1px solid #cccccc;
+}
+
+QCalendarWidget QTableView::item {
+    padding: 4px;
+}
+
+QCalendarWidget QTableView::item:selected {
+    background-color: #e6e6e6;
+    color: #333333;
+}
+
+QCalendarWidget QTableView::item:hover {
+    background-color: #f0f0f0;
+}
+
+/* Color dialog styling */
+QColorDialog {
+    background-color: #ffffff;
+    color: #333333;
+}
+
+QColorDialog QPushButton {
+    background-color: #e6e6e6;
+    color: #333333;
+    border: 1px solid #cccccc;
+    padding: 6px 12px;
+    border-radius: 2px;
+}
+
+QColorDialog QPushButton:hover {
+    background-color: #d9d9d9;
+}
+
+QColorDialog QPushButton:pressed {
+    background-color: #cccccc;
+}
+
+/* Font dialog styling */
+QFontDialog {
+    background-color: #ffffff;
+    color: #333333;
+}
+
+QFontDialog QPushButton {
+    background-color: #e6e6e6;
+    color: #333333;
+    border: 1px solid #cccccc;
+    padding: 6px 12px;
+    border-radius: 2px;
+}
+
+QFontDialog QPushButton:hover {
+    background-color: #d9d9d9;
+}
+
+QFontDialog QPushButton:pressed {
+    background-color: #cccccc;
+}
+
+/* Input dialog styling */
+QInputDialog {
+    background-color: #ffffff;
+    color: #333333;
+}
+
+QInputDialog QPushButton {
+    background-color: #e6e6e6;
+    color: #333333;
+    border: 1px solid #cccccc;
+    padding: 6px 12px;
+    border-radius: 2px;
+}
+
+QInputDialog QPushButton:hover {
+    background-color: #d9d9d9;
+}
+
+QInputDialog QPushButton:pressed {
+    background-color: #cccccc;
+}
+
+/* Print dialog styling */
+QPrintDialog {
+    background-color: #ffffff;
+    color: #333333;
+}
+
+QPrintDialog QPushButton {
+    background-color: #e6e6e6;
+    color: #333333;
+    border: 1px solid #cccccc;
+    padding: 6px 12px;
+    border-radius: 2px;
+}
+
+QPrintDialog QPushButton:hover {
+    background-color: #d9d9d9;
+}
+
+QPrintDialog QPushButton:pressed {
+    background-color: #cccccc;
+}
+
+/* File dialog styling */
+QFileDialog {
+    background-color: #ffffff;
+    color: #333333;
+}
+
+QFileDialog QPushButton {
+    background-color: #e6e6e6;
+    color: #333333;
+    border: 1px solid #cccccc;
+    padding: 6px 12px;
+    border-radius: 2px;
+}
+
+QFileDialog QPushButton:hover {
+    background-color: #d9d9d9;
+}
+
+QFileDialog QPushButton:pressed {
+    background-color: #cccccc;
+}

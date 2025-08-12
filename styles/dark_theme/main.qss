@@ -1,0 +1,50 @@
+/* icon_color: #cccccc */
+/* icon_color_active: #ffffff */
+/* highlight_color: #2d2d30 */
+
+/* styles/main.qss */
+
+/* General styles for the main window, menu, and status bar. */
+QMainWindow {
+    background-color: #1e1e1e;
+}
+
+QMenuBar {
+    background-color: #252526;
+    color: #cccccc;
+    font-size: 9pt;
+}
+
+QMenuBar::item {
+    padding: 4px 8px;
+}
+
+QMenuBar::item:selected {
+    background-color: #2d2d30;
+}
+
+QMenu {
+    background-color: #252526;
+    color: #cccccc;
+    border: 1px solid #3e3e42;
+}
+
+QMenu::item:selected {
+    background-color: #2d2d30;
+}
+
+QStatusBar {
+    background-color: #252526;
+    color: #cccccc;
+    font-weight: bold;
+}
+
+QStatusBar::item {
+    border: none;
+}
+
+QStatusBar > QWidget > QLabel {
+    padding: 0 2px;
+    color: #cccccc;
+    font-weight: normal;
+}

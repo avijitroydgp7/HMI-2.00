@@ -1,0 +1,65 @@
+/* Dock widget styling for dark theme - modern dark */
+
+QDockWidget {
+    color: #cccccc;
+    titlebar-close-icon: url(none);
+    titlebar-normal-icon: url(none);
+}
+
+QDockWidget::title {
+    background-color: #252526;
+    color: #cccccc;
+    padding: 5px;
+    border: 1px solid #3e3e42;
+    border-bottom: none;
+}
+
+QDockWidget::close-button, QDockWidget::float-button {
+    background-color: transparent;
+    border: none;
+    padding: 2px;
+}
+
+QDockWidget::close-button:hover, QDockWidget::float-button:hover {
+    background-color: #094771;
+    border: 1px solid #3e3e42;
+    border-radius: 2px;
+}
+
+QDockWidget::close-button:pressed, QDockWidget::float-button:pressed {
+    background-color: #3e3e42;
+}
+
+/* Dock widget contents */
+QDockWidget > QWidget {
+    background-color: #1e1e1e;
+    color: #cccccc;
+    border: 1px solid #3e3e42;
+    border-top: none;
+}
+
+/* MODIFIED: This is a more specific and reliable selector for the dock tabs */
+/* It targets the tab bar that is a direct child of the main window, which is
+   how Qt creates the tab bar for docked widgets. */
+QMainWindow > QTabBar {
+    background: #252526;
+}
+
+QMainWindow > QTabBar::tab {
+    background: #252526;
+    color: #9da5b4;
+    border: 1px solid #1e1e1e;
+    border-top: 1px solid #3e3e42;
+    border-bottom: none;
+    padding: 5px 5px; /* Compact padding */
+    font-weight: bold;
+}
+
+QMainWindow > QTabBar::tab:selected {
+    background: #0078d4;
+    color: #cccccc;
+}
+
+QMainWindow > QTabBar::tab:!selected:hover {
+    background: #094771;
+}

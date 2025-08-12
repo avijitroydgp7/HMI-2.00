@@ -1,0 +1,67 @@
+/* styles/messagebox.qss */
+
+#CustomMessageBox {
+    background-color: transparent;
+}
+
+#CustomMessageBox > #Container {
+    background-color: #2c313c;
+    border: 1px solid #528bff;
+    border-radius: 5px;
+}
+
+/* Custom Title Bar Styling */
+#CustomMessageBox #TitleBar {
+    background-color: #383e4a;
+    border-top-left-radius: 5px;
+    border-top-right-radius: 5px;
+    border-bottom: 1px solid #454c5a;
+}
+
+#CustomMessageBox #TitleLabel {
+    font-size: 11pt;
+    font-weight: bold;
+    color: #dbe0e8;
+}
+
+#CustomMessageBox #CloseButton {
+    background-color: transparent;
+    border: none;
+    padding: 5px;
+    min-width: 20px;
+}
+
+#CustomMessageBox #CloseButton:hover {
+    background-color: #ff5252;
+    border-radius: 4px;
+}
+
+/* Content Area Styling */
+#CustomMessageBox QLabel {
+    color: #dbe0e8;
+}
+
+/* Button Box Styling */
+#CustomMessageBox QPushButton {
+    background-color: #4a5263;
+    color: #dbe0e8;
+    border: 1px solid #5a6270;
+    padding: 8px 16px;
+    border-radius: 4px;
+    font-weight: bold;
+    min-width: 80px;
+}
+
+#CustomMessageBox QPushButton:hover {
+    background-color: #5a6270;
+    border-color: #6a7281;
+}
+
+#CustomMessageBox QPushButton#SaveButton {
+    background-color: #528bff;
+    border-color: #528bff;
+}
+
+#CustomMessageBox QPushButton#SaveButton:hover {
+    background-color: #699eff;
+}

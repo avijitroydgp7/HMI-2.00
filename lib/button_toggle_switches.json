@@ -1,0 +1,22 @@
+[
+  {
+    "id": "toggle_01",
+    "name": "Toggle Switch On",
+    "description": "Toggle switch in ON position"
+  },
+  {
+    "id": "toggle_02",
+    "name": "Toggle Switch Off",
+    "description": "Toggle switch in OFF position"
+  },
+  {
+    "id": "toggle_03",
+    "name": "Toggle Switch Disabled",
+    "description": "Toggle switch in disabled state"
+  },
+  {
+    "id": "toggle_04",
+    "name": "Toggle Switch Locked",
+    "description": "Toggle switch in locked state"
+  }
+]
