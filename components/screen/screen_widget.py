@@ -63,8 +63,7 @@ class ScreenWidget(QWidget):
             self.layout().addWidget(QLabel("Screen has been deleted."))
 
     def get_zoom_percentage(self):
-        zoom_level = self.design_canvas.transform().m11()
-        return f"{int(zoom_level * 100)}%"
+        return f"{int(self.design_canvas.current_zoom * 100)}%"
 
     def has_selection(self):
         return self.design_canvas.has_selection()
@@ -83,11 +82,21 @@ class ScreenWidget(QWidget):
 
     def clear_selection(self):
         self.design_canvas.clear_selection()
-        
+
     def zoom_in(self):
-        self.design_canvas.scale(1.25, 1.25)
+        new_zoom = min(self.design_canvas.current_zoom * 1.25, self.design_canvas.max_zoom)
+        factor = new_zoom / self.design_canvas.current_zoom
+        if factor != 1.0:
+            self.design_canvas.scale(factor, factor)
+        self.design_canvas.current_zoom = new_zoom
+        self.design_canvas._update_shadow_for_zoom()
         self.zoom_changed.emit(self.get_zoom_percentage())
 
     def zoom_out(self):
-        self.design_canvas.scale(0.8, 0.8)
+        new_zoom = max(self.design_canvas.current_zoom * 0.8, self.design_canvas.min_zoom)
+        factor = new_zoom / self.design_canvas.current_zoom
+        if factor != 1.0:
+            self.design_canvas.scale(factor, factor)
+        self.design_canvas.current_zoom = new_zoom
+        self.design_canvas._update_shadow_for_zoom()
         self.zoom_changed.emit(self.get_zoom_percentage())

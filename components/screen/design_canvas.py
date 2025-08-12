@@ -36,7 +36,10 @@ class DesignCanvas(QGraphicsView):
         self.active_tool = constants.TOOL_SELECT
         self._item_map = {}
         self.selection_overlay = SelectionOverlay()
-        
+
+        self.current_zoom = 1.0
+        self.min_zoom = 0.25
+        self.max_zoom = 4.0
         self._rubber_band_origin = None
         self._rubber_band_rect = QRect()
 
@@ -452,12 +455,13 @@ class DesignCanvas(QGraphicsView):
     def wheelEvent(self, event):
         if event.modifiers() == Qt.KeyboardModifier.ControlModifier:
             factor = 1.1 if event.angleDelta().y() > 0 else 1 / 1.1
-            self.scale(factor, factor)
-
-            zoom_level = self.transform().m11()
-            self.view_zoomed.emit(f"{int(zoom_level * 100)}%")
+            new_zoom = max(self.min_zoom, min(self.max_zoom, self.current_zoom * factor))
+            scale_factor = new_zoom / self.current_zoom
+            if scale_factor != 1.0:
+                self.scale(scale_factor, scale_factor)
+            self.current_zoom = new_zoom
+            self.view_zoomed.emit(f"{int(self.current_zoom * 100)}%")
             self._update_shadow_for_zoom()
-
             event.accept()
         else:
             super().wheelEvent(event)
