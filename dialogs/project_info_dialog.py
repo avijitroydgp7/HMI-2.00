@@ -1,12 +1,11 @@
 # dialogs/project_info_dialog.py
 from PyQt6.QtWidgets import (
     QFormLayout, QLineEdit, QTextEdit,
-    QDialogButtonBox, QLabel, QListWidget, QAbstractItemView
+    QDialogButtonBox, QLabel, QListWidget, QAbstractItemView, QVBoxLayout, QDialog
 )
 from typing import Dict, Any
-from .base_dialog import CustomDialog
 
-class ProjectInfoDialog(CustomDialog):
+class ProjectInfoDialog(QDialog):
     """
     A dialog to display and edit project-wide information, with a custom title bar.
     """
@@ -16,7 +15,7 @@ class ProjectInfoDialog(CustomDialog):
         self.setMinimumWidth(500)
         self.setMinimumHeight(450)
 
-        content_layout = self.get_content_layout()
+        content_layout = QVBoxLayout(self)
         form_layout = QFormLayout()
 
         self.author_edit = QLineEdit(project_info.get('author', ''))

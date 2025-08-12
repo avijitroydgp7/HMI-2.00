@@ -2,14 +2,13 @@
 # A reusable dialog for browsing and selecting tags from all databases.
 
 from PyQt6.QtWidgets import (
-    QVBoxLayout, QTreeWidget, QTreeWidgetItem, QDialogButtonBox, 
-    QHeaderView, QLineEdit, QTreeWidgetItemIterator, QHBoxLayout, QWidget
+    QVBoxLayout, QTreeWidget, QTreeWidgetItem, QDialogButtonBox,
+    QHeaderView, QLineEdit, QTreeWidgetItemIterator, QHBoxLayout, QWidget, QDialog
 )
 from PyQt6.QtCore import Qt
 from typing import List, Optional, Tuple
 
 from services.tag_data_service import tag_data_service
-from .base_dialog import CustomDialog
 
 class TagTreeItem(QTreeWidgetItem):
     """
@@ -23,7 +22,7 @@ class TagTreeItem(QTreeWidgetItem):
         column = tree.sortColumn()
         return self.text(column).lower() < other.text(column).lower()
 
-class TagBrowserDialog(CustomDialog):
+class TagBrowserDialog(QDialog):
     """
     A dialog that allows users to browse all tag databases and select a tag.
     Includes a dynamic search field and per-column filters.
@@ -36,7 +35,7 @@ class TagBrowserDialog(CustomDialog):
         self.allow_arrays = allow_arrays
         self.selected_tag_info = None
 
-        content_layout = self.get_content_layout()
+        content_layout = QVBoxLayout(self)
 
         filter_widget = QWidget()
         filter_layout = QHBoxLayout(filter_widget)

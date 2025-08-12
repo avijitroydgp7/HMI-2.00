@@ -2,15 +2,14 @@
 from PyQt6.QtWidgets import (
     QVBoxLayout, QHBoxLayout, QPushButton, QLabel, QGroupBox,
     QFormLayout, QLineEdit, QTextEdit, QSpinBox, QColorDialog,
-    QDialogButtonBox, QCheckBox
+    QDialogButtonBox, QCheckBox, QDialog
 )
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QIntValidator, QColor
 from typing import Optional, Dict, Any
 from services.screen_data_service import screen_service
-from .base_dialog import CustomDialog
 
-class ScreenPropertiesDialog(CustomDialog):
+class ScreenPropertiesDialog(QDialog):
     """Dialog for creating and editing screen properties with a custom title bar."""
     def __init__(self, screen_type, parent=None, edit_data=None):
         super().__init__(parent)
@@ -24,7 +23,7 @@ class ScreenPropertiesDialog(CustomDialog):
         self.setWindowTitle(title)
         self.setMinimumWidth(450)
         
-        content_layout = self.get_content_layout()
+        content_layout = QVBoxLayout(self)
         content_layout.addWidget(self._create_main_properties_group())
         content_layout.addWidget(self._create_style_group())
         

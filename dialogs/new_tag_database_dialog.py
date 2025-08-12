@@ -1,12 +1,11 @@
 # dialogs/new_tag_database_dialog.py
 from PyQt6.QtWidgets import (
-    QFormLayout, QLineEdit, QDialogButtonBox, QLabel
+    QFormLayout, QLineEdit, QDialogButtonBox, QLabel, QVBoxLayout, QDialog
 )
 from PyQt6.QtCore import pyqtSlot
 from services.tag_data_service import tag_data_service
-from .base_dialog import CustomDialog
 
-class NewTagDatabaseDialog(CustomDialog):
+class NewTagDatabaseDialog(QDialog):
     """
     A simple dialog to get a name for a new tag database or to rename an
     existing one, with a custom title bar.
@@ -19,7 +18,7 @@ class NewTagDatabaseDialog(CustomDialog):
         self.setWindowTitle(title)
         self.setMinimumWidth(350)
 
-        content_layout = self.get_content_layout()
+        content_layout = QVBoxLayout(self)
         form_layout = QFormLayout()
 
         self.name_edit = QLineEdit()

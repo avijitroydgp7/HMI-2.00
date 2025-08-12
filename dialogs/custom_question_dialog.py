@@ -1,10 +1,9 @@
 # dialogs/custom_question_dialog.py
 # A custom, stylable dialog for asking Yes/No questions.
 
-from PyQt6.QtWidgets import QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QMessageBox
-from .base_dialog import CustomDialog
+from PyQt6.QtWidgets import QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QMessageBox, QDialog
 
-class CustomQuestionDialog(CustomDialog):
+class CustomQuestionDialog(QDialog):
     """
     A custom dialog for asking Yes/No questions, inheriting the
     custom title bar and application theme.
@@ -14,7 +13,7 @@ class CustomQuestionDialog(CustomDialog):
         self.setMinimumWidth(400)
         self.answer = QMessageBox.StandardButton.No # Default answer is No
 
-        content_layout = self.get_content_layout()
+        content_layout = QVBoxLayout(self)
         
         self.question_label = QLabel("Question text goes here.")
         self.question_label.setWordWrap(True)

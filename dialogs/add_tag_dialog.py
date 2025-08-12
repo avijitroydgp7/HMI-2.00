@@ -1,13 +1,11 @@
 # dialogs/add_tag_dialog.py
 from PyQt6.QtWidgets import (
-    QFormLayout, QLineEdit, QComboBox, QDialogButtonBox, QSpinBox, 
-    QLabel, QMessageBox, QCheckBox, QWidget, QHBoxLayout
+    QFormLayout, QLineEdit, QComboBox, QDialogButtonBox, QSpinBox,
+    QLabel, QMessageBox, QCheckBox, QWidget, QHBoxLayout, QVBoxLayout, QDialog
 )
 from PyQt6.QtCore import pyqtSlot
 from typing import Optional, Dict, Any
 from services.tag_data_service import tag_data_service
-# MODIFIED: Import the new CustomDialog base class
-from .base_dialog import CustomDialog
 
 DATA_TYPE_RANGES = {
     "INT": {"min": -32768, "max": 32767},
@@ -15,8 +13,7 @@ DATA_TYPE_RANGES = {
     "REAL": {"min": -3.4028235e+38, "max": 3.4028235e+38},
 }
 
-# MODIFIED: Inherit from CustomDialog
-class AddTagDialog(CustomDialog):
+class AddTagDialog(QDialog):
     def __init__(self, db_id: str, parent=None, edit_data: Optional[Dict[str, Any]] = None):
         super().__init__(parent)
         self.db_id = db_id
@@ -27,8 +24,7 @@ class AddTagDialog(CustomDialog):
         self.setWindowTitle("Edit Tag" if edit_data else "Add New Tag")
         self.setMinimumWidth(400)
 
-        # MODIFIED: Get the content layout from the base class
-        content_layout = self.get_content_layout()
+        content_layout = QVBoxLayout(self)
         form_layout = QFormLayout()
         form_layout.setContentsMargins(0, 0, 0, 0)
 
@@ -59,7 +55,6 @@ class AddTagDialog(CustomDialog):
         form_layout.addRow(self.initial_value_label, self.initial_value_edit)
         form_layout.addRow("Comment:", self.comment_edit)
         
-        # MODIFIED: Add all widgets to the content_layout
         content_layout.addLayout(form_layout)
 
         self.error_label = QLabel()

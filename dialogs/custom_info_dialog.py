@@ -1,10 +1,9 @@
 # dialogs/custom_info_dialog.py
 # A custom, stylable dialog for showing simple informational messages.
 
-from PyQt6.QtWidgets import QVBoxLayout, QHBoxLayout, QLabel, QPushButton
-from .base_dialog import CustomDialog
+from PyQt6.QtWidgets import QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QDialog
 
-class CustomInfoDialog(CustomDialog):
+class CustomInfoDialog(QDialog):
     """
     A custom dialog for showing information, warnings, or errors,
     with a single "OK" button. It inherits the custom title bar.
@@ -13,7 +12,7 @@ class CustomInfoDialog(CustomDialog):
         super().__init__(parent)
         self.setMinimumWidth(400)
 
-        content_layout = self.get_content_layout()
+        content_layout = QVBoxLayout(self)
         
         # Main content layout
         main_content_layout = QVBoxLayout()

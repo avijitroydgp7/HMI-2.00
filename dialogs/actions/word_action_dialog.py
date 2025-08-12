@@ -4,13 +4,13 @@
 from PyQt6.QtWidgets import (
     QGroupBox, QGridLayout, QHBoxLayout, QVBoxLayout,
     QLabel, QComboBox, QDialogButtonBox, QCheckBox, QWidget,
-    QStackedWidget, QFrame, QScrollArea
+    QStackedWidget, QFrame, QScrollArea, QDialog
 )
 from PyQt6.QtCore import Qt
 from typing import Dict, Optional
 
-from ..base_dialog import CustomDialog
 from ..custom_widgets import TagSelector, CollapsibleBox
+
 
 class DataTypeMapper:
     """Centralized data type mapping to ensure consistency."""
@@ -35,7 +35,7 @@ class DataTypeMapper:
         normalized_type2 = cls.normalize_type(type2)
         return normalized_type1 == normalized_type2
 
-class WordActionDialog(CustomDialog):
+class WordActionDialog(QDialog):
     """
     A redesigned dialog for configuring a 'Word Action' with a focus on
     progressive disclosure, inline validation, and clearer visual hierarchy.
@@ -47,28 +47,9 @@ class WordActionDialog(CustomDialog):
         self.setMinimumWidth(800)
         self.setFixedHeight(750)
 
-        # Main layout from the base dialog
-        content_layout = self.get_content_layout()
+        # Main layout for the dialog
+        content_layout = QVBoxLayout(self)
         content_layout.setContentsMargins(0, 0, 0, 0)
-        
-        # Add a stylesheet for the card-like group boxes
-        # self.setStyleSheet("""
-        #     QScrollArea#ContentScrollArea, QWidget#ScrollContainer {
-        #         background: transparent;
-        #         border: none;
-        #     }
-        #     QGroupBox#CardGroup {
-        #         background-color: #2F3640;
-        #         border: 1px solid #454c5a;
-        #         border-radius: 4px;
-        #         margin-top: 6px;
-        #     }
-        #     QGroupBox#CardGroup::title {
-        #         subcontrol-origin: margin;
-        #         subcontrol-position: top left;
-        #         padding: 0 5px;
-        #     }
-        # """)
 
         # Create a scroll area for the main configuration
         scroll_area = QScrollArea()

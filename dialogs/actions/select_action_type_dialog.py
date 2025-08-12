@@ -1,10 +1,9 @@
 # dialogs/actions/select_action_type_dialog.py
 # A simple dialog to let the user choose the type of action to create.
 
-from PyQt6.QtWidgets import QPushButton
-from ..base_dialog import CustomDialog
+from PyQt6.QtWidgets import QPushButton, QVBoxLayout, QDialog
 
-class SelectActionTypeDialog(CustomDialog):
+class SelectActionTypeDialog(QDialog):
     """
     A dialog that prompts the user to select what kind of action
     they want to add to a button, with a custom title bar.
@@ -14,7 +13,7 @@ class SelectActionTypeDialog(CustomDialog):
         self.setWindowTitle("Select Action Type")
         self.selected_action_type = None
 
-        content_layout = self.get_content_layout()
+        content_layout = QVBoxLayout(self)
         
         self.bit_button = QPushButton("Bit Action")
         self.bit_button.setToolTip("Control a single bit (ON/OFF, Toggle, etc.)")

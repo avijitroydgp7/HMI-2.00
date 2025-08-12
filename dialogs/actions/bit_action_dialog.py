@@ -2,18 +2,16 @@
 # Configuration dialog for Bit Actions.
 
 from PyQt6.QtWidgets import (
-    QFormLayout, QDialogButtonBox, QButtonGroup, QRadioButton, QWidget, 
+    QFormLayout, QDialogButtonBox, QButtonGroup, QRadioButton, QWidget,
     QVBoxLayout, QGroupBox, QGridLayout, QLabel, QComboBox, QStackedWidget,
-    QScrollArea, QHBoxLayout
+    QScrollArea, QHBoxLayout, QDialog
 )
 from typing import Dict, Optional
 
-from ..tag_browser_dialog import TagBrowserDialog
 from services.tag_data_service import tag_data_service
-from ..base_dialog import CustomDialog
-from ..custom_widgets import TagLineEdit, TagSelector, CollapsibleBox
+from ..custom_widgets import TagSelector, CollapsibleBox
 
-class BitActionDialog(CustomDialog):
+class BitActionDialog(QDialog):
     """
     A dialog to configure a Bit Action for a button, with a custom title bar
     and an advanced trigger section.
@@ -24,7 +22,7 @@ class BitActionDialog(CustomDialog):
         self.setMinimumWidth(600)
         self.setFixedHeight(650)
 
-        content_layout = self.get_content_layout()
+        content_layout = QVBoxLayout(self)
         content_layout.setContentsMargins(0,0,0,0)
 
         # Scroll Area for all content
