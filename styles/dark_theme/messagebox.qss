@@ -1,13 +1,6 @@
 /* Message box styling for dark theme - modern dark with proper popup backgrounds */
 
-QMessageBox {
-    background-color: #252526;
-    color: #cccccc;
-    border: 1px solid #3e3e42;
-    border-radius: 8px;
-}
-
-QMessageBox QPushButton {
+QPushButton {
     background-color: #2d2d30;
     color: #cccccc;
     border: 1px solid #3e3e42;
@@ -17,36 +10,36 @@ QMessageBox QPushButton {
     min-width: 75px;
 }
 
-QMessageBox QPushButton:hover {
+QPushButton:hover {
     background-color: #3e3e42;
     border-color: #4a4a4a;
 }
 
-QMessageBox QPushButton:pressed {
+QPushButton:pressed {
     background-color: #094771;
     border-color: #094771;
 }
 
-QMessageBox QLabel {
+QLabel {
     color: #cccccc;
 }
 
-QMessageBox QCheckBox {
+QCheckBox {
     color: #cccccc;
     spacing: 5px;
 }
 
-QMessageBox QCheckBox::indicator {
+QCheckBox::indicator {
     width: 13px;
     height: 13px;
 }
 
-QMessageBox QCheckBox::indicator:unchecked {
+QCheckBox::indicator:unchecked {
     border: 1px solid #3e3e42;
     background-color: #1e1e1e;
 }
 
-QMessageBox QCheckBox::indicator:checked {
+QCheckBox::indicator:checked {
     border: 1px solid #2d2d30;
     background-color: #2d2d30;
 }
