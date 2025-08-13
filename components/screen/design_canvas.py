@@ -132,9 +132,10 @@ class DesignCanvas(QGraphicsView):
         self.update_visible_items()
 
     def eventFilter(self, source, event):
-        if event.type() in (QEvent.Type.MouseMove, QEvent.Type.HoverMove):
-            pos = event.pos() if hasattr(event, "pos") else event.position().toPoint()
-            self._last_mouse_scene_pos = self.mapToScene(pos)
+        if event.type() == QEvent.Type.HoverMove:
+            self._last_mouse_scene_pos = self.mapToScene(event.position().toPoint())
+        elif event.type() == QEvent.Type.MouseMove and event.buttons() == Qt.MouseButton.NoButton:
+            self._last_mouse_scene_pos = self.mapToScene(event.pos())
         return False
 
     def set_shadow_enabled(self, enabled: bool):
