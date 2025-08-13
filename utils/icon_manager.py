@@ -1,19 +1,11 @@
 from PyQt6.QtGui import QIcon, QPixmap
 import qtawesome as qta
-from services.settings_service import settings_service
-from .theme_manager import get_theme_colors
 
 class IconManager:
     """
     Centralized manager for creating and converting icons in the application.
     Handles compatibility between PySide6 and PyQt6 icon types and theme-aware colors.
     """
-
-    @staticmethod
-    def get_current_theme_colors():
-        """Gets the colors for the currently active theme."""
-        current_theme = settings_service.get_value("appearance/theme", "dark_theme")
-        return get_theme_colors(current_theme)
 
     @staticmethod
     def create_icon(icon_name: str, color: str = None, active_color: str = None, size: int = None) -> QIcon:
@@ -30,11 +22,11 @@ class IconManager:
             QIcon: A PyQt6-compatible QIcon.
         """
         try:
-            theme_colors = IconManager.get_current_theme_colors()
-            base_color = color if color is not None else theme_colors.get('icon_color', '#dbe0e8')
+            base_color = color if color is not None else '#dbe0e8'
             
             # For now, we use the same color for all states, but this can be expanded.
             qta_icon = qta.icon(icon_name, color=base_color)
+
             
             if size is None:
                 return qta_icon
@@ -60,10 +52,10 @@ class IconManager:
             QPixmap: A PyQt6-compatible QPixmap.
         """
         try:
-            theme_colors = IconManager.get_current_theme_colors()
-            base_color = color if color is not None else theme_colors.get('icon_color', '#dbe0e8')
+            base_color = color if color is not None else '#dbe0e8'
             
             qta_icon = qta.icon(icon_name, color=base_color)
+
             return qta_icon.pixmap(size, size)
             
         except Exception as e:

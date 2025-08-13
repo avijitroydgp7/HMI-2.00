@@ -8,14 +8,12 @@ from components.ribbon import Ribbon
 from components.toolbar import QuickAccessToolBar, ToolsToolbar
 from components.docks import create_docks
 from components.welcome_widget import WelcomeWidget
-from components.theme_selector import ThemeSelectorWidget
 # MODIFIED: Import ScreenWidget to check the type of the current tab
 from components.screen.screen_widget import ScreenWidget
 from services.project_service import project_service
 from services.command_history_service import command_history_service
 from services.settings_service import settings_service
 from utils import constants
-from utils.stylesheet_loader import get_available_themes
 
 from . import ui_setup, actions, project_actions, tabs, events
 
@@ -32,11 +30,6 @@ class MainWindow(QMainWindow):
         self.open_tag_tabs = {}
         self.last_focused_copypaste_widget = None
         self.active_tool = constants.TOOL_SELECT
-
-        self.available_themes = get_available_themes()
-        self.current_theme = settings_service.get_value("appearance/theme", "dark_theme")
-        if self.current_theme not in self.available_themes:
-            self.current_theme = "dark_theme" if "dark_theme" in self.available_themes else (self.available_themes[0] if self.available_themes else "")
 
         ui_setup.setup_window(self)
 
@@ -57,9 +50,6 @@ class MainWindow(QMainWindow):
         
         self.ribbon = Ribbon(self)
         self.addToolBar(Qt.ToolBarArea.TopToolBarArea, self.ribbon)
-        
-        # Add theme selector to View tab in ribbon
-        self.ribbon.populate_theme_selector(self.available_themes, self.current_theme, self.on_theme_changed)
         
         self.tools_toolbar = ToolsToolbar(self)
         self.addToolBar(Qt.ToolBarArea.LeftToolBarArea, self.tools_toolbar)
@@ -87,25 +77,7 @@ class MainWindow(QMainWindow):
         tabs.update_central_widget(self)
         self.update_window_title()
         actions.update_edit_actions(self)
-        if self.current_theme:
-            ui_setup.apply_stylesheet(self, self.current_theme)
 
-    def on_theme_changed(self, theme_name: str):
-        """
-        Applies the selected theme and saves the setting.
-        """
-        if theme_name in self.available_themes:
-            self.current_theme = theme_name
-            ui_setup.apply_stylesheet(self, self.current_theme)
-            
-            # Update all canvas areas to match the new theme
-            for i in range(self.tab_widget.count()):
-                widget = self.tab_widget.widget(i)
-                if hasattr(widget, 'canvas'):
-                    widget.canvas.update_theme_colors(theme_name)
-            
-            settings_service.set_value("appearance/theme", self.current_theme)
-            settings_service.save()
 
     def set_active_tool(self, tool_name: str):
 

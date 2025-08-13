@@ -2,13 +2,12 @@
 # The main application ribbon (toolbar) for accessing common tools.
 
 from PyQt6.QtWidgets import (
-    QToolBar, QWidget, QVBoxLayout, QTabWidget, QHBoxLayout, QLabel, 
-    QPushButton, QSpinBox, QCheckBox, QComboBox
+    QToolBar, QWidget, QVBoxLayout, QTabWidget, QHBoxLayout, 
+    QPushButton, QSpinBox, QCheckBox
 )
 from PyQt6.QtGui import QAction, QIcon, QKeySequence
 from PyQt6.QtCore import QSize, Qt, pyqtSignal
 from utils.icon_manager import IconManager
-from utils.stylesheet_loader import get_available_themes
 
 class RibbonTab(QWidget):
     """A single tab within the ribbon."""
@@ -100,27 +99,3 @@ class Ribbon(QToolBar):
     def add_view_action(self, action: QAction):
         """Adds a shared view action to the View tab's toolbar."""
         self.view_tab.toolbar.addAction(action)
-
-    def populate_theme_selector(self, themes, current_theme, on_theme_changed):
-        """Adds a theme selector to the View tab."""
-        # Add separator
-        self.view_tab.toolbar.addSeparator()
-        
-        # Add label
-        label = QLabel("Theme:")
-        self.view_tab.toolbar.addWidget(label)
-        
-        # Create theme combo box
-        self.theme_combo = QComboBox()
-        self.theme_combo.setObjectName("RibbonThemeSelector")
-        self.theme_combo.setFixedWidth(120)
-        self.theme_combo.addItems(themes)
-        
-        # Set current theme
-        if current_theme in themes:
-            self.theme_combo.setCurrentText(current_theme)
-            
-        # Connect signal
-        self.theme_combo.currentTextChanged.connect(on_theme_changed)
-        
-        self.view_tab.toolbar.addWidget(self.theme_combo)

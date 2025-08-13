@@ -3,8 +3,8 @@ from PyQt6.QtWidgets import QStatusBar, QLabel, QWidget, QHBoxLayout, QFrame, QP
 from PyQt6.QtCore import QByteArray
 from utils.icon_manager import IconManager
 
-from utils.stylesheet_loader import load_all_stylesheets
 from services.settings_service import settings_service
+
 import qtawesome as qta
 
 def setup_window(win):
@@ -82,9 +82,8 @@ def _create_separator():
     return separator
 
 
-def apply_stylesheet(win, theme_name):
-    full_stylesheet = load_all_stylesheets(theme_name)
-    win.setStyleSheet(full_stylesheet)
+
+
 
 
 def save_window_state(win):

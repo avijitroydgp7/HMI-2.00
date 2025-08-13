@@ -2,7 +2,7 @@
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QTreeWidget, QTreeWidgetItem,
     QPushButton, QAbstractItemView, QStyledItemDelegate, 
-    QLineEdit, QTreeWidgetItemIterator, QMenu, QFileDialog
+    QLineEdit, QTreeWidgetItemIterator, QMenu, QFileDialog, QHeaderView
 )
 from PyQt6.QtCore import Qt, pyqtSlot, pyqtSignal
 from PyQt6.QtGui import QKeyEvent
@@ -20,7 +20,6 @@ from dialogs import AddTagDialog
 from dialogs.custom_info_dialog import CustomInfoDialog
 from dialogs.custom_question_dialog import CustomQuestionDialog
 from PyQt6.QtWidgets import QMessageBox
-from .custom_header_view import CustomHeaderView
 from .custom_tree_widget import CustomTreeWidget
 from utils import constants
 
@@ -103,9 +102,8 @@ class TagEditorWidget(QWidget):
         self.tag_tree.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.tag_tree.setSortingEnabled(True)
         
-        header = CustomHeaderView(Qt.Orientation.Horizontal, self.tag_tree)
-        self.tag_tree.setHeader(header)
-        header.setSectionResizeMode(header.Stretch)
+        header = self.tag_tree.header()
+        header.setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
         
         layout.addWidget(self.tag_tree)
         
