@@ -241,13 +241,8 @@ class DesignCanvas(QGraphicsView):
                     default_props = button_tool.get_default_properties()
                     pos_x = int(scene_pos.x() - default_props['size']['width'] / 2)
                     pos_y = int(scene_pos.y() - default_props['size']['height'] / 2)
-                    child_data = {
-                        "instance_id": str(uuid.uuid4()),
-                        "tool_type": constants.TOOL_BUTTON,
-                        "properties": {**default_props, "position": {"x": pos_x, "y": pos_y}},
-                    }
-                    command = AddChildCommand(self.screen_id, child_data)
-                    command_history_service.add_command(command)
+                    default_props["position"] = {"x": pos_x, "y": pos_y}
+                    self._add_tool_item(constants.TOOL_BUTTON, default_props)
                 elif self.active_tool == constants.TOOL_TEXT:
                     default_props = text_tool.get_default_properties()
                     default_props["position"] = {
@@ -833,6 +828,9 @@ class DesignCanvas(QGraphicsView):
         }
         command = AddChildCommand(self.screen_id, child_data)
         command_history_service.add_command(command)
+        main_window = self.window()
+        if hasattr(main_window, "revert_to_select_tool"):
+            main_window.revert_to_select_tool()
 
     def add_embedded_screen(self, screen_id, position):
         """

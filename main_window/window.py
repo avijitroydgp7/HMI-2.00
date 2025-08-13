@@ -95,11 +95,11 @@ class MainWindow(QMainWindow):
 
     def revert_to_select_tool(self):
         self.tools_toolbar.set_active_tool(constants.TOOL_SELECT)
+        self.set_active_tool(constants.TOOL_SELECT)
 
     def set_active_drawing_tool(self, tool_name: str):
         """Sets the active tool from the drawing toolbar."""
         self.set_active_tool(tool_name)
-        self.revert_to_select_tool()
 
     def on_cut(self):
         from . import clipboard
