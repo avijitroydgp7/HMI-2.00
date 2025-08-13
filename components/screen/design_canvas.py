@@ -7,7 +7,6 @@ from PyQt6.QtWidgets import (
     QMenu,
     QGraphicsRectItem,
     QGraphicsDropShadowEffect,
-    QFileDialog,
 )
 from PyQt6.QtGui import (
     QPainter,
@@ -255,14 +254,8 @@ class DesignCanvas(QGraphicsView):
                     }
                     self._add_tool_item(constants.TOOL_TEXT, default_props)
                 elif self.active_tool == constants.TOOL_IMAGE:
-                    file_path, _ = QFileDialog.getOpenFileName(
-                        self,
-                        "Select Image",
-                        "",
-                        "Images (*.jpg *.jpeg *.png *.svg)",
-                    )
-                    if file_path:
-                        props = image_tool.get_default_properties(file_path)
+                    props = image_tool.prompt_for_image(self)
+                    if props:
                         props["position"] = {
                             "x": int(scene_pos.x()),
                             "y": int(scene_pos.y()),
