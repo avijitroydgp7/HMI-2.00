@@ -1,0 +1,35 @@
+1. main_window/ui_setup.py (1 instance)
+Line 15-21: Main window stylesheet for selected toolbar buttons
+
+win.setStyleSheet("""
+    QToolButton:checked {
+        background-color: #7f7f7f; /* Deep dark blue */
+    }
+""")
+2. dialogs/custom_widgets.py (3 instances)
+Line 45: Collapsible box toggle button styling
+
+self.toggle_button.setStyleSheet("QToolButton { border: none; font-weight: bold; }")
+Line 119: Error label styling in ValueSelector
+
+self.error_label.setStyleSheet("color: #E57373; padding-left: 5px;")
+Line 198-207: TagSelector widget styling
+
+self.setStyleSheet("""
+    #TagSelector > ValueSelector {
+        border: 1px solid #454c5a;
+        border-radius: 4px;
+        padding: 2px;
+    }
+    #TagSelector > ValueSelector[error='true'] {
+        border: 1px solid #E57373;
+    }
+""")
+3. dialogs/screen_properties_dialog.py (1 instance)
+Line 142-147: Color button styling with dynamic colors
+
+button.setStyleSheet(f"background-color: {color_hex}; color: {text_color}; border: 1px solid #5a6270; padding: 5px; border-radius: 4px;")
+4. components/tag_editor_widget.py (1 instance)
+Line 27: Tag tree delegate editor styling
+
+editor.setStyleSheet("padding: 0px; margin: 0px; border: none;")

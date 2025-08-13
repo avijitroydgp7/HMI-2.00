@@ -1,3 +1,4 @@
+from typing import Optional
 from PyQt6.QtGui import QIcon, QPixmap
 import qtawesome as qta
 
@@ -8,7 +9,7 @@ class IconManager:
     """
 
     @staticmethod
-    def create_icon(icon_name: str, color: str = None, active_color: str = None, size: int = None) -> QIcon:
+    def create_icon(icon_name: str, color: Optional[str] = None, active_color: Optional[str] = None, size: Optional[int] = None):
         """
         Create a PyQt6 QIcon from a qtawesome icon name with theme-aware colors.
         
@@ -22,12 +23,21 @@ class IconManager:
             QIcon: A PyQt6-compatible QIcon.
         """
         try:
-            base_color = color if color is not None else '#dbe0e8'
-            
-            # For now, we use the same color for all states, but this can be expanded.
-            qta_icon = qta.icon(icon_name, color=base_color)
+            base_color = color if color is not None else "#DADADA"
+            selected_color = active_color if active_color is not None else "#DADADA"
 
             
+            # Use different colors for normal and selected states
+            qta_icon = qta.icon(
+                icon_name,
+                color=base_color,
+                color_active=selected_color,
+                color_selected=selected_color
+            )
+            
+            if qta_icon is None:
+                return QIcon()
+
             if size is None:
                 return qta_icon
                 
@@ -39,7 +49,7 @@ class IconManager:
             return QIcon()
 
     @staticmethod
-    def create_pixmap(icon_name: str, size: int, color: str = None) -> QPixmap:
+    def create_pixmap(icon_name: str, size: int, color: Optional[str] = None):
         """
         Create a PyQt6 QPixmap from a qtawesome icon name with a theme-aware color.
         
@@ -52,9 +62,13 @@ class IconManager:
             QPixmap: A PyQt6-compatible QPixmap.
         """
         try:
-            base_color = color if color is not None else '#dbe0e8'
+            base_color = color if color is not None else "#FFFFFF"
+
             
             qta_icon = qta.icon(icon_name, color=base_color)
+
+            if qta_icon is None:
+                return QPixmap()
 
             return qta_icon.pixmap(size, size)
             

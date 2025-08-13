@@ -100,7 +100,6 @@ class CustomTreeWidget(QTreeWidget):
 
     def drawBranches(self, painter: QPainter, rect: QRect, index: QModelIndex):
         # First, let the base class draw the tracking lines and default indicator.
-        super().drawBranches(painter, rect, index)
 
         # Now, we will draw our custom icon over the default indicator.
         item = self.itemFromIndex(index)

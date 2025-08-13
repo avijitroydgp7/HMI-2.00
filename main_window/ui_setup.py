@@ -12,6 +12,13 @@ def setup_window(win):
     win.setWindowIcon(app_icon)
     win.resize(1600, 900)
 
+    # Add stylesheet for selected toolbar buttons to have a deeper background color
+    win.setStyleSheet("""
+        QToolButton:checked {
+            background-color: #7f7f7f; /* Deep dark blue */
+        }
+    """)
+
 
 def setup_status_bar(win):
     win.status_bar = QStatusBar()
