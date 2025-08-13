@@ -3,7 +3,7 @@
 
 from PyQt6.QtWidgets import QGraphicsView, QGraphicsScene, QMenu, QGraphicsRectItem, QGraphicsDropShadowEffect
 from PyQt6.QtGui import QPainter, QColor, QMouseEvent, QKeyEvent, QDragEnterEvent, QDropEvent, QPen, QPainterPath, QCursor, QBrush
-from PyQt6.QtCore import Qt, QPoint, QPointF, pyqtSignal, QRectF, QRect
+from PyQt6.QtCore import Qt, QPoint, QPointF, pyqtSignal, QRectF, QRect, QEvent
 import copy
 import uuid
 
@@ -78,12 +78,19 @@ class DesignCanvas(QGraphicsView):
         self.setAcceptDrops(True)
         self.setObjectName("DesignCanvas")
         self.setBackgroundBrush(QColor("#1f1f1f"))
+        self.viewport().installEventFilter(self)
 
         self.scene.selectionChanged.connect(self._on_selection_changed)
 
         self.update_screen_data()
         self._update_shadow_for_zoom()
         self.update_visible_items()
+
+    def eventFilter(self, source, event):
+        if event.type() in (QEvent.Type.MouseMove, QEvent.Type.HoverMove):
+            pos = event.pos() if hasattr(event, "pos") else event.position().toPoint()
+            self._last_mouse_scene_pos = self.mapToScene(pos)
+        return False
 
     def set_shadow_enabled(self, enabled: bool):
         """Enable or disable page shadows dynamically."""
