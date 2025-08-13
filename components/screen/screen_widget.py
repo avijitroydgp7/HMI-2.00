@@ -3,6 +3,7 @@
 
 from PyQt6.QtWidgets import QWidget, QLabel, QVBoxLayout
 from PyQt6.QtCore import pyqtSignal, pyqtSlot, QPointF
+from PyQt6.QtGui import QCursor
 from services.screen_data_service import screen_service
 from .design_canvas import DesignCanvas
 
@@ -87,7 +88,10 @@ class ScreenWidget(QWidget):
         new_zoom = min(self.design_canvas.current_zoom * 1.25, self.design_canvas.max_zoom)
         factor = new_zoom / self.design_canvas.current_zoom
         if factor != 1.0:
+            mouse_pos = self.design_canvas.mapFromGlobal(QCursor.pos())
+            scene_pos = self.design_canvas.mapToScene(mouse_pos)
             self.design_canvas.scale(factor, factor)
+            self.design_canvas.centerOn(scene_pos)
         self.design_canvas.current_zoom = new_zoom
         self.design_canvas._update_shadow_for_zoom()
         self.design_canvas.update_visible_items()
@@ -97,7 +101,10 @@ class ScreenWidget(QWidget):
         new_zoom = max(self.design_canvas.current_zoom * 0.8, self.design_canvas.min_zoom)
         factor = new_zoom / self.design_canvas.current_zoom
         if factor != 1.0:
+            mouse_pos = self.design_canvas.mapFromGlobal(QCursor.pos())
+            scene_pos = self.design_canvas.mapToScene(mouse_pos)
             self.design_canvas.scale(factor, factor)
+            self.design_canvas.centerOn(scene_pos)
         self.design_canvas.current_zoom = new_zoom
         self.design_canvas.update_visible_items()
         self.zoom_changed.emit(self.get_zoom_percentage())
