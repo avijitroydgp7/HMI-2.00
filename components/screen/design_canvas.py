@@ -50,6 +50,7 @@ class DesignCanvas(QGraphicsView):
         self._shift_pressed = False
 
         self.scene = QGraphicsScene(self)
+        self.scene.setItemIndexMethod(QGraphicsScene.ItemIndexMethod.BspTreeIndex)
         self.setScene(self.scene)
 
         self.page_item = QGraphicsRectItem()
@@ -82,6 +83,7 @@ class DesignCanvas(QGraphicsView):
 
         self.update_screen_data()
         self._update_shadow_for_zoom()
+        self.update_visible_items()
 
     def set_shadow_enabled(self, enabled: bool):
         """Enable or disable page shadows dynamically."""
@@ -99,6 +101,14 @@ class DesignCanvas(QGraphicsView):
         else:
             if self.page_item.graphicsEffect() is self._shadow_effect:
                 self._shadow_effect.setEnabled(False)
+
+    def update_visible_items(self):
+        """Show or hide items based on their intersection with the viewport."""
+        scene_rect = self.mapToScene(self.viewport().rect()).boundingRect()
+        for item in self.scene.items():
+            visible = item.sceneBoundingRect().intersects(scene_rect)
+            item.setVisible(visible)
+            item.setEnabled(visible)
 
     def drawForeground(self, painter: QPainter, rect):
         super().drawForeground(painter, rect)
@@ -157,6 +167,14 @@ class DesignCanvas(QGraphicsView):
             if rect.contains(QPointF(pos)):
                 return handle
         return None
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        self.update_visible_items()
+
+    def scrollContentsBy(self, dx, dy):
+        super().scrollContentsBy(dx, dy)
+        self.update_visible_items()
 
     def mousePressEvent(self, event: QMouseEvent):
         if self.active_tool != constants.TOOL_SELECT:
@@ -462,6 +480,7 @@ class DesignCanvas(QGraphicsView):
             self.current_zoom = new_zoom
             self.view_zoomed.emit(f"{int(self.current_zoom * 100)}%")
             self._update_shadow_for_zoom()
+            self.update_visible_items()
             event.accept()
         else:
             super().wheelEvent(event)
@@ -488,6 +507,7 @@ class DesignCanvas(QGraphicsView):
         self._sync_scene_items()
         self.update()
         self._update_shadow_for_zoom()
+        self.update_visible_items()
 
     def update_theme_colors(self, theme_name):
         """Update canvas colors based on the current theme."""

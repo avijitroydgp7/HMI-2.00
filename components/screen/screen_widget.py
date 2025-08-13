@@ -90,6 +90,7 @@ class ScreenWidget(QWidget):
             self.design_canvas.scale(factor, factor)
         self.design_canvas.current_zoom = new_zoom
         self.design_canvas._update_shadow_for_zoom()
+        self.design_canvas.update_visible_items()
         self.zoom_changed.emit(self.get_zoom_percentage())
 
     def zoom_out(self):
@@ -98,5 +99,5 @@ class ScreenWidget(QWidget):
         if factor != 1.0:
             self.design_canvas.scale(factor, factor)
         self.design_canvas.current_zoom = new_zoom
-        self.design_canvas._update_shadow_for_zoom()
+        self.design_canvas.update_visible_items()
         self.zoom_changed.emit(self.get_zoom_percentage())
