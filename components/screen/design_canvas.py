@@ -7,6 +7,7 @@ from PyQt6.QtWidgets import (
     QMenu,
     QGraphicsRectItem,
     QGraphicsDropShadowEffect,
+    QFileDialog,
 )
 from PyQt6.QtGui import (
     QPainter,
@@ -28,8 +29,14 @@ from services.screen_data_service import screen_service
 from services.clipboard_service import clipboard_service
 from services.command_history_service import command_history_service
 from services.commands import MoveChildCommand, RemoveChildCommand, AddChildCommand, UpdateChildPropertiesCommand, BulkUpdateChildPropertiesCommand, BulkMoveChildCommand
-from utils.icon_manager import IconManager
-from tools import button as button_tool, line as line_tool, polygon as polygon_tool, text as text_tool
+from tools import (
+    button as button_tool,
+    line as line_tool,
+    polygon as polygon_tool,
+    text as text_tool,
+    image as image_tool,
+)
+
 from .graphics_items import (
     ButtonItem,
     EmbeddedScreenItem,
@@ -248,6 +255,20 @@ class DesignCanvas(QGraphicsView):
                         "y": int(scene_pos.y()),
                     }
                     self._add_tool_item(constants.TOOL_TEXT, default_props)
+                elif self.active_tool == constants.TOOL_IMAGE:
+                    file_path, _ = QFileDialog.getOpenFileName(
+                        self,
+                        "Select Image",
+                        "",
+                        "Images (*.jpg *.jpeg *.png *.svg)",
+                    )
+                    if file_path:
+                        props = image_tool.get_default_properties(file_path)
+                        props["position"] = {
+                            "x": int(scene_pos.x()),
+                            "y": int(scene_pos.y()),
+                        }
+                        self._add_tool_item(constants.TOOL_IMAGE, props)
                 elif self.active_tool == constants.TOOL_POLYGON:
                     if not self._drawing:
                         self._drawing = True
@@ -607,17 +628,7 @@ class DesignCanvas(QGraphicsView):
                         "color": "#000000",
                     }
                     self._add_tool_item(constants.TOOL_SCALE, props)
-                elif self.active_tool == constants.TOOL_IMAGE:
-                    x = int(min(self._start_pos.x(), scene_pos.x()))
-                    y = int(min(self._start_pos.y(), scene_pos.y()))
-                    w = int(abs(scene_pos.x() - self._start_pos.x()))
-                    h = int(abs(scene_pos.y() - self._start_pos.y()))
-                    props = {
-                        "position": {"x": x, "y": y},
-                        "size": {"width": w, "height": h},
-                        "path": "",
-                    }
-                    self._add_tool_item(constants.TOOL_IMAGE, props)
+
                 elif self.active_tool == constants.TOOL_DXF:
                     x = int(min(self._start_pos.x(), scene_pos.x()))
                     y = int(min(self._start_pos.y(), scene_pos.y()))

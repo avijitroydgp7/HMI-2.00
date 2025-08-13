@@ -683,7 +683,7 @@ class ImageItem(BaseGraphicsItem):
         rect = self.boundingRect()
         painter.save()
         if self._pixmap and not self._pixmap.isNull():
-            painter.drawPixmap(rect, self._pixmap)
+            painter.drawPixmap(rect, self._pixmap, QRectF(self._pixmap.rect()))
         else:
             painter.setBrush(QColor("#cccccc"))
             painter.setPen(QPen(Qt.GlobalColor.darkGray, 1, Qt.PenStyle.DashLine))
