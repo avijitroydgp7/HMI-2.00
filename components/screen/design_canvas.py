@@ -204,24 +204,27 @@ class DesignCanvas(QGraphicsView):
 
     def get_handle_at(self, pos: QPoint):
         group_rect = self.get_group_bounding_rect()
-        if not group_rect: return None
+        if not group_rect:
+            return None
 
-        view_rect = self.mapFromScene(group_rect).boundingRect()
-        s = self.selection_overlay.handle_size
+        current_scale = self.transform().m11()
+        handle_size = self.selection_overlay.handle_size / current_scale
+        half_handle = handle_size / 2.0
         
         handle_positions = {
-            'top_left': QRectF(view_rect.left() - s/2, view_rect.top() - s/2, s, s),
-            'top_right': QRectF(view_rect.right() - s/2, view_rect.top() - s/2, s, s),
-            'bottom_left': QRectF(view_rect.left() - s/2, view_rect.bottom() - s/2, s, s),
-            'bottom_right': QRectF(view_rect.right() - s/2, view_rect.bottom() - s/2, s, s),
-            'top': QRectF(view_rect.center().x() - s/2, view_rect.top() - s/2, s, s),
-            'bottom': QRectF(view_rect.center().x() - s/2, view_rect.bottom() - s/2, s, s),
-            'left': QRectF(view_rect.left() - s/2, view_rect.center().y() - s/2, s, s),
-            'right': QRectF(view_rect.right() - s/2, view_rect.center().y() - s/2, s, s),
+            'top_left': QRectF(group_rect.left() - half_handle, group_rect.top() - half_handle, handle_size, handle_size),
+            'top_right': QRectF(group_rect.right() - half_handle, group_rect.top() - half_handle, handle_size, handle_size),
+            'bottom_left': QRectF(group_rect.left() - half_handle, group_rect.bottom() - half_handle, handle_size, handle_size),
+            'bottom_right': QRectF(group_rect.right() - half_handle, group_rect.bottom() - half_handle, handle_size, handle_size),
+            'top': QRectF(group_rect.center().x() - half_handle, group_rect.top() - half_handle, handle_size, handle_size),
+            'bottom': QRectF(group_rect.center().x() - half_handle, group_rect.bottom() - half_handle, handle_size, handle_size),
+            'left': QRectF(group_rect.left() - half_handle, group_rect.center().y() - half_handle, handle_size, handle_size),
+            'right': QRectF(group_rect.right() - half_handle, group_rect.center().y() - half_handle, handle_size, handle_size),
         }
 
+        scene_pos = self.mapToScene(pos)
         for handle, rect in handle_positions.items():
-            if rect.contains(QPointF(pos)):
+            if rect.contains(scene_pos):
                 return handle
         return None
 
