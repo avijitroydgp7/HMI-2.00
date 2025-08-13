@@ -75,18 +75,6 @@ class ToolsToolbar(QToolBar):
         tools = [
             {"id": constants.TOOL_SELECT, "name": "Select Tool", "icon": "fa5s.mouse-pointer", "shortcut": "V", "checked": True},
             {"id": constants.TOOL_BUTTON, "name": "Button Tool", "icon": "fa5s.hand-pointer", "shortcut": "B", "checked": False},
-            {"id": constants.TOOL_TEXT, "name": "Text Tool", "icon": "fa5s.font", "shortcut": "T", "checked": False},
-            {"id": constants.TOOL_LINE, "name": "Line Tool", "icon": "fa5s.minus", "shortcut": "L", "checked": False},
-            {"id": constants.TOOL_FREEFORM, "name": "Freeform Tool", "icon": "fa5s.pencil-alt", "shortcut": "F", "checked": False},
-            {"id": constants.TOOL_RECT, "name": "Rectangle Tool", "icon": "fa5s.square", "shortcut": "R", "checked": False},
-            {"id": constants.TOOL_POLYGON, "name": "Polygon Tool", "icon": "fa5s.draw-polygon", "shortcut": "P", "checked": False},
-            {"id": constants.TOOL_CIRCLE, "name": "Circle Tool", "icon": "fa5s.circle", "shortcut": "C", "checked": False},
-            {"id": constants.TOOL_ARC, "name": "Arc Tool", "icon": "fa5s.circle-notch", "shortcut": "A", "checked": False},
-            {"id": constants.TOOL_SECTOR, "name": "Sector Tool", "icon": "fa5s.chart-pie", "shortcut": "S", "checked": False},
-            {"id": constants.TOOL_TABLE, "name": "Table Tool", "icon": "fa5s.table", "shortcut": "Ctrl+T", "checked": False},
-            {"id": constants.TOOL_SCALE, "name": "Scale Tool", "icon": "fa5s.ruler-combined", "shortcut": "K", "checked": False},
-            {"id": constants.TOOL_IMAGE, "name": "Image Tool", "icon": "fa5s.image", "shortcut": "I", "checked": False},
-            {"id": constants.TOOL_DXF, "name": "DXF Tool", "icon": "fa5s.file-import", "shortcut": "D", "checked": False},
         ]
 
         for tool in tools:
@@ -101,6 +89,58 @@ class ToolsToolbar(QToolBar):
 
     def set_active_tool(self, tool_id: str):
         """Programmatically sets the active tool in the toolbar."""
+        for action in self._action_group.actions():
+            if action.data() == tool_id:
+                action.setChecked(True)
+                break
+
+
+class DrawingToolbar(QToolBar):
+    """A toolbar dedicated to drawing tools."""
+
+    tool_changed = pyqtSignal(str)
+
+    def __init__(self, parent=None):
+        super().__init__("Drawing", parent)
+        self.setObjectName("DrawingToolbar")
+        self.setMovable(True)
+        self.setFloatable(True)
+        self.setOrientation(Qt.Orientation.Vertical)
+        self.setIconSize(QSize(20, 20))
+        self._action_group = QActionGroup(self)
+        self._create_actions()
+
+    def _create_actions(self):
+        """Creates the drawing tool actions and adds them to the toolbar."""
+        self._action_group.setExclusive(True)
+        self._action_group.triggered.connect(lambda action: self.tool_changed.emit(action.data()))
+
+        tools = [
+            {"id": constants.TOOL_LINE, "name": "Line Tool", "icon": "fa5s.minus", "shortcut": "L"},
+            {"id": constants.TOOL_FREEFORM, "name": "Freeform Tool", "icon": "fa5s.pencil-alt", "shortcut": "F"},
+            {"id": constants.TOOL_RECT, "name": "Rectangle Tool", "icon": "fa5s.square", "shortcut": "R"},
+            {"id": constants.TOOL_POLYGON, "name": "Polygon Tool", "icon": "fa5s.draw-polygon", "shortcut": "P"},
+            {"id": constants.TOOL_CIRCLE, "name": "Circle Tool", "icon": "fa5s.circle", "shortcut": "C"},
+            {"id": constants.TOOL_ARC, "name": "Arc Tool", "icon": "fa5s.circle-notch", "shortcut": "A"},
+            {"id": constants.TOOL_SECTOR, "name": "Sector Tool", "icon": "fa5s.chart-pie", "shortcut": "S"},
+            {"id": constants.TOOL_TEXT, "name": "Text Tool", "icon": "fa5s.font", "shortcut": "T", "checked": False},
+            {"id": constants.TOOL_TABLE, "name": "Table Tool", "icon": "fa5s.table", "shortcut": "Ctrl+T", "checked": False},
+            {"id": constants.TOOL_SCALE, "name": "Scale Tool", "icon": "fa5s.ruler-combined", "shortcut": "K", "checked": False},
+            {"id": constants.TOOL_IMAGE, "name": "Image Tool", "icon": "fa5s.image", "shortcut": "I", "checked": False},
+            {"id": constants.TOOL_DXF, "name": "DXF Tool", "icon": "fa5s.file-import", "shortcut": "D", "checked": False},
+        ]
+
+        for tool in tools:
+            action = QAction(IconManager.create_icon(tool["icon"]), tool["name"], self)
+            action.setToolTip(f"{tool['name']} ({tool['shortcut']})")
+            action.setShortcut(tool["shortcut"])
+            action.setCheckable(True)
+            action.setData(tool["id"])
+            self._action_group.addAction(action)
+            self.addAction(action)
+
+    def set_active_tool(self, tool_id: str):
+        """Programmatically sets the active drawing tool in the toolbar."""
         for action in self._action_group.actions():
             if action.data() == tool_id:
                 action.setChecked(True)

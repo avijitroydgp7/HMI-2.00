@@ -68,6 +68,12 @@ def setup_view_actions(win):
     win.ribbon.add_view_action(tools_action)
     win.quick_access_toolbar.add_view_action(tools_action)
 
+    drawing_action = win.drawing_toolbar.toggleViewAction()
+    drawing_action.setText("Drawing Toolbar")
+    drawing_action.setIcon(IconManager.create_icon('fa5s.pencil-alt'))
+    win.ribbon.add_view_action(drawing_action)
+    win.quick_access_toolbar.add_view_action(drawing_action)
+
     icon_map = {
         'project': 'fa5s.project-diagram', 'system': 'fa5s.cogs', 
         'screens': 'fa5.clone', 'properties': 'fa5s.list-ul',

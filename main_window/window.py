@@ -5,7 +5,7 @@ from PyQt6.QtWidgets import QMainWindow, QStackedWidget, QTabWidget, QDockWidget
 from PyQt6.QtCore import Qt
 
 from components.ribbon import Ribbon
-from components.toolbar import QuickAccessToolBar, ToolsToolbar
+from components.toolbar import QuickAccessToolBar, ToolsToolbar, DrawingToolbar
 from components.docks import create_docks
 from components.welcome_widget import WelcomeWidget
 # MODIFIED: Import ScreenWidget to check the type of the current tab
@@ -54,6 +54,9 @@ class MainWindow(QMainWindow):
         self.tools_toolbar = ToolsToolbar(self)
         self.addToolBar(Qt.ToolBarArea.LeftToolBarArea, self.tools_toolbar)
 
+        self.drawing_toolbar = DrawingToolbar(self)
+        self.addToolBar(Qt.ToolBarArea.LeftToolBarArea, self.drawing_toolbar)
+
         self.docks = create_docks(self)
         self.addDockWidget(Qt.DockWidgetArea.LeftDockWidgetArea, self.docks['project'])
         self.addDockWidget(Qt.DockWidgetArea.LeftDockWidgetArea, self.docks['system'])
@@ -92,6 +95,11 @@ class MainWindow(QMainWindow):
 
     def revert_to_select_tool(self):
         self.tools_toolbar.set_active_tool(constants.TOOL_SELECT)
+
+    def set_active_drawing_tool(self, tool_name: str):
+        """Sets the active tool from the drawing toolbar."""
+        self.set_active_tool(tool_name)
+        self.revert_to_select_tool()
 
     def on_cut(self):
         from . import clipboard
@@ -140,6 +148,7 @@ class MainWindow(QMainWindow):
         self.ribbon.exit_action.triggered.connect(self.close)
         
         self.tools_toolbar.tool_changed.connect(self.set_active_tool)
+        self.drawing_toolbar.tool_changed.connect(self.set_active_drawing_tool)
 
         self.undo_action.triggered.connect(command_history_service.undo)
 
