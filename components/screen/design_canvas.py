@@ -17,10 +17,7 @@ from .graphics_items import ButtonItem, EmbeddedScreenItem, BaseGraphicsItem
 from ..selection_overlay import SelectionOverlay
 from utils import constants
 
-from .advanced_view import AdvancedGraphicsView
-
-
-class DesignCanvas(AdvancedGraphicsView):
+class DesignCanvas(QGraphicsView):
     """
     The main design surface, implemented using Qt's Graphics View Framework
     for efficient rendering, selection, and interaction.
