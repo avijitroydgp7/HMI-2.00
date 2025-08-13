@@ -63,7 +63,7 @@ class DesignCanvas(QGraphicsView):
 
         # Allow turning shadows off and auto-disabling at high zoom levels
         self._shadow_enabled = True
-        self._shadow_disable_threshold = 2.0
+        self._shadow_disable_threshold = 1.25
         if self._shadow_enabled:
             self.page_item.setGraphicsEffect(self._shadow_effect)
 
@@ -91,8 +91,13 @@ class DesignCanvas(QGraphicsView):
         self._update_shadow_for_zoom()
 
     def _update_shadow_for_zoom(self):
-        """Toggle shadow based on zoom level and preferences."""
-        use_shadow = self._shadow_enabled and self.transform().m11() <= self._shadow_disable_threshold
+        """Toggle shadow based on zoom level, drag state, and preferences."""
+        disable_shadow = self._drag_mode in ('move', 'resize')
+        use_shadow = (
+            self._shadow_enabled
+            and self.transform().m11() <= self._shadow_disable_threshold
+            and not disable_shadow
+        )
 
         if use_shadow:
             if self.page_item.graphicsEffect() is not self._shadow_effect:
@@ -204,6 +209,7 @@ class DesignCanvas(QGraphicsView):
                 for item in self.scene.selectedItems():
                     if isinstance(item, BaseGraphicsItem):
                         self._start_selection_states[item.get_instance_id()] = item.sceneBoundingRect()
+                self._update_shadow_for_zoom()
                 event.accept()
                 return
 
@@ -232,6 +238,7 @@ class DesignCanvas(QGraphicsView):
                     for item in self.scene.selectedItems():
                         if isinstance(item, BaseGraphicsItem):
                             self._start_selection_states[item.get_instance_id()] = item.pos()
+                    self._update_shadow_for_zoom()
                     event.accept()
                     return
             else:
@@ -244,6 +251,7 @@ class DesignCanvas(QGraphicsView):
                 self._rubber_band_origin = event.pos()
                 self._rubber_band_rect = QRect(self._rubber_band_origin, self._rubber_band_origin)
                 self.viewport().update()
+                self._update_shadow_for_zoom()
                 event.accept()
                 return
         else:
@@ -467,6 +475,7 @@ class DesignCanvas(QGraphicsView):
             self._resize_handle = None
             self._rubber_band_origin = None
             self._rubber_band_rect = QRect()
+            self._update_shadow_for_zoom()
         
         super().mouseReleaseEvent(event)
 
