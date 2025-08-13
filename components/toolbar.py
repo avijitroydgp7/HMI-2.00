@@ -75,6 +75,18 @@ class ToolsToolbar(QToolBar):
         tools = [
             {"id": constants.TOOL_SELECT, "name": "Select Tool", "icon": "fa5s.mouse-pointer", "shortcut": "V", "checked": True},
             {"id": constants.TOOL_BUTTON, "name": "Button Tool", "icon": "fa5s.hand-pointer", "shortcut": "B", "checked": False},
+            {"id": constants.TOOL_TEXT, "name": "Text Tool", "icon": "fa5s.font", "shortcut": "T", "checked": False},
+            {"id": constants.TOOL_LINE, "name": "Line Tool", "icon": "fa5s.minus", "shortcut": "L", "checked": False},
+            {"id": constants.TOOL_FREEFORM, "name": "Freeform Tool", "icon": "fa5s.pencil-alt", "shortcut": "F", "checked": False},
+            {"id": constants.TOOL_RECT, "name": "Rectangle Tool", "icon": "fa5s.square", "shortcut": "R", "checked": False},
+            {"id": constants.TOOL_POLYGON, "name": "Polygon Tool", "icon": "fa5s.draw-polygon", "shortcut": "P", "checked": False},
+            {"id": constants.TOOL_CIRCLE, "name": "Circle Tool", "icon": "fa5s.circle", "shortcut": "C", "checked": False},
+            {"id": constants.TOOL_ARC, "name": "Arc Tool", "icon": "fa5s.circle-notch", "shortcut": "A", "checked": False},
+            {"id": constants.TOOL_SECTOR, "name": "Sector Tool", "icon": "fa5s.chart-pie", "shortcut": "S", "checked": False},
+            {"id": constants.TOOL_TABLE, "name": "Table Tool", "icon": "fa5s.table", "shortcut": "Ctrl+T", "checked": False},
+            {"id": constants.TOOL_SCALE, "name": "Scale Tool", "icon": "fa5s.ruler-combined", "shortcut": "K", "checked": False},
+            {"id": constants.TOOL_IMAGE, "name": "Image Tool", "icon": "fa5s.image", "shortcut": "I", "checked": False},
+            {"id": constants.TOOL_DXF, "name": "DXF Tool", "icon": "fa5s.file-import", "shortcut": "D", "checked": False},
         ]
 
         for tool in tools:
