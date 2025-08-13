@@ -481,12 +481,16 @@ class DesignCanvas(QGraphicsView):
 
     def wheelEvent(self, event):
         if event.modifiers() == Qt.KeyboardModifier.ControlModifier:
+            old_pos = self.mapToScene(event.position().toPoint())
             factor = 1.1 if event.angleDelta().y() > 0 else 1 / 1.1
             new_zoom = max(self.min_zoom, min(self.max_zoom, self.current_zoom * factor))
             scale_factor = new_zoom / self.current_zoom
             if scale_factor != 1.0:
                 self.scale(scale_factor, scale_factor)
             self.current_zoom = new_zoom
+            new_pos = self.mapToScene(event.position().toPoint())
+            delta = old_pos - new_pos
+            self.translate(delta.x(), delta.y())
             self.view_zoomed.emit(f"{int(self.current_zoom * 100)}%")
             self._update_shadow_for_zoom()
             self.update_visible_items()
