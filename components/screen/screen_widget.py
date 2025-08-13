@@ -3,6 +3,7 @@
 
 from PyQt6.QtWidgets import QWidget, QLabel, QVBoxLayout
 from PyQt6.QtCore import pyqtSignal, pyqtSlot, QPointF
+from PyQt6.QtGui import QCursor
 from services.screen_data_service import screen_service
 from .design_canvas import DesignCanvas
 
@@ -87,7 +88,11 @@ class ScreenWidget(QWidget):
         new_zoom = min(self.design_canvas.current_zoom * 1.25, self.design_canvas.max_zoom)
         factor = new_zoom / self.design_canvas.current_zoom
         if factor != 1.0:
-            scene_pos = self.design_canvas._last_mouse_scene_pos
+            mouse_view_pos = self.design_canvas.mapFromGlobal(QCursor.pos())
+            if self.design_canvas.viewport().rect().contains(mouse_view_pos):
+                scene_pos = self.design_canvas.mapToScene(mouse_view_pos)
+            else:
+                scene_pos = self.design_canvas._last_mouse_scene_pos
             view_pt = self.design_canvas.mapFromScene(scene_pos)
             if not self.design_canvas.viewport().rect().contains(view_pt):
                 scene_pos = self.design_canvas.mapToScene(self.design_canvas.viewport().rect().center())
@@ -105,7 +110,11 @@ class ScreenWidget(QWidget):
         new_zoom = max(self.design_canvas.current_zoom * 0.8, self.design_canvas.min_zoom)
         factor = new_zoom / self.design_canvas.current_zoom
         if factor != 1.0:
-            scene_pos = self.design_canvas._last_mouse_scene_pos
+            mouse_view_pos = self.design_canvas.mapFromGlobal(QCursor.pos())
+            if self.design_canvas.viewport().rect().contains(mouse_view_pos):
+                scene_pos = self.design_canvas.mapToScene(mouse_view_pos)
+            else:
+                scene_pos = self.design_canvas._last_mouse_scene_pos
             view_pt = self.design_canvas.mapFromScene(scene_pos)
             if not self.design_canvas.viewport().rect().contains(view_pt):
                 scene_pos = self.design_canvas.mapToScene(self.design_canvas.viewport().rect().center())
