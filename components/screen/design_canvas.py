@@ -491,6 +491,7 @@ class DesignCanvas(QGraphicsView):
             new_pos = self.mapToScene(event.position().toPoint())
             delta = old_pos - new_pos
             self.translate(delta.x(), delta.y())
+            self._last_mouse_scene_pos = self.mapToScene(event.position().toPoint())
             self.view_zoomed.emit(f"{int(self.current_zoom * 100)}%")
             self._update_shadow_for_zoom()
             self.update_visible_items()
