@@ -1,8 +1,25 @@
 # components/screen/design_canvas.py
 # MODIFIED: Overhauled mouse event logic to correctly handle multi-selection.
 
-from PyQt6.QtWidgets import QGraphicsView, QGraphicsScene, QMenu, QGraphicsRectItem, QGraphicsDropShadowEffect
-from PyQt6.QtGui import QPainter, QColor, QMouseEvent, QKeyEvent, QDragEnterEvent, QDropEvent, QPen, QPainterPath, QCursor, QBrush
+from PyQt6.QtWidgets import (
+    QGraphicsView,
+    QGraphicsScene,
+    QMenu,
+    QGraphicsRectItem,
+    QGraphicsDropShadowEffect,
+)
+from PyQt6.QtGui import (
+    QPainter,
+    QColor,
+    QMouseEvent,
+    QKeyEvent,
+    QDragEnterEvent,
+    QDropEvent,
+    QPen,
+    QPainterPath,
+    QCursor,
+    QBrush,
+)
 from PyQt6.QtCore import Qt, QPoint, QPointF, pyqtSignal, QRectF, QRect, QEvent
 import copy
 import uuid
@@ -12,8 +29,24 @@ from services.clipboard_service import clipboard_service
 from services.command_history_service import command_history_service
 from services.commands import MoveChildCommand, RemoveChildCommand, AddChildCommand, UpdateChildPropertiesCommand, BulkUpdateChildPropertiesCommand, BulkMoveChildCommand
 from utils.icon_manager import IconManager
-from tools import button as button_tool
-from .graphics_items import ButtonItem, EmbeddedScreenItem, BaseGraphicsItem
+from tools import button as button_tool, line as line_tool, polygon as polygon_tool, text as text_tool
+from .graphics_items import (
+    ButtonItem,
+    EmbeddedScreenItem,
+    BaseGraphicsItem,
+    TextItem,
+    LineItem,
+    FreeformItem,
+    RectItem,
+    PolygonItem,
+    CircleItem,
+    ArcItem,
+    SectorItem,
+    TableItem,
+    ScaleItem,
+    ImageItem,
+    DxfItem,
+)
 from ..selection_overlay import SelectionOverlay
 from utils import constants
 
@@ -48,6 +81,11 @@ class DesignCanvas(QGraphicsView):
         self._start_selection_states = {}
         self._last_mouse_scene_pos = QPointF()
         self._shift_pressed = False
+
+        # State used while creating new items with drawing tools
+        self._drawing = False
+        self._start_pos = None
+        self._draw_points = []
 
         self.scene = QGraphicsScene(self)
         self.scene.setItemIndexMethod(QGraphicsScene.ItemIndexMethod.BspTreeIndex)
@@ -199,10 +237,29 @@ class DesignCanvas(QGraphicsView):
                     child_data = {
                         "instance_id": str(uuid.uuid4()),
                         "tool_type": constants.TOOL_BUTTON,
-                        "properties": {**default_props, "position": {"x": pos_x, "y": pos_y}}
+                        "properties": {**default_props, "position": {"x": pos_x, "y": pos_y}},
                     }
                     command = AddChildCommand(self.screen_id, child_data)
                     command_history_service.add_command(command)
+                elif self.active_tool == constants.TOOL_TEXT:
+                    default_props = text_tool.get_default_properties()
+                    default_props["position"] = {
+                        "x": int(scene_pos.x()),
+                        "y": int(scene_pos.y()),
+                    }
+                    self._add_tool_item(constants.TOOL_TEXT, default_props)
+                elif self.active_tool == constants.TOOL_POLYGON:
+                    if not self._drawing:
+                        self._drawing = True
+                        self._draw_points = [scene_pos]
+                    else:
+                        self._draw_points.append(scene_pos)
+                elif self.active_tool == constants.TOOL_FREEFORM:
+                    self._drawing = True
+                    self._draw_points = [scene_pos]
+                else:
+                    self._drawing = True
+                    self._start_pos = scene_pos
             return
 
         if event.button() == Qt.MouseButton.LeftButton:
@@ -267,7 +324,12 @@ class DesignCanvas(QGraphicsView):
     def mouseMoveEvent(self, event: QMouseEvent):
         current_scene_pos = self.mapToScene(event.pos())
         self.mouse_moved_on_scene.emit(current_scene_pos)
-        
+
+        if self.active_tool != constants.TOOL_SELECT:
+            if self._drawing and self.active_tool == constants.TOOL_FREEFORM:
+                self._draw_points.append(current_scene_pos)
+            return
+
         delta = current_scene_pos - self._last_mouse_scene_pos
 
         if self._drag_mode == 'resize':
@@ -281,10 +343,14 @@ class DesignCanvas(QGraphicsView):
             if self.scene.selectedItems():
                 handle = self.get_handle_at(event.pos())
                 if handle:
-                    if handle in ['top_left', 'bottom_right']: self.setCursor(QCursor(Qt.CursorShape.SizeFDiagCursor))
-                    elif handle in ['top_right', 'bottom_left']: self.setCursor(QCursor(Qt.CursorShape.SizeBDiagCursor))
-                    elif handle in ['top', 'bottom']: self.setCursor(QCursor(Qt.CursorShape.SizeVerCursor))
-                    elif handle in ['left', 'right']: self.setCursor(QCursor(Qt.CursorShape.SizeHorCursor))
+                    if handle in ['top_left', 'bottom_right']:
+                        self.setCursor(QCursor(Qt.CursorShape.SizeFDiagCursor))
+                    elif handle in ['top_right', 'bottom_left']:
+                        self.setCursor(QCursor(Qt.CursorShape.SizeBDiagCursor))
+                    elif handle in ['top', 'bottom']:
+                        self.setCursor(QCursor(Qt.CursorShape.SizeVerCursor))
+                    elif handle in ['left', 'right']:
+                        self.setCursor(QCursor(Qt.CursorShape.SizeHorCursor))
                 else:
                     self.setCursor(QCursor(Qt.CursorShape.ArrowCursor))
             else:
@@ -429,6 +495,144 @@ class DesignCanvas(QGraphicsView):
                 self.selection_changed.emit(self.screen_id, selection_data)
 
     def mouseReleaseEvent(self, event: QMouseEvent):
+        if self.active_tool != constants.TOOL_SELECT:
+            if event.button() == Qt.MouseButton.LeftButton and self._drawing:
+                scene_pos = self.mapToScene(event.pos())
+                if self.active_tool == constants.TOOL_LINE:
+                    pts = [self._start_pos, scene_pos]
+                    min_x = min(p.x() for p in pts)
+                    min_y = min(p.y() for p in pts)
+                    start = {"x": int(self._start_pos.x() - min_x), "y": int(self._start_pos.y() - min_y)}
+                    end = {"x": int(scene_pos.x() - min_x), "y": int(scene_pos.y() - min_y)}
+                    props = line_tool.get_default_properties()
+                    props.update({"start": start, "end": end, "position": {"x": int(min_x), "y": int(min_y)}})
+                    self._add_tool_item(constants.TOOL_LINE, props)
+                elif self.active_tool == constants.TOOL_FREEFORM:
+                    self._draw_points.append(scene_pos)
+                    min_x = min(p.x() for p in self._draw_points)
+                    min_y = min(p.y() for p in self._draw_points)
+                    rel = [{"x": int(p.x() - min_x), "y": int(p.y() - min_y)} for p in self._draw_points]
+                    props = polygon_tool.get_default_properties()
+                    props.update({"points": rel, "position": {"x": int(min_x), "y": int(min_y)}})
+                    self._add_tool_item(constants.TOOL_FREEFORM, props)
+                elif self.active_tool == constants.TOOL_RECT:
+                    x = int(min(self._start_pos.x(), scene_pos.x()))
+                    y = int(min(self._start_pos.y(), scene_pos.y()))
+                    w = int(abs(scene_pos.x() - self._start_pos.x()))
+                    h = int(abs(scene_pos.y() - self._start_pos.y()))
+                    props = {
+                        "position": {"x": x, "y": y},
+                        "size": {"width": w, "height": h},
+                        "fill_color": "#ffffff",
+                        "stroke_color": "#000000",
+                        "stroke_width": 1,
+                        "stroke_style": "solid",
+                    }
+                    self._add_tool_item(constants.TOOL_RECT, props)
+                elif self.active_tool == constants.TOOL_CIRCLE:
+                    x = int(min(self._start_pos.x(), scene_pos.x()))
+                    y = int(min(self._start_pos.y(), scene_pos.y()))
+                    w = int(abs(scene_pos.x() - self._start_pos.x()))
+                    h = int(abs(scene_pos.y() - self._start_pos.y()))
+                    props = {
+                        "position": {"x": x, "y": y},
+                        "size": {"width": w, "height": h},
+                        "fill_color": "#ffffff",
+                        "stroke_color": "#000000",
+                        "stroke_width": 1,
+                        "stroke_style": "solid",
+                    }
+                    self._add_tool_item(constants.TOOL_CIRCLE, props)
+                elif self.active_tool == constants.TOOL_ARC:
+                    x = int(min(self._start_pos.x(), scene_pos.x()))
+                    y = int(min(self._start_pos.y(), scene_pos.y()))
+                    w = int(abs(scene_pos.x() - self._start_pos.x()))
+                    h = int(abs(scene_pos.y() - self._start_pos.y()))
+                    props = {
+                        "position": {"x": x, "y": y},
+                        "size": {"width": w, "height": h},
+                        "start_angle": 0,
+                        "span_angle": 90,
+                        "color": "#000000",
+                        "width": 1,
+                        "style": "solid",
+                    }
+                    self._add_tool_item(constants.TOOL_ARC, props)
+                elif self.active_tool == constants.TOOL_SECTOR:
+                    x = int(min(self._start_pos.x(), scene_pos.x()))
+                    y = int(min(self._start_pos.y(), scene_pos.y()))
+                    w = int(abs(scene_pos.x() - self._start_pos.x()))
+                    h = int(abs(scene_pos.y() - self._start_pos.y()))
+                    props = {
+                        "position": {"x": x, "y": y},
+                        "size": {"width": w, "height": h},
+                        "start_angle": 0,
+                        "span_angle": 90,
+                        "stroke_color": "#000000",
+                        "stroke_width": 1,
+                        "stroke_style": "solid",
+                        "fill_color": "#ffffff",
+                    }
+                    self._add_tool_item(constants.TOOL_SECTOR, props)
+                elif self.active_tool == constants.TOOL_TABLE:
+                    x = int(min(self._start_pos.x(), scene_pos.x()))
+                    y = int(min(self._start_pos.y(), scene_pos.y()))
+                    w = int(abs(scene_pos.x() - self._start_pos.x()))
+                    h = int(abs(scene_pos.y() - self._start_pos.y()))
+                    props = {
+                        "position": {"x": x, "y": y},
+                        "rows": 2,
+                        "columns": 2,
+                        "cell_size": {"width": max(int(w / 2), 1), "height": max(int(h / 2), 1)},
+                        "stroke_color": "#000000",
+                        "stroke_width": 1,
+                        "fill_color": "#ffffff",
+                    }
+                    self._add_tool_item(constants.TOOL_TABLE, props)
+                elif self.active_tool == constants.TOOL_SCALE:
+                    x = int(min(self._start_pos.x(), scene_pos.x()))
+                    y = int(min(self._start_pos.y(), scene_pos.y()))
+                    w = int(abs(scene_pos.x() - self._start_pos.x()))
+                    h = int(abs(scene_pos.y() - self._start_pos.y()))
+                    orient = "horizontal" if w >= h else "vertical"
+                    length = w if orient == "horizontal" else h
+                    thickness = h if orient == "horizontal" else w
+                    props = {
+                        "position": {"x": x, "y": y},
+                        "orientation": orient,
+                        "length": int(length),
+                        "thickness": int(thickness),
+                        "major_ticks": 10,
+                        "minor_ticks": 5,
+                        "color": "#000000",
+                    }
+                    self._add_tool_item(constants.TOOL_SCALE, props)
+                elif self.active_tool == constants.TOOL_IMAGE:
+                    x = int(min(self._start_pos.x(), scene_pos.x()))
+                    y = int(min(self._start_pos.y(), scene_pos.y()))
+                    w = int(abs(scene_pos.x() - self._start_pos.x()))
+                    h = int(abs(scene_pos.y() - self._start_pos.y()))
+                    props = {
+                        "position": {"x": x, "y": y},
+                        "size": {"width": w, "height": h},
+                        "path": "",
+                    }
+                    self._add_tool_item(constants.TOOL_IMAGE, props)
+                elif self.active_tool == constants.TOOL_DXF:
+                    x = int(min(self._start_pos.x(), scene_pos.x()))
+                    y = int(min(self._start_pos.y(), scene_pos.y()))
+                    w = int(abs(scene_pos.x() - self._start_pos.x()))
+                    h = int(abs(scene_pos.y() - self._start_pos.y()))
+                    props = {
+                        "position": {"x": x, "y": y},
+                        "size": {"width": w, "height": h},
+                    }
+                    self._add_tool_item(constants.TOOL_DXF, props)
+                if self.active_tool != constants.TOOL_POLYGON:
+                    self._drawing = False
+                    self._start_pos = None
+                    self._draw_points = []
+            return
         if event.button() == Qt.MouseButton.LeftButton:
             if self._drag_mode == 'resize':
                 update_list = []
@@ -574,8 +778,33 @@ class DesignCanvas(QGraphicsView):
         if not instance_id: return None
         item = None
         if 'tool_type' in child_data:
-            if child_data['tool_type'] == constants.TOOL_BUTTON:
+            t = child_data['tool_type']
+            if t == constants.TOOL_BUTTON:
                 item = ButtonItem(child_data)
+            elif t == constants.TOOL_TEXT:
+                item = TextItem(child_data)
+            elif t == constants.TOOL_LINE:
+                item = LineItem(child_data)
+            elif t == constants.TOOL_FREEFORM:
+                item = FreeformItem(child_data)
+            elif t == constants.TOOL_RECT:
+                item = RectItem(child_data)
+            elif t == constants.TOOL_POLYGON:
+                item = PolygonItem(child_data)
+            elif t == constants.TOOL_CIRCLE:
+                item = CircleItem(child_data)
+            elif t == constants.TOOL_ARC:
+                item = ArcItem(child_data)
+            elif t == constants.TOOL_SECTOR:
+                item = SectorItem(child_data)
+            elif t == constants.TOOL_TABLE:
+                item = TableItem(child_data)
+            elif t == constants.TOOL_SCALE:
+                item = ScaleItem(child_data)
+            elif t == constants.TOOL_IMAGE:
+                item = ImageItem(child_data)
+            elif t == constants.TOOL_DXF:
+                item = DxfItem(child_data)
         elif 'screen_id' in child_data:
             item = EmbeddedScreenItem(child_data)
         if item:
@@ -584,6 +813,15 @@ class DesignCanvas(QGraphicsView):
             self.scene.addItem(item)
             self._item_map[instance_id] = item
         return item
+
+    def _add_tool_item(self, tool_type, properties):
+        child_data = {
+            "instance_id": str(uuid.uuid4()),
+            "tool_type": tool_type,
+            "properties": properties,
+        }
+        command = AddChildCommand(self.screen_id, child_data)
+        command_history_service.add_command(command)
 
     def add_embedded_screen(self, screen_id, position):
         """
@@ -619,6 +857,18 @@ class DesignCanvas(QGraphicsView):
             self.clear_selection()
 
     def mouseDoubleClickEvent(self, event: QMouseEvent):
+        if self.active_tool == constants.TOOL_POLYGON and self._drawing:
+            scene_pos = self.mapToScene(event.pos())
+            self._draw_points.append(scene_pos)
+            min_x = min(p.x() for p in self._draw_points)
+            min_y = min(p.y() for p in self._draw_points)
+            rel = [{"x": int(p.x() - min_x), "y": int(p.y() - min_y)} for p in self._draw_points]
+            props = polygon_tool.get_default_properties()
+            props.update({"points": rel, "position": {"x": int(min_x), "y": int(min_y)}})
+            self._add_tool_item(constants.TOOL_POLYGON, props)
+            self._drawing = False
+            self._draw_points = []
+            return
         item = self.itemAt(event.pos())
         if isinstance(item, ButtonItem):
             self._open_button_properties(item.instance_data)
