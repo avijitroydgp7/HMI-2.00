@@ -9,7 +9,7 @@ from PyQt6.QtWidgets import (
 from typing import Dict, Optional
 
 from services.tag_data_service import tag_data_service
-from ..custom_widgets import TagSelector, CollapsibleBox
+from ..widgets import TagSelector, CollapsibleBox
 
 class BitActionDialog(QDialog):
     """

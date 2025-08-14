@@ -17,10 +17,10 @@ from services.commands import (
     BulkAddTagsCommand
 )
 from dialogs import AddTagDialog
-from dialogs.custom_info_dialog import CustomInfoDialog
-from dialogs.custom_question_dialog import CustomQuestionDialog
+from dialogs.info_dialog import CustomInfoDialog
+from dialogs.question_dialog import CustomQuestionDialog
 from PyQt6.QtWidgets import QMessageBox
-from .custom_tree_widget import CustomTreeWidget
+from .tree_widget import CustomTreeWidget
 from utils import constants
 
 

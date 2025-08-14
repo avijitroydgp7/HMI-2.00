@@ -11,7 +11,7 @@ from services.command_history_service import command_history_service
 from services.commands import AddTagDatabaseCommand, RemoveTagDatabaseCommand, RenameTagDatabaseCommand
 from dialogs import NewTagDatabaseDialog
 from utils import constants
-from components.custom_tree_widget import CustomTreeWidget
+from components.tree_widget import CustomTreeWidget
 
 class ProjectTreeWidget(CustomTreeWidget):
 

@@ -196,7 +196,7 @@ class ScreenManagerWidget(QWidget):
             self.handle_delete_screen(item.data(0, Qt.ItemDataRole.UserRole), item.text(0))
 
     def handle_delete_screen(self, screen_id, screen_name):
-        from dialogs.custom_question_dialog import CustomQuestionDialog
+        from dialogs.question_dialog import CustomQuestionDialog
         dialog = CustomQuestionDialog(self)
         dialog.setWindowTitle("Delete Screen")
         dialog.setText(f"Are you sure you want to permanently delete '{screen_name}'?")

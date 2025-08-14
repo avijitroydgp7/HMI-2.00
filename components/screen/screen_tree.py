@@ -4,7 +4,7 @@
 from PyQt6.QtWidgets import QTreeWidget, QTreeWidgetItem, QAbstractItemView
 from PyQt6.QtCore import Qt, pyqtSignal, QMimeData, QByteArray
 from PyQt6.QtGui import QDrag, QKeyEvent
-from components.custom_tree_widget import CustomTreeWidget
+from components.tree_widget import CustomTreeWidget
 from utils import constants
 
 

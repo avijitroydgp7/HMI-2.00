@@ -9,7 +9,7 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtCore import Qt
 from typing import Dict, Optional
 
-from ..custom_widgets import TagSelector, CollapsibleBox
+from ..widgets import TagSelector, CollapsibleBox
 
 
 class DataTypeMapper:
