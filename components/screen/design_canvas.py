@@ -35,6 +35,7 @@ from tools import (
     text as text_tool,
     image as image_tool,
     dxf as dxf_tool,
+    scale as scale_tool,
 )
 
 from .graphics_items import (
@@ -611,7 +612,8 @@ class DesignCanvas(QGraphicsView):
                     orient = "horizontal" if w >= h else "vertical"
                     length = w if orient == "horizontal" else h
                     thickness = h if orient == "horizontal" else w
-                    props = {
+                    props = scale_tool.get_default_properties()
+                    props.update({
                         "position": {"x": x, "y": y},
                         "orientation": orient,
                         "length": int(length),
@@ -619,7 +621,7 @@ class DesignCanvas(QGraphicsView):
                         "major_ticks": 10,
                         "minor_ticks": 5,
                         "color": "#000000",
-                    }
+                    })
                     self._add_tool_item(constants.TOOL_SCALE, props)
 
                 elif self.active_tool == constants.TOOL_DXF:

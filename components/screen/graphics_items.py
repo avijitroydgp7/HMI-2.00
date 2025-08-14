@@ -597,7 +597,7 @@ class TableItem(BaseGraphicsItem):
 
 
 class ScaleItem(BaseGraphicsItem):
-    """Basic ruler-like scale."""
+    """Basic ruler-like scale with measurement labels."""
 
     def __init__(self, instance_data, parent=None):
         super().__init__(instance_data, parent)
@@ -608,42 +608,94 @@ class ScaleItem(BaseGraphicsItem):
         orient = props.get("orientation", "horizontal")
         length = props.get("length", 100)
         thickness = props.get("thickness", 20)
+        major = max(1, props.get("major_ticks", 10))
+        tick_spacing = props.get("tick_spacing", 1)
+        units = props.get("units", "")
+
+        font = QFont("Arial", 8)
+        metrics = QFontMetrics(font)
+        max_label = f"{major * tick_spacing}{units}"
+        label_w = metrics.horizontalAdvance(max_label) + 4
+        label_h = metrics.height() + 2
+
         if orient == "vertical":
-            return QRectF(0, 0, thickness, length)
-        return QRectF(0, 0, length, thickness)
+            return QRectF(0, 0, thickness + label_w, length)
+        return QRectF(0, 0, length, thickness + label_h)
 
     def paint(self, painter: QPainter, option, widget=None):
         props = self.instance_data.get("properties", {})
         orient = props.get("orientation", "horizontal")
         length = props.get("length", 100)
         thickness = props.get("thickness", 20)
-        major = props.get("major_ticks", 10)
+        major = max(1, props.get("major_ticks", 10))
         minor = props.get("minor_ticks", 5)
+        tick_spacing = props.get("tick_spacing", 1)
+        units = props.get("units", "")
         color = QColor(props.get("color", "#000000"))
+
         pen = QPen(color, 1)
         painter.save()
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
         painter.setPen(pen)
+
+        font = QFont("Arial", 8)
+        painter.setFont(font)
+        metrics = QFontMetrics(font)
+
         if orient == "vertical":
-            painter.drawLine(thickness / 2, 0, thickness / 2, length)
+            painter.drawLine(QPointF(thickness / 2, 0), QPointF(thickness / 2, length))
             for i in range(major + 1):
                 y = i * (length / major)
-                painter.drawLine(0, y, thickness, y)
+                painter.drawLine(QPointF(0, y), QPointF(thickness, y))
+
+                label = f"{i * tick_spacing:g}{units}"
+                text_rect = QRectF(
+                    thickness,
+                    y - metrics.height() / 2,
+                    metrics.horizontalAdvance(label) + 4,
+                    metrics.height(),
+                )
+                painter.drawText(
+                    text_rect,
+                    Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter,
+                    label,
+                )
+
                 if minor > 1 and i < major:
                     step = length / major / minor
                     for j in range(1, minor):
                         yy = y + j * step
-                        painter.drawLine(thickness / 4, yy, 3 * thickness / 4, yy)
+                        painter.drawLine(
+                            QPointF(thickness / 4, yy),
+                            QPointF(3 * thickness / 4, yy),
+                        )
         else:
-            painter.drawLine(0, thickness / 2, length, thickness / 2)
+            painter.drawLine(QPointF(0, thickness / 2), QPointF(length, thickness / 2))
             for i in range(major + 1):
                 x = i * (length / major)
-                painter.drawLine(x, 0, x, thickness)
+                painter.drawLine(QPointF(x, 0), QPointF(x, thickness))
+
+                label = f"{i * tick_spacing:g}{units}"
+                text_rect = QRectF(
+                    x - metrics.horizontalAdvance(label) / 2,
+                    thickness,
+                    metrics.horizontalAdvance(label) + 4,
+                    metrics.height(),
+                )
+                painter.drawText(
+                    text_rect,
+                    Qt.AlignmentFlag.AlignCenter | Qt.AlignmentFlag.AlignTop,
+                    label,
+                )
+
                 if minor > 1 and i < major:
                     step = length / major / minor
                     for j in range(1, minor):
                         xx = x + j * step
-                        painter.drawLine(xx, thickness / 4, xx, 3 * thickness / 4)
+                        painter.drawLine(
+                            QPointF(xx, thickness / 4),
+                            QPointF(xx, 3 * thickness / 4),
+                        )
         painter.restore()
 
 
