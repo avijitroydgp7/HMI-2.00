@@ -12,10 +12,13 @@ def setup_window(win):
     win.setWindowIcon(app_icon)
     win.resize(1600, 900)
 
-    # Add stylesheet for selected toolbar buttons to have a deeper background color
+    # Style toolbar buttons to highlight on hover and when checked
     win.setStyleSheet("""
+        QToolButton:hover {
+            background-color: #00350e;
+        }
         QToolButton:checked {
-            background-color: #7f7f7f; /* Deep dark blue */
+            background-color: #00791f;
         }
     """)
 
