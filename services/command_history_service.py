@@ -23,13 +23,20 @@ class CommandHistoryService(QObject):
         """
         from .project_service import project_service
         
-        command.redo()
-        
+        try:
+            command.redo()
+        except Exception as e:
+            print(f"Command redo failed: {e}")
+            return
+
         self._undo_stack.append(command)
         self._redo_stack.clear()
-        
+
         # FIX: Notify the UI that the data has changed after the initial "do"
-        command._notify()
+        try:
+            command._notify()
+        except Exception as e:
+            print(f"Command notify failed: {e}")
         
         self.history_changed.emit()
         project_service.set_dirty(True)
@@ -42,9 +49,19 @@ class CommandHistoryService(QObject):
         from .project_service import project_service
         
         if self.can_undo():
-            command = self._undo_stack.pop()
-            command.undo()
-            command._notify()
+            command = self._undo_stack[-1]
+            try:
+                command.undo()
+            except Exception as e:
+                print(f"Command undo failed: {e}")
+                return
+
+            try:
+                command._notify()
+            except Exception as e:
+                print(f"Command notify failed: {e}")
+
+            self._undo_stack.pop()
             self._redo_stack.append(command)
             self.history_changed.emit()
             project_service.set_dirty(True)
@@ -57,9 +74,19 @@ class CommandHistoryService(QObject):
         from .project_service import project_service
         
         if self.can_redo():
-            command = self._redo_stack.pop()
-            command.redo()
-            command._notify()
+            command = self._redo_stack[-1]
+            try:
+                command.redo()
+            except Exception as e:
+                print(f"Command redo failed: {e}")
+                return
+
+            try:
+                command._notify()
+            except Exception as e:
+                print(f"Command notify failed: {e}")
+
+            self._redo_stack.pop()
             self._undo_stack.append(command)
             self.history_changed.emit()
             project_service.set_dirty(True)
