@@ -569,6 +569,18 @@ class DesignCanvas(QGraphicsView):
                 start = {'x': start.get('x', 0) * scale_x, 'y': start.get('y', 0) * scale_y}
                 end = {'x': end.get('x', 0) * scale_x, 'y': end.get('y', 0) * scale_y}
                 props.update({'start': start, 'end': end, 'size': {'width': new_width, 'height': new_height}})
+            elif isinstance(item, (PolygonItem, FreeformItem)):
+                pts = props.get('points', [])
+                scaled_pts = [
+                    {
+                        'x': p.get('x', 0) * scale_x,
+                        'y': p.get('y', 0) * scale_y,
+                    }
+                    for p in pts
+                ]
+                props.update({'points': scaled_pts, 'size': {'width': new_width, 'height': new_height}})
+                item.update_data(item.instance_data)
+                continue
             else:
                 props['size'] = {'width': new_width, 'height': new_height}
 
