@@ -931,7 +931,7 @@ class DesignCanvas(QGraphicsView):
             instance_id = child_data['instance_id']
             if instance_id in self._item_map:
                 item = self._item_map[instance_id]
-                item.update_data(child_data)
+                item.update_data(copy.deepcopy(child_data))
                 pos_data = child_data.get('position') or child_data.get('properties', {}).get('position', {})
                 item.setPos(QPointF(pos_data.get('x', 0), pos_data.get('y', 0)))
             else:
@@ -944,39 +944,40 @@ class DesignCanvas(QGraphicsView):
     def _create_item(self, child_data):
         instance_id = child_data.get('instance_id')
         if not instance_id: return None
+        data_copy = copy.deepcopy(child_data)
         item = None
-        if 'tool_type' in child_data:
-            t = child_data['tool_type']
+        if 'tool_type' in data_copy:
+            t = data_copy['tool_type']
             if t == constants.TOOL_BUTTON:
-                item = ButtonItem(child_data)
+                item = ButtonItem(data_copy)
             elif t == constants.TOOL_TEXT:
-                item = TextItem(child_data)
+                item = TextItem(data_copy)
             elif t == constants.TOOL_LINE:
-                item = LineItem(child_data)
+                item = LineItem(data_copy)
             elif t == constants.TOOL_FREEFORM:
-                item = FreeformItem(child_data)
+                item = FreeformItem(data_copy)
             elif t == constants.TOOL_RECT:
-                item = RectItem(child_data)
+                item = RectItem(data_copy)
             elif t == constants.TOOL_POLYGON:
-                item = PolygonItem(child_data)
+                item = PolygonItem(data_copy)
             elif t == constants.TOOL_CIRCLE:
-                item = CircleItem(child_data)
+                item = CircleItem(data_copy)
             elif t == constants.TOOL_ARC:
-                item = ArcItem(child_data)
+                item = ArcItem(data_copy)
             elif t == constants.TOOL_SECTOR:
-                item = SectorItem(child_data)
+                item = SectorItem(data_copy)
             elif t == constants.TOOL_TABLE:
-                item = TableItem(child_data)
+                item = TableItem(data_copy)
             elif t == constants.TOOL_SCALE:
-                item = ScaleItem(child_data)
+                item = ScaleItem(data_copy)
             elif t == constants.TOOL_IMAGE:
-                item = ImageItem(child_data)
+                item = ImageItem(data_copy)
             elif t == constants.TOOL_DXF:
-                item = DxfItem(child_data)
-        elif 'screen_id' in child_data:
-            item = EmbeddedScreenItem(child_data)
+                item = DxfItem(data_copy)
+        elif 'screen_id' in data_copy:
+            item = EmbeddedScreenItem(data_copy)
         if item:
-            pos_data = child_data.get('position') or child_data.get('properties', {}).get('position', {})
+            pos_data = data_copy.get('position') or data_copy.get('properties', {}).get('position', {})
             item.setPos(QPointF(pos_data.get('x', 0), pos_data.get('y', 0)))
             self.scene.addItem(item)
             self._item_map[instance_id] = item
