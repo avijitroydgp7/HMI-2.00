@@ -12,7 +12,7 @@ from PyQt6.QtGui import (
     QPainterPath,
     QPolygonF,
 )
-from PyQt6.QtCore import QRectF, Qt, QPointF
+from PyQt6.QtCore import QRectF, Qt, QPointF, QLineF
 import copy
 
 from services.screen_data_service import screen_service
@@ -586,13 +586,13 @@ class TableItem(BaseGraphicsItem):
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
         painter.setPen(pen)
         painter.setBrush(QColor(props.get("fill_color", "#ffffff")))
-        painter.drawRect(0, 0, w, h)
+        painter.drawRect(QRectF(0, 0, w, h))
         for r in range(1, rows):
             y = r * cell.get("height", 20)
-            painter.drawLine(0, y, w, y)
+            painter.drawLine(QLineF(0, y, w, y))
         for c in range(1, cols):
             x = c * cell.get("width", 50)
-            painter.drawLine(x, 0, x, h)
+            painter.drawLine(QLineF(x, 0, x, h))
         painter.restore()
 
 

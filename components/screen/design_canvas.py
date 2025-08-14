@@ -581,6 +581,17 @@ class DesignCanvas(QGraphicsView):
                 props.update({'points': scaled_pts, 'size': {'width': new_width, 'height': new_height}})
                 item.update_data(item.instance_data)
                 continue
+            elif isinstance(item, TableItem):
+                rows = props.get('rows', 1) or 1
+                cols = props.get('columns', 1) or 1
+                cell_width = new_width / cols
+                cell_height = new_height / rows
+                props.update(
+                    {
+                        'size': {'width': new_width, 'height': new_height},
+                        'cell_size': {'width': cell_width, 'height': cell_height},
+                    }
+                )
             else:
                 props['size'] = {'width': new_width, 'height': new_height}
 
