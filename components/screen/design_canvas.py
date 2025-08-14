@@ -34,6 +34,7 @@ from tools import (
     polygon as polygon_tool,
     text as text_tool,
     image as image_tool,
+    dxf as dxf_tool,
 )
 
 from .graphics_items import (
@@ -622,15 +623,26 @@ class DesignCanvas(QGraphicsView):
                     self._add_tool_item(constants.TOOL_SCALE, props)
 
                 elif self.active_tool == constants.TOOL_DXF:
-                    x = int(min(self._start_pos.x(), scene_pos.x()))
-                    y = int(min(self._start_pos.y(), scene_pos.y()))
-                    w = int(abs(scene_pos.x() - self._start_pos.x()))
-                    h = int(abs(scene_pos.y() - self._start_pos.y()))
-                    props = {
-                        "position": {"x": x, "y": y},
-                        "size": {"width": w, "height": h},
-                    }
-                    self._add_tool_item(constants.TOOL_DXF, props)
+                    shapes = dxf_tool.prompt_for_dxf(self)
+                    if shapes:
+                        x = int(min(self._start_pos.x(), scene_pos.x()))
+                        y = int(min(self._start_pos.y(), scene_pos.y()))
+                        for shape in shapes:
+                            t = shape.get("tool_type")
+                            props = shape.get("properties", {})
+                            if t == constants.TOOL_LINE:
+                                props["start"]["x"] += x
+                                props["start"]["y"] += y
+                                props["end"]["x"] += x
+                                props["end"]["y"] += y
+                            elif t == constants.TOOL_ARC:
+                                props["position"]["x"] += x
+                                props["position"]["y"] += y
+                            elif t == constants.TOOL_POLYGON:
+                                for pt in props.get("points", []):
+                                    pt["x"] += x
+                                    pt["y"] += y
+                            self._add_tool_item(t, props)
                 if self.active_tool != constants.TOOL_POLYGON:
                     self._drawing = False
                     self._start_pos = None
