@@ -592,6 +592,15 @@ class DesignCanvas(QGraphicsView):
                         'cell_size': {'width': cell_width, 'height': cell_height},
                     }
                 )
+            elif isinstance(item, ScaleItem):
+                orient = props.get('orientation', 'horizontal')
+                if orient == 'horizontal':
+                    length = int(new_width)
+                    thickness = int(new_height)
+                else:
+                    length = int(new_height)
+                    thickness = int(new_width)
+                props.update({'length': length, 'thickness': thickness})
             else:
                 props['size'] = {'width': new_width, 'height': new_height}
 
