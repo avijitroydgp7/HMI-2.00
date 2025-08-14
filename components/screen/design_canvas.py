@@ -1272,12 +1272,23 @@ class DesignCanvas(QGraphicsView):
 
     def delete_selected(self):
         selected_items = self.scene.selectedItems()
-        if not selected_items: return
-        for item in list(self.scene.selectedItems()):
-            if isinstance(item, BaseGraphicsItem):
-                command = RemoveChildCommand(self.screen_id, item.instance_data)
-                command_history_service.add_command(command)
+        if not selected_items:
+            return
+
+        instance_data_list = [
+            item.instance_data
+            for item in selected_items
+            if isinstance(item, BaseGraphicsItem)
+        ]
+
+        if not instance_data_list:
+            return
+
         self.clear_selection()
+
+        for instance_data in instance_data_list:
+            command = RemoveChildCommand(self.screen_id, instance_data)
+            command_history_service.add_command(command)
 
     def _move_selected_items(self, key):
         """Move selected items using arrow keys."""
