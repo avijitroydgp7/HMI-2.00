@@ -560,14 +560,21 @@ class DesignCanvas(QGraphicsView):
             new_width = start_item_rect.width() * scale_x
             new_height = start_item_rect.height() * scale_y
 
-            item.setPos(new_group_rect.left() + relative_x, new_group_rect.top() + relative_y)
-
             props = item.instance_data.setdefault('properties', {})
+
             if isinstance(item, LineItem):
                 start = props.get('start', {'x': 0, 'y': 0})
                 end = props.get('end', {'x': new_width, 'y': new_height})
                 start = {'x': start.get('x', 0) * scale_x, 'y': start.get('y', 0) * scale_y}
                 end = {'x': end.get('x', 0) * scale_x, 'y': end.get('y', 0) * scale_y}
+                min_x = min(start['x'], end['x'])
+                min_y = min(start['y'], end['y'])
+                start['x'] -= min_x
+                start['y'] -= min_y
+                end['x'] -= min_x
+                end['y'] -= min_y
+                relative_x += min_x
+                relative_y += min_y
                 props.update({'start': start, 'end': end, 'size': {'width': new_width, 'height': new_height}})
             elif isinstance(item, (PolygonItem, FreeformItem)):
                 pts = props.get('points', [])
@@ -578,9 +585,18 @@ class DesignCanvas(QGraphicsView):
                     }
                     for p in pts
                 ]
+                if scaled_pts:
+                    min_x = min(p['x'] for p in scaled_pts)
+                    min_y = min(p['y'] for p in scaled_pts)
+                else:
+                    min_x = min_y = 0
+                scaled_pts = [
+                    {'x': p['x'] - min_x, 'y': p['y'] - min_y}
+                    for p in scaled_pts
+                ]
+                relative_x += min_x
+                relative_y += min_y
                 props.update({'points': scaled_pts, 'size': {'width': new_width, 'height': new_height}})
-                item.update_data(item.instance_data)
-                continue
             elif isinstance(item, TextItem):
                 props['size'] = {'width': new_width, 'height': new_height}
                 font_info = props.get('font', {})
@@ -612,6 +628,12 @@ class DesignCanvas(QGraphicsView):
                 props['size'] = {'width': new_width, 'height': new_height}
 
             item.update_data(item.instance_data)
+
+            offset_rect = item.boundingRect()
+            item.setPos(
+                new_group_rect.left() + relative_x - offset_rect.left(),
+                new_group_rect.top() + relative_y - offset_rect.top(),
+            )
 
         self.scene.update()
         
