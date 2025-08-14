@@ -329,7 +329,10 @@ class DesignCanvas(QGraphicsView):
                 self._start_selection_states.clear()
                 for item in self.scene.selectedItems():
                     if isinstance(item, BaseGraphicsItem):
-                        self._start_selection_states[item.get_instance_id()] = item.sceneBoundingRect()
+                        self._start_selection_states[item.get_instance_id()] = {
+                            'rect': item.sceneBoundingRect(),
+                            'properties': copy.deepcopy(item.instance_data.get('properties', {}))
+                        }
                 self._update_shadow_for_zoom()
                 event.accept()
                 return
@@ -546,8 +549,9 @@ class DesignCanvas(QGraphicsView):
 
         # Apply the scaling to all selected items
         for item in self.scene.selectedItems():
-            if not isinstance(item, BaseGraphicsItem) or not hasattr(item, 'is_resizable') or not item.is_resizable: continue
-            
+            if not isinstance(item, BaseGraphicsItem) or not hasattr(item, 'is_resizable') or not item.is_resizable:
+                continue
+
             start_item_rect = item.sceneBoundingRect()
             
             relative_x = (start_item_rect.left() - current_group_rect.left()) * scale_x
@@ -557,7 +561,17 @@ class DesignCanvas(QGraphicsView):
             new_height = start_item_rect.height() * scale_y
 
             item.setPos(new_group_rect.left() + relative_x, new_group_rect.top() + relative_y)
-            item.instance_data.setdefault('properties', {})['size'] = {'width': new_width, 'height': new_height}
+
+            props = item.instance_data.setdefault('properties', {})
+            if isinstance(item, LineItem):
+                start = props.get('start', {'x': 0, 'y': 0})
+                end = props.get('end', {'x': new_width, 'y': new_height})
+                start = {'x': start.get('x', 0) * scale_x, 'y': start.get('y', 0) * scale_y}
+                end = {'x': end.get('x', 0) * scale_x, 'y': end.get('y', 0) * scale_y}
+                props.update({'start': start, 'end': end, 'size': {'width': new_width, 'height': new_height}})
+            else:
+                props['size'] = {'width': new_width, 'height': new_height}
+
             item.update_data(item.instance_data)
 
         self.scene.update()
@@ -730,9 +744,11 @@ class DesignCanvas(QGraphicsView):
                 for item in self.scene.selectedItems():
                     if not isinstance(item, BaseGraphicsItem) or not hasattr(item, 'is_resizable') or not item.is_resizable: continue
                     
-                    start_rect = self._start_selection_states[item.get_instance_id()]
-                    
-                    old_props = copy.deepcopy(item.instance_data['properties'])
+                    start_state = self._start_selection_states[item.get_instance_id()]
+                    start_rect = start_state['rect'] if isinstance(start_state, dict) else start_state
+
+                    base_props = start_state.get('properties', {}) if isinstance(start_state, dict) else {}
+                    old_props = copy.deepcopy(base_props)
                     old_props['position'] = {'x': start_rect.x(), 'y': start_rect.y()}
                     old_props['size'] = {'width': start_rect.width(), 'height': start_rect.height()}
                     
