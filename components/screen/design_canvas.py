@@ -27,6 +27,7 @@ from PyQt6.QtCore import Qt, QPoint, QPointF, pyqtSignal, QRectF, QRect, QEvent,
 import copy
 import uuid
 
+from utils.icon_manager import IconManager
 from services.screen_data_service import screen_service
 from services.clipboard_service import clipboard_service
 from services.command_history_service import command_history_service
@@ -102,6 +103,7 @@ class DesignCanvas(QGraphicsView):
         self.scene = QGraphicsScene(self)
         self.scene.setItemIndexMethod(QGraphicsScene.ItemIndexMethod.BspTreeIndex)
         self.setScene(self.scene)
+        self.page_item = QGraphicsRectItem()
 
         self.page_item = QGraphicsRectItem()
 
@@ -311,7 +313,9 @@ class DesignCanvas(QGraphicsView):
                     else:
                         self._preview_item = QGraphicsRectItem()
                     self._preview_item.setPen(pen)
-                    self._preview_item.setBrush(Qt.BrushStyle.NoBrush)
+                    # Only set brush for items that support it
+                    if isinstance(self._preview_item, (QGraphicsRectItem, QGraphicsEllipseItem)):
+                        self._preview_item.setBrush(QBrush(Qt.BrushStyle.NoBrush))
                     self.scene.addItem(self._preview_item)
             return
 

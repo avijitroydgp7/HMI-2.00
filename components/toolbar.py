@@ -81,7 +81,7 @@ class ToolsToolbar(QToolBar):
 
         tools = [
             {"id": constants.TOOL_SELECT, "name": "Select Tool", "icon": "fa5s.mouse-pointer", "shortcut": "V", "checked": True},
-            {"id": constants.TOOL_BUTTON, "name": "Button Tool", "icon": "fa5s.hand-pointer", "shortcut": "B", "checked": False},
+            {"id": constants.TOOL_BUTTON, "name": "Button Tool", "icon": "mdi.gesture-tap-box", "shortcut": "B", "checked": False},
         ]
 
         icon_sz = self.iconSize().width()
@@ -124,11 +124,11 @@ class DrawingToolbar(QToolBar):
 
         tool_groups = [
             [
-                {"id": constants.TOOL_LINE, "name": "Line Tool", "icon": "fa5s.minus", "shortcut": "L"},
+                {"id": constants.TOOL_LINE, "name": "Line Tool", "icon": "fa5s.slash", "shortcut": "L"},
                 {"id": constants.TOOL_FREEFORM, "name": "Freeform Tool", "icon": "fa5s.pencil-alt", "shortcut": "F"},
             ],
             [
-                {"id": constants.TOOL_RECT, "name": "Rectangle Tool", "icon": "fa5s.square", "shortcut": "R"},
+                {"id": constants.TOOL_RECT, "name": "Rectangle Tool", "icon": "fa5.square", "shortcut": "R"},
                 {"id": constants.TOOL_POLYGON, "name": "Polygon Tool", "icon": "fa5s.draw-polygon", "shortcut": "P"},
                 {"id": constants.TOOL_CIRCLE, "name": "Circle Tool", "icon": "fa5s.circle", "shortcut": "C"},
                 {"id": constants.TOOL_ARC, "name": "Arc Tool", "icon": "fa5s.circle-notch", "shortcut": "A"},
