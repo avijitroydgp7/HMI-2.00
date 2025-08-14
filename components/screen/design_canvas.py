@@ -473,12 +473,29 @@ class DesignCanvas(QGraphicsView):
         new_group_rect = QRectF(current_group_rect)
 
         # Apply delta to the appropriate edges based on the resize handle
-        if 'left' in self._resize_handle: new_group_rect.setLeft(new_group_rect.left() + delta.x())
-        if 'right' in self._resize_handle: new_group_rect.setRight(new_group_rect.right() + delta.x())
-        if 'top' in self._resize_handle: new_group_rect.setTop(new_group_rect.top() + delta.y())
-        if 'bottom' in self._resize_handle: new_group_rect.setBottom(new_group_rect.bottom() + delta.y())
+        if 'left' in self._resize_handle:
+            new_left = new_group_rect.left() + delta.x()
+            max_left = new_group_rect.right() - 1
+            new_group_rect.setLeft(new_left if new_left <= max_left else max_left)
+        if 'right' in self._resize_handle:
+            new_right = new_group_rect.right() + delta.x()
+            min_right = new_group_rect.left() + 1
+            new_group_rect.setRight(new_right if new_right >= min_right else min_right)
+        if 'top' in self._resize_handle:
+            new_top = new_group_rect.top() + delta.y()
+            max_top = new_group_rect.bottom() - 1
+            new_group_rect.setTop(new_top if new_top <= max_top else max_top)
+        if 'bottom' in self._resize_handle:
+            new_bottom = new_group_rect.bottom() + delta.y()
+            min_bottom = new_group_rect.top() + 1
+            new_group_rect.setBottom(new_bottom if new_bottom >= min_bottom else min_bottom)
 
-        # Calculate scale factors
+        if new_group_rect.width() < 1:
+            new_group_rect.setWidth(1)
+        if new_group_rect.height() < 1:
+            new_group_rect.setHeight(1)
+
+        # Calculate scale factors after clamping
         scale_x = new_group_rect.width() / current_group_rect.width() if current_group_rect.width() != 0 else 1
         scale_y = new_group_rect.height() / current_group_rect.height() if current_group_rect.height() != 0 else 1
 
@@ -1256,7 +1273,7 @@ class DesignCanvas(QGraphicsView):
     def delete_selected(self):
         selected_items = self.scene.selectedItems()
         if not selected_items: return
-        for item in self.scene.selectedItems():
+        for item in list(self.scene.selectedItems()):
             if isinstance(item, BaseGraphicsItem):
                 command = RemoveChildCommand(self.screen_id, item.instance_data)
                 command_history_service.add_command(command)
