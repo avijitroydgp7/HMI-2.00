@@ -250,10 +250,15 @@ class TextItem(BaseGraphicsItem):
 
     def boundingRect(self) -> QRectF:
         props = self.instance_data.get("properties", {})
-        text = props.get("content", "")
-        metrics = QFontMetrics(self._get_font())
-        w = metrics.horizontalAdvance(text)
-        h = metrics.height()
+        size = props.get("size")
+        if size:
+            w = size.get("width", 0)
+            h = size.get("height", 0)
+        else:
+            text = props.get("content", "")
+            metrics = QFontMetrics(self._get_font())
+            w = metrics.horizontalAdvance(text)
+            h = metrics.height()
         return QRectF(0, 0, w, h)
 
     def paint(self, painter: QPainter, option, widget=None):

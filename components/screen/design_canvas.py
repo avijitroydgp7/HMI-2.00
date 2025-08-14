@@ -581,6 +581,13 @@ class DesignCanvas(QGraphicsView):
                 props.update({'points': scaled_pts, 'size': {'width': new_width, 'height': new_height}})
                 item.update_data(item.instance_data)
                 continue
+            elif isinstance(item, TextItem):
+                props['size'] = {'width': new_width, 'height': new_height}
+                font_info = props.get('font', {})
+                original_size = font_info.get('size', 12)
+                scale = min(scale_x, scale_y)
+                font_info['size'] = max(1, int(original_size * scale))
+                props['font'] = font_info
             elif isinstance(item, TableItem):
                 rows = props.get('rows', 1) or 1
                 cols = props.get('columns', 1) or 1
