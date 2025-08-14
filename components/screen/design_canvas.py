@@ -7,6 +7,9 @@ from PyQt6.QtWidgets import (
     QMenu,
     QGraphicsRectItem,
     QGraphicsDropShadowEffect,
+    QGraphicsLineItem,
+    QGraphicsEllipseItem,
+    QGraphicsPathItem,
 )
 from PyQt6.QtGui import (
     QPainter,
@@ -20,7 +23,7 @@ from PyQt6.QtGui import (
     QCursor,
     QBrush,
 )
-from PyQt6.QtCore import Qt, QPoint, QPointF, pyqtSignal, QRectF, QRect, QEvent
+from PyQt6.QtCore import Qt, QPoint, QPointF, pyqtSignal, QRectF, QRect, QEvent, QLineF
 import copy
 import uuid
 
@@ -94,6 +97,7 @@ class DesignCanvas(QGraphicsView):
         self._drawing = False
         self._start_pos = None
         self._draw_points = []
+        self._preview_item = None
 
         self.scene = QGraphicsScene(self)
         self.scene.setItemIndexMethod(QGraphicsScene.ItemIndexMethod.BspTreeIndex)
@@ -242,6 +246,11 @@ class DesignCanvas(QGraphicsView):
         if self.active_tool != constants.TOOL_SELECT:
             if event.button() == Qt.MouseButton.LeftButton:
                 scene_pos = self.mapToScene(event.pos())
+
+                if not self._drawing and self._preview_item:
+                    self.scene.removeItem(self._preview_item)
+                    self._preview_item = None
+
                 if self.active_tool == constants.TOOL_BUTTON:
                     default_props = button_tool.get_default_properties()
                     pos_x = int(scene_pos.x() - default_props['size']['width'] / 2)
@@ -267,14 +276,43 @@ class DesignCanvas(QGraphicsView):
                     if not self._drawing:
                         self._drawing = True
                         self._draw_points = [scene_pos]
+                        pen = QPen(QColor(200, 200, 255), 1, Qt.PenStyle.DashLine)
+                        self._preview_item = QGraphicsPathItem()
+                        self._preview_item.setPen(pen)
+                        self.scene.addItem(self._preview_item)
                     else:
                         self._draw_points.append(scene_pos)
                 elif self.active_tool == constants.TOOL_FREEFORM:
                     self._drawing = True
                     self._draw_points = [scene_pos]
+                    pen = QPen(QColor(200, 200, 255), 1, Qt.PenStyle.DashLine)
+                    self._preview_item = QGraphicsPathItem()
+                    self._preview_item.setPen(pen)
+                    self.scene.addItem(self._preview_item)
                 else:
                     self._drawing = True
                     self._start_pos = scene_pos
+                    pen = QPen(QColor(200, 200, 255), 1, Qt.PenStyle.DashLine)
+                    if self.active_tool == constants.TOOL_LINE:
+                        self._preview_item = QGraphicsLineItem()
+                    elif self.active_tool in (
+                        constants.TOOL_RECT,
+                        constants.TOOL_TABLE,
+                        constants.TOOL_SCALE,
+                        constants.TOOL_DXF,
+                    ):
+                        self._preview_item = QGraphicsRectItem()
+                    elif self.active_tool in (
+                        constants.TOOL_CIRCLE,
+                        constants.TOOL_ARC,
+                        constants.TOOL_SECTOR,
+                    ):
+                        self._preview_item = QGraphicsEllipseItem()
+                    else:
+                        self._preview_item = QGraphicsRectItem()
+                    self._preview_item.setPen(pen)
+                    self._preview_item.setBrush(Qt.BrushStyle.NoBrush)
+                    self.scene.addItem(self._preview_item)
             return
 
         if event.button() == Qt.MouseButton.LeftButton:
@@ -341,8 +379,37 @@ class DesignCanvas(QGraphicsView):
         self.mouse_moved_on_scene.emit(current_scene_pos)
 
         if self.active_tool != constants.TOOL_SELECT:
-            if self._drawing and self.active_tool == constants.TOOL_FREEFORM:
-                self._draw_points.append(current_scene_pos)
+            if self._drawing and self._preview_item:
+                if self.active_tool == constants.TOOL_FREEFORM:
+                    self._draw_points.append(current_scene_pos)
+                    path = QPainterPath(self._draw_points[0])
+                    for p in self._draw_points[1:]:
+                        path.lineTo(p)
+                    self._preview_item.setPath(path)
+                elif self.active_tool == constants.TOOL_POLYGON:
+                    if self._draw_points:
+                        path = QPainterPath(self._draw_points[0])
+                        for p in self._draw_points[1:]:
+                            path.lineTo(p)
+                        path.lineTo(current_scene_pos)
+                        self._preview_item.setPath(path)
+                elif self.active_tool == constants.TOOL_LINE:
+                    self._preview_item.setLine(QLineF(self._start_pos, current_scene_pos))
+                elif self.active_tool in (
+                    constants.TOOL_RECT,
+                    constants.TOOL_TABLE,
+                    constants.TOOL_SCALE,
+                    constants.TOOL_DXF,
+                ):
+                    rect = QRectF(self._start_pos, current_scene_pos).normalized()
+                    self._preview_item.setRect(rect)
+                elif self.active_tool in (
+                    constants.TOOL_CIRCLE,
+                    constants.TOOL_ARC,
+                    constants.TOOL_SECTOR,
+                ):
+                    rect = QRectF(self._start_pos, current_scene_pos).normalized()
+                    self._preview_item.setRect(rect)
             return
 
         delta = current_scene_pos - self._last_mouse_scene_pos
@@ -649,6 +716,9 @@ class DesignCanvas(QGraphicsView):
                     self._drawing = False
                     self._start_pos = None
                     self._draw_points = []
+                    if self._preview_item:
+                        self.scene.removeItem(self._preview_item)
+                        self._preview_item = None
             return
         if event.button() == Qt.MouseButton.LeftButton:
             if self._drag_mode == 'resize':
@@ -888,6 +958,9 @@ class DesignCanvas(QGraphicsView):
             self._add_tool_item(constants.TOOL_POLYGON, props)
             self._drawing = False
             self._draw_points = []
+            if self._preview_item:
+                self.scene.removeItem(self._preview_item)
+                self._preview_item = None
             return
         item = self.itemAt(event.pos())
         if isinstance(item, ButtonItem):
