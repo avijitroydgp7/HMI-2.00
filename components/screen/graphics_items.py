@@ -389,8 +389,8 @@ class RectItem(BaseGraphicsItem):
     def paint(self, painter: QPainter, option, widget=None):
         props = self.instance_data.get("properties", {})
         size = props.get("size", {})
-        w = size.get("width", 100)
-        h = size.get("height", 100)
+        w = int(size.get("width", 100))
+        h = int(size.get("height", 100))
         pen = QPen(QColor(props.get("stroke_color", "#000000")), props.get("stroke_width", 1))
         style = props.get("stroke_style", "solid")
         if style == "dash":
