@@ -237,13 +237,17 @@ class ButtonPropertiesDialog(QDialog):
         return "N/A"
 
     def _format_trigger_for_display(self, trigger_data: Optional[Dict]) -> str:
-        """Format trigger information for display."""
+        """Format trigger information for display.
+
+        Returns an empty string when no trigger is defined or when the
+        trigger is an ordinary click.
+        """
         if not trigger_data:
-            return "Click"
+            return ""
         
         mode = trigger_data.get('mode', 'Ordinary')
         if mode == "Ordinary":
-            return "Click"
+            return ""
         elif mode == "On":
             tag_data = trigger_data.get('tag')
             if tag_data:
@@ -279,9 +283,12 @@ class ButtonPropertiesDialog(QDialog):
         return mode
 
     def _format_conditional_reset_for_display(self, conditional_data: Optional[Dict]) -> str:
-        """Format conditional reset information for display."""
+        """Format conditional reset information for display.
+
+        Returns an empty string when no conditional reset is defined.
+        """
         if not conditional_data:
-            return "None"
+            return ""
         
         operator = conditional_data.get('operator', '==')
         operand1 = conditional_data.get('operand1')
@@ -344,12 +351,6 @@ class ButtonPropertiesDialog(QDialog):
         if action_dialog and action_dialog.exec():
             action_data = action_dialog.get_data()
             if action_data:
-                # Ensure new actions have trigger and conditional reset fields
-                if 'trigger' not in action_data:
-                    action_data['trigger'] = {'type': 'click'}
-                if 'conditional_reset' not in action_data:
-                    action_data['conditional_reset'] = {'type': 'none'}
-                
                 self.properties['actions'].append(action_data)
                 self._refresh_action_table()
 
@@ -370,12 +371,6 @@ class ButtonPropertiesDialog(QDialog):
         if action_dialog and action_dialog.exec():
             new_action_data = action_dialog.get_data()
             if new_action_data:
-                # Ensure trigger and conditional reset fields exist
-                if 'trigger' not in new_action_data:
-                    new_action_data['trigger'] = {'type': 'click'}
-                if 'conditional_reset' not in new_action_data:
-                    new_action_data['conditional_reset'] = {'type': 'none'}
-                
                 self.properties['actions'][row] = new_action_data
                 self._refresh_action_table()
 
