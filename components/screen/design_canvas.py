@@ -130,6 +130,7 @@ class DesignCanvas(QGraphicsView):
         self.setAcceptDrops(True)
         self.setObjectName("DesignCanvas")
         self.setBackgroundBrush(QColor("#1f1f1f"))
+        self.setViewportUpdateMode(QGraphicsView.ViewportUpdateMode.FullViewportUpdate)
         self.viewport().installEventFilter(self)
 
         self.scene.selectionChanged.connect(self._on_selection_changed)
@@ -458,6 +459,7 @@ class DesignCanvas(QGraphicsView):
             if isinstance(item, BaseGraphicsItem):
                 item.moveBy(delta.x(), delta.y())
         self.scene.update()
+        self.viewport().update()
         
         # Emit real-time position updates during drag
         if self.scene.selectedItems():
@@ -653,6 +655,7 @@ class DesignCanvas(QGraphicsView):
             )
 
         self.scene.update()
+        self.viewport().update()
         
         # Emit real-time size and position updates during resize
         if self.scene.selectedItems():
@@ -866,6 +869,8 @@ class DesignCanvas(QGraphicsView):
                     selection_op = Qt.ItemSelectionOperation.ToggleSelection
                 
                 self.scene.setSelectionArea(selection_path, selection_op, Qt.ItemSelectionMode.ContainsItemBoundingRect)
+            if self._drag_mode in ('move', 'resize'):
+                self.viewport().update()
                 
             self._drag_mode = None
             self._resize_handle = None
