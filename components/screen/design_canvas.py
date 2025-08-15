@@ -105,8 +105,6 @@ class DesignCanvas(QGraphicsView):
         self.setScene(self.scene)
         self.page_item = QGraphicsRectItem()
 
-        self.page_item = QGraphicsRectItem()
-
         # Track items currently visible/hidden on the scene
         self._visible_items = set()
         self._hidden_items = set()
@@ -140,8 +138,7 @@ class DesignCanvas(QGraphicsView):
         self.scene.selectionChanged.connect(self._on_selection_changed)
 
         self.update_screen_data()
-        self._update_shadow_for_zoom()
-        self.update_visible_items()
+
 
     def eventFilter(self, source, event):
         if event.type() == QEvent.Type.HoverMove:
