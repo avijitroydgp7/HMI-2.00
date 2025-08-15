@@ -167,9 +167,35 @@ class MainWindow(QMainWindow):
         project_dock.tree.itemSelectionChanged.connect(lambda: actions.update_clipboard_actions(self))
         project_dock.system_tab_requested.connect(self.docks['system'].raise_)
         project_dock.screens_tab_requested.connect(self.docks['screens'].raise_)
-        
+
         self.zoom_in_btn.clicked.connect(lambda: handlers.zoom_in_current_tab(self))
         self.zoom_out_btn.clicked.connect(lambda: handlers.zoom_out_current_tab(self))
 
+        # Grid and guide controls
+        self.grid_size_spin.valueChanged.connect(lambda val: self._on_grid_size_changed(val))
+        self.guides_cb.toggled.connect(lambda checked: self._on_guides_visibility_changed(checked))
+        self.snap_objects_cb.toggled.connect(lambda checked: self._on_snap_objects_changed(checked))
+        self.snap_lines_cb.toggled.connect(lambda checked: self._on_snap_lines_visibility_changed(checked))
+
     def update_window_title(self): project_actions.update_window_title(self)
     def closeEvent(self, event): events.closeEvent(self, event)
+
+    def _on_grid_size_changed(self, value: int):
+        settings_service.set_value("grid_size", int(value))
+        for widget in self.open_screen_tabs.values():
+            widget.design_canvas.set_grid_size(value)
+
+    def _on_guides_visibility_changed(self, visible: bool):
+        settings_service.set_value("guides_visible", bool(visible))
+        for widget in self.open_screen_tabs.values():
+            widget.design_canvas.set_guides_visible(visible)
+
+    def _on_snap_objects_changed(self, enabled: bool):
+        settings_service.set_value("snap_to_objects", bool(enabled))
+        for widget in self.open_screen_tabs.values():
+            widget.design_canvas.set_snap_to_objects(enabled)
+
+    def _on_snap_lines_visibility_changed(self, visible: bool):
+        settings_service.set_value("snap_lines_visible", bool(visible))
+        for widget in self.open_screen_tabs.values():
+            widget.design_canvas.set_snap_lines_visible(visible)

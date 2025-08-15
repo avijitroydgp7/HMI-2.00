@@ -15,6 +15,11 @@ class SettingsService:
         """
         self.file_path = file_name
         self.settings = self._load()
+        # Default snap/grid settings
+        self.settings.setdefault("grid_size", 10)
+        self.settings.setdefault("guides_visible", True)
+        self.settings.setdefault("snap_to_objects", True)
+        self.settings.setdefault("snap_lines_visible", True)
 
     def _load(self):
         """

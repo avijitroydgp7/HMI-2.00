@@ -32,6 +32,7 @@ from services.screen_data_service import screen_service
 from services.clipboard_service import clipboard_service
 from services.command_history_service import command_history_service
 from services.commands import MoveChildCommand, RemoveChildCommand, AddChildCommand, UpdateChildPropertiesCommand, BulkUpdateChildPropertiesCommand, BulkMoveChildCommand
+from services.settings_service import settings_service
 from tools import (
     button as button_tool,
     line as line_tool,
@@ -129,6 +130,13 @@ class DesignCanvas(QGraphicsView):
         self.page_item.setZValue(-1)
         self.scene.addItem(self.page_item)
 
+        # Grid snapping / guide visibility
+        self.grid_size = settings_service.get_value("grid_size", 10)
+        self.guides_visible = settings_service.get_value("guides_visible", True)
+        self.snap_to_objects = settings_service.get_value("snap_to_objects", True)
+        self.snap_lines_visible = settings_service.get_value("snap_lines_visible", True)
+        self._snap_lines = []
+
         self.setRenderHint(QPainter.RenderHint.Antialiasing)
         self.setDragMode(QGraphicsView.DragMode.NoDrag)
         self.setTransformationAnchor(QGraphicsView.ViewportAnchor.AnchorUnderMouse)
@@ -150,13 +158,36 @@ class DesignCanvas(QGraphicsView):
         self.scene.selectionChanged.connect(self._on_selection_changed)
 
         self.update_screen_data()
+        
+    def drawBackground(self, painter: QPainter, rect: QRectF):
+        super().drawBackground(painter, rect)
+        if not self.guides_visible or self.grid_size <= 0:
+            return
+        page_rect = self.page_item.rect()
+        rect = rect.intersected(page_rect)
+        if rect.isNull():
+            return
+        grid = self.grid_size
+        left = int(rect.left()) - (int(rect.left()) % grid)
+        top = int(rect.top()) - (int(rect.top()) % grid)
+        lines = []
+        x = left
+        while x < rect.right():
+            lines.append(QLineF(x, rect.top(), x, rect.bottom()))
+            x += grid
+        y = top
+        while y < rect.bottom():
+            lines.append(QLineF(rect.left(), y, rect.right(), y))
+            y += grid
+        painter.setPen(QPen(QColor(60, 60, 60), 0))
+        painter.drawLines(lines)
 
 
     def eventFilter(self, source, event):
         if event.type() == QEvent.Type.HoverMove:
-            self._last_mouse_scene_pos = self.mapToScene(event.position().toPoint())
+            self._last_mouse_scene_pos = self._snap_position(self.mapToScene(event.position().toPoint()))
         elif event.type() == QEvent.Type.MouseMove and event.buttons() == Qt.MouseButton.NoButton:
-            self._last_mouse_scene_pos = self.mapToScene(event.pos())
+            self._last_mouse_scene_pos = self._snap_position(self.mapToScene(event.pos()))
         return False
 
     def set_shadow_enabled(self, enabled: bool):
@@ -180,6 +211,73 @@ class DesignCanvas(QGraphicsView):
         else:
             if self.page_item.graphicsEffect() is self._shadow_effect:
                 self._shadow_effect.setEnabled(False)
+
+    def _snap_position(self, pos: QPointF) -> QPointF:
+        self._snap_lines.clear()
+        grid = self.grid_size
+        x = pos.x()
+        y = pos.y()
+        if grid > 0:
+            x = round(x / grid) * grid
+            y = round(y / grid) * grid
+        snapped = QPointF(x, y)
+        if self.snap_to_objects:
+            snapped = self._snap_to_objects(snapped)
+        if self.snap_lines_visible:
+            self.viewport().update()
+        return snapped
+
+    def _snap_to_objects(self, pos: QPointF) -> QPointF:
+        threshold = 5 / self.transform().m11()
+        page_rect = self.page_item.rect()
+        snap_x = pos.x()
+        snap_y = pos.y()
+        best_dx = threshold
+        best_dy = threshold
+        snap_line_x = None
+        snap_line_y = None
+
+        for item in self.scene.items():
+            if item is self.page_item or item is self._preview_item or item in self.scene.selectedItems():
+                continue
+            rect = item.sceneBoundingRect()
+            for x_val in (rect.left(), rect.center().x(), rect.right()):
+                dx = abs(pos.x() - x_val)
+                if dx < best_dx:
+                    best_dx = dx
+                    snap_x = x_val
+                    snap_line_x = QLineF(x_val, page_rect.top(), x_val, page_rect.bottom())
+            for y_val in (rect.top(), rect.center().y(), rect.bottom()):
+                dy = abs(pos.y() - y_val)
+                if dy < best_dy:
+                    best_dy = dy
+                    snap_y = y_val
+                    snap_line_y = QLineF(page_rect.left(), y_val, page_rect.right(), y_val)
+
+        if self.snap_lines_visible:
+            self._snap_lines.clear()
+            if snap_line_x:
+                self._snap_lines.append(snap_line_x)
+            if snap_line_y:
+                self._snap_lines.append(snap_line_y)
+        return QPointF(snap_x, snap_y)
+
+    def set_grid_size(self, size: int):
+        self.grid_size = max(1, int(size))
+        self.viewport().update()
+
+    def set_guides_visible(self, visible: bool):
+        self.guides_visible = visible
+        self.viewport().update()
+
+    def set_snap_to_objects(self, enabled: bool):
+        self.snap_to_objects = enabled
+
+    def set_snap_lines_visible(self, visible: bool):
+        self.snap_lines_visible = visible
+        if not visible:
+            self._snap_lines.clear()
+            self.viewport().update()
 
     def update_visible_items(self):
         """Show or hide items based on their intersection with the viewport."""
@@ -214,10 +312,15 @@ class DesignCanvas(QGraphicsView):
 
     def drawForeground(self, painter: QPainter, rect):
         super().drawForeground(painter, rect)
-        
+        if self.snap_lines_visible and self._snap_lines:
+            painter.save()
+            painter.setPen(QPen(QColor(200, 200, 255), 1, Qt.PenStyle.DashLine))
+            painter.drawLines(self._snap_lines)
+            painter.restore()
+
         if self._drag_mode == 'rubberband':
             painter.save()
-            painter.resetTransform() 
+            painter.resetTransform()
             painter.setPen(QPen(QColor(200, 200, 255), 1, Qt.PenStyle.DashLine))
             painter.setBrush(QColor(82, 139, 255, 30))
             painter.drawRect(self._rubber_band_rect.normalized())
@@ -284,7 +387,7 @@ class DesignCanvas(QGraphicsView):
     def mousePressEvent(self, event: QMouseEvent):
         if self.active_tool != constants.TOOL_SELECT:
             if event.button() == Qt.MouseButton.LeftButton:
-                scene_pos = self.mapToScene(event.pos())
+                scene_pos = self._snap_position(self.mapToScene(event.pos()))
 
                 if not self._drawing and self._preview_item:
                     self.scene.removeItem(self._preview_item)
@@ -357,7 +460,7 @@ class DesignCanvas(QGraphicsView):
             return
 
         if event.button() == Qt.MouseButton.LeftButton:
-            self._last_mouse_scene_pos = self.mapToScene(event.pos())
+            self._last_mouse_scene_pos = self._snap_position(self.mapToScene(event.pos()))
             
             # Priority 1: Check for resize handle click
             self._resize_handle = self.get_handle_at(event.pos())
@@ -419,7 +522,7 @@ class DesignCanvas(QGraphicsView):
              super().mousePressEvent(event)
 
     def mouseMoveEvent(self, event: QMouseEvent):
-        current_scene_pos = self.mapToScene(event.pos())
+        current_scene_pos = self._snap_position(self.mapToScene(event.pos()))
         self.mouse_moved_on_scene.emit(current_scene_pos)
 
         if self.active_tool != constants.TOOL_SELECT:
@@ -712,7 +815,7 @@ class DesignCanvas(QGraphicsView):
     def mouseReleaseEvent(self, event: QMouseEvent):
         if self.active_tool != constants.TOOL_SELECT:
             if event.button() == Qt.MouseButton.LeftButton and self._drawing:
-                scene_pos = self.mapToScene(event.pos())
+                scene_pos = self._snap_position(self.mapToScene(event.pos()))
                 if self.active_tool == constants.TOOL_LINE:
                     pts = [self._start_pos, scene_pos]
                     min_x = min(p.x() for p in pts)
@@ -911,7 +1014,9 @@ class DesignCanvas(QGraphicsView):
             self._rubber_band_origin = None
             self._rubber_band_rect = QRect()
             self._update_shadow_for_zoom()
-        
+            self._snap_lines.clear()
+            self.viewport().update()
+
         super().mouseReleaseEvent(event)
 
     def wheelEvent(self, event):
@@ -926,7 +1031,7 @@ class DesignCanvas(QGraphicsView):
             new_pos = self.mapToScene(event.position().toPoint())
             delta = old_pos - new_pos
             self.translate(delta.x(), delta.y())
-            self._last_mouse_scene_pos = self.mapToScene(event.position().toPoint())
+            self._last_mouse_scene_pos = self._snap_position(self.mapToScene(event.position().toPoint()))
             self.view_zoomed.emit(f"{int(self.current_zoom * 100)}%")
             self._update_shadow_for_zoom()
             self._schedule_visible_items_update()
