@@ -107,6 +107,10 @@ class DesignCanvas(QGraphicsView):
 
         self.page_item = QGraphicsRectItem()
 
+        # Track items currently visible/hidden on the scene
+        self._visible_items = set()
+        self._hidden_items = set()
+
         # Cache a lighter drop shadow effect for better performance
         self._shadow_effect = QGraphicsDropShadowEffect()
         self._shadow_effect.setBlurRadius(10)
@@ -171,10 +175,28 @@ class DesignCanvas(QGraphicsView):
     def update_visible_items(self):
         """Show or hide items based on their intersection with the viewport."""
         scene_rect = self.mapToScene(self.viewport().rect()).boundingRect()
-        for item in self.scene.items():
-            visible = item.sceneBoundingRect().intersects(scene_rect)
-            item.setVisible(visible)
-            item.setEnabled(visible)
+
+        # Items intersecting the current viewport
+        visible_now = set(self.scene.items(scene_rect))
+
+        # On first run, assume everything starts visible so off-screen items get hidden
+        if not self._visible_items and not self._hidden_items:
+            self._visible_items = set(self.scene.items())
+
+        # Show items that were hidden but now intersect the viewport
+        for item in visible_now & self._hidden_items:
+            item.setVisible(True)
+            item.setEnabled(True)
+            self._hidden_items.remove(item)
+
+        # Hide items that no longer intersect the viewport
+        for item in self._visible_items - visible_now:
+            item.setVisible(False)
+            item.setEnabled(False)
+            self._hidden_items.add(item)
+
+        # Update the set of currently visible items
+        self._visible_items = visible_now
 
     def drawForeground(self, painter: QPainter, rect):
         super().drawForeground(painter, rect)
