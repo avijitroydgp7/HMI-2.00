@@ -17,11 +17,16 @@ class TagDataService(QObject):
     def __init__(self):
         super().__init__()
         self._tag_databases = {}
+        # Dictionaries for O(1) lookups
+        self._db_name_index: Dict[str, str] = {}  # database name -> id
+        self._tag_name_index: Dict[str, Dict[str, Dict[str, Any]]] = {}
 
     def clear_all(self):
         """Resets the service by clearing all tag data."""
         self._tag_databases.clear()
         self.database_list_changed.emit()
+        self._db_name_index.clear()
+        self._tag_name_index.clear()
         self.tags_changed.emit()
 
     def _create_default_array(self, dims, data_type):
@@ -43,25 +48,17 @@ class TagDataService(QObject):
 
     def is_database_name_unique(self, name):
         """Checks if a tag database name is unique across the project."""
-        for db in self._tag_databases.values():
-            if db.get('name') == name: return False
-        return True
+        return name not in self._db_name_index
 
     # MODIFIED: Added a helper method to find a DB by its name.
     def find_db_id_by_name(self, db_name: str) -> Optional[str]:
         """Finds a database ID by its unique name."""
-        for db_id, db_data in self._tag_databases.items():
-            if db_data.get('name') == db_name:
-                return db_id
-        return None
+        return self._db_name_index.get(db_name)
 
     # --- Tag Getters ---
     def get_tag(self, db_id, tag_name):
         """Gets a specific tag from a database."""
-        if db_id in self._tag_databases:
-            for tag in self._tag_databases[db_id]['tags']:
-                if tag['name'] == tag_name: return tag
-        return None
+        return self._tag_name_index.get(db_id, {}).get(tag_name)
         
     def get_tag_element_value(self, db_id, tag_name, indices):
         """Gets the value of a tag or a specific element of an array tag."""
@@ -89,10 +86,7 @@ class TagDataService(QObject):
 
     def is_tag_name_unique(self, db_id, tag_name):
         """Checks if a tag name is unique within its database."""
-        if db_id in self._tag_databases:
-            for tag in self._tag_databases[db_id]['tags']:
-                if tag['name'] == tag_name: return False
-        return True
+        return tag_name not in self._tag_name_index.get(db_id, {})
 
     # --- Internal "Perform" Methods for Commands ---
     def _perform_add_tag_database(self, db_data, db_id=None):
@@ -100,28 +94,54 @@ class TagDataService(QObject):
         db_data['id'] = new_id
         if 'tags' not in db_data: db_data['tags'] = []
         self._tag_databases[new_id] = db_data
+        db_name = db_data.get('name')
+        if db_name:
+            self._db_name_index[db_name] = new_id
+        # build tag index for this database
+        tag_dict: Dict[str, Dict[str, Any]] = {}
+        for tag in db_data['tags']:
+            tag_name = tag.get('name')
+            if tag_name:
+                tag_dict[tag_name] = tag
+        self._tag_name_index[new_id] = tag_dict
         return new_id
 
     def _perform_remove_tag_database(self, db_id):
         if db_id in self._tag_databases:
-            return self._tag_databases.pop(db_id)
+            db_data = self._tag_databases.pop(db_id)
+            db_name = db_data.get('name')
+            if db_name:
+                self._db_name_index.pop(db_name, None)
+            self._tag_name_index.pop(db_id, None)
+            return db_data
         return None
 
     def _perform_rename_tag_database(self, db_id, new_name):
         if db_id in self._tag_databases:
+            old_name = self._tag_databases[db_id].get('name')
             self._tag_databases[db_id]['name'] = new_name
+            if old_name:
+                self._db_name_index.pop(old_name, None)
+            self._db_name_index[new_name] = db_id
             return True
         return False
 
     def _perform_add_tag(self, db_id, tag_data):
         if db_id in self._tag_databases:
             self._tag_databases[db_id]['tags'].append(tag_data)
+            tag_name = tag_data.get('name')
+            if db_id not in self._tag_name_index:
+                self._tag_name_index[db_id] = {}
+            if tag_name:
+                self._tag_name_index[db_id][tag_name] = tag_data
             return True
         return False
 
     def _perform_remove_tag(self, db_id, tag_name):
         if db_id in self._tag_databases:
             self._tag_databases[db_id]['tags'] = [t for t in self._tag_databases[db_id]['tags'] if t['name'] != tag_name]
+            if db_id in self._tag_name_index:
+                self._tag_name_index[db_id].pop(tag_name, None)
             return True
         return False
 
@@ -130,6 +150,13 @@ class TagDataService(QObject):
             for i, tag in enumerate(self._tag_databases[db_id]['tags']):
                 if tag['name'] == original_tag_name:
                     self._tag_databases[db_id]['tags'][i] = new_tag_data
+                    # update name index
+                    if db_id not in self._tag_name_index:
+                        self._tag_name_index[db_id] = {}
+                    self._tag_name_index[db_id].pop(original_tag_name, None)
+                    new_name = new_tag_data.get('name')
+                    if new_name:
+                        self._tag_name_index[db_id][new_name] = new_tag_data
                     return True
         return False
         
@@ -154,6 +181,17 @@ class TagDataService(QObject):
     def load_from_project(self, project_data):
         self.clear_all()
         self._tag_databases = project_data.get("tag_databases", {})
+        # rebuild indexes
+        for db_id, db_data in self._tag_databases.items():
+            db_name = db_data.get('name')
+            if db_name:
+                self._db_name_index[db_name] = db_id
+            tag_dict: Dict[str, Dict[str, Any]] = {}
+            for tag in db_data.get('tags', []):
+                tag_name = tag.get('name')
+                if tag_name:
+                    tag_dict[tag_name] = tag
+            self._tag_name_index[db_id] = tag_dict
         self.database_list_changed.emit()
         self.tags_changed.emit()
 
