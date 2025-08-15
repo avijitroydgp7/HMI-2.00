@@ -23,7 +23,7 @@ from PyQt6.QtGui import (
     QCursor,
     QBrush,
 )
-from PyQt6.QtCore import Qt, QPoint, QPointF, pyqtSignal, QRectF, QRect, QEvent, QLineF
+from PyQt6.QtCore import Qt, QPoint, QPointF, pyqtSignal, QRectF, QRect, QEvent, QLineF, QTimer
 import copy
 import uuid
 
@@ -108,6 +108,11 @@ class DesignCanvas(QGraphicsView):
         # Track items currently visible/hidden on the scene
         self._visible_items = set()
         self._hidden_items = set()
+
+        # Throttle expensive visibility updates
+        self._visible_update_timer = QTimer(self)
+        self._visible_update_timer.setSingleShot(True)
+        self._visible_update_timer.timeout.connect(self.update_visible_items)
 
         # Cache a lighter drop shadow effect for better performance
         self._shadow_effect = QGraphicsDropShadowEffect()
@@ -195,6 +200,11 @@ class DesignCanvas(QGraphicsView):
         # Update the set of currently visible items
         self._visible_items = visible_now
 
+    def _schedule_visible_items_update(self):
+        """Schedule a deferred call to update_visible_items."""
+        # Restarting the timer coalesces multiple rapid requests
+        self._visible_update_timer.start(16)
+
     def drawForeground(self, painter: QPainter, rect):
         super().drawForeground(painter, rect)
         
@@ -258,11 +268,11 @@ class DesignCanvas(QGraphicsView):
 
     def resizeEvent(self, event):
         super().resizeEvent(event)
-        self.update_visible_items()
+        self._schedule_visible_items_update()
 
     def scrollContentsBy(self, dx, dy):
         super().scrollContentsBy(dx, dy)
-        self.update_visible_items()
+        self._schedule_visible_items_update()
 
     def mousePressEvent(self, event: QMouseEvent):
         if self.active_tool != constants.TOOL_SELECT:
@@ -912,7 +922,7 @@ class DesignCanvas(QGraphicsView):
             self._last_mouse_scene_pos = self.mapToScene(event.position().toPoint())
             self.view_zoomed.emit(f"{int(self.current_zoom * 100)}%")
             self._update_shadow_for_zoom()
-            self.update_visible_items()
+            self._schedule_visible_items_update()
             event.accept()
         else:
             super().wheelEvent(event)
