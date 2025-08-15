@@ -6,7 +6,7 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtCore import (
     Qt, pyqtSlot, pyqtSignal, QSortFilterProxyModel,
-    QModelIndex, QItemSelectionModel
+    QModelIndex, QItemSelectionModel, QTimer
 )
 from PyQt6.QtGui import QKeyEvent, QStandardItemModel, QStandardItem
 import copy
@@ -156,8 +156,8 @@ class TagEditorWidget(QWidget):
         header.setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
         
         layout.addWidget(self.tag_tree)
-        
-        tag_data_service.tags_changed.connect(self.refresh_table)
+
+        tag_data_service.tags_changed.connect(self._schedule_refresh)
         self._model.itemChanged.connect(self._on_item_changed)
         self.tag_tree.doubleClicked.connect(self._on_item_double_clicked)
         self.tag_tree.selectionModel().selectionChanged.connect(lambda *_: self._update_button_states())
@@ -176,6 +176,10 @@ class TagEditorWidget(QWidget):
             self.type_filter_input.text(),
             self.comment_filter_input.text(),
         )
+
+    def _schedule_refresh(self):
+        """Refresh the table on the next event loop tick to avoid model churn during edits."""
+        QTimer.singleShot(0, self.refresh_table)
 
     def _import_tags(self):
         file_path, _ = QFileDialog.getOpenFileName(self, "Import Tags from CSV", "", "CSV Files (*.csv)")
@@ -253,7 +257,12 @@ class TagEditorWidget(QWidget):
             new_tag_data = dialog.get_final_data()
             is_old_array = bool(old_tag_data.get('array_dims'))
             is_new_array = bool(new_tag_data.get('array_dims'))
-            if is_old_array and is_new_array and old_tag_data.get('array_dims') == new_tag_data.get('array_dims'):
+            if (
+                is_old_array
+                and is_new_array
+                and old_tag_data.get('data_type') == new_tag_data.get('data_type')
+                and old_tag_data.get('array_dims') == new_tag_data.get('array_dims')
+            ):
                 new_tag_data['value'] = old_tag_data.get('value')
             if new_tag_data != old_tag_data:
                 command = UpdateTagCommand(self.db_id, tag_name, new_tag_data)
