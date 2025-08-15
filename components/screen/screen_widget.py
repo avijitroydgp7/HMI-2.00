@@ -37,19 +37,22 @@ class ScreenWidget(QWidget):
         self.design_canvas.view_zoomed.connect(self.zoom_changed)
 
         screen_service.screen_modified.connect(self.on_screen_modified)
-        
-        self.update_screen_data()
 
     def set_active_tool(self, tool_name: str):
         self.design_canvas.set_active_tool(tool_name)
 
     @pyqtSlot(str)
     def on_screen_modified(self, modified_screen_id: str):
+        if self.screen_id == modified_screen_id:
+            self.update_screen_data()
+            return
+
         if self.design_canvas.screen_data:
-            if self.screen_id == modified_screen_id:
-                self.update_screen_data()
-                return
-            children_ids = {child.get('screen_id') for child in self.design_canvas.screen_data.get('children', []) if 'screen_id' in child}
+            children_ids = {
+                child.get('screen_id')
+                for child in self.design_canvas.screen_data.get('children', [])
+                if 'screen_id' in child
+            }
             if modified_screen_id in children_ids:
                 self.update_screen_data()
 

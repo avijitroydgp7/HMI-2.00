@@ -477,7 +477,6 @@ class DesignCanvas(QGraphicsView):
         for item in self.scene.selectedItems():
             if isinstance(item, BaseGraphicsItem):
                 item.moveBy(delta.x(), delta.y())
-        self.scene.update()
         self.viewport().update()
         
         # Emit real-time position updates during drag
@@ -673,7 +672,6 @@ class DesignCanvas(QGraphicsView):
                 new_group_rect.top() + relative_y - offset_rect.top(),
             )
 
-        self.scene.update()
         self.viewport().update()
         
         # Emit real-time size and position updates during resize
