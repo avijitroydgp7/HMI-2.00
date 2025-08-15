@@ -419,7 +419,25 @@ class WordActionDialog(QDialog):
         if not self.value_selector.get_data():
             self.value_selector.setError("A value or tag must be provided.")
             is_valid = False
-            
+
+        # Validate data type compatibility between target and value
+        target_type = None
+        if self.target_tag_selector.current_tag_data:
+            target_type = self.target_tag_selector.current_tag_data.get('data_type')
+            if target_type:
+                target_type = DataTypeMapper.normalize_type(target_type)
+
+        value_type = None
+        if self.value_selector.current_tag_data:
+            value_type = self.value_selector.current_tag_data.get('data_type')
+            if value_type:
+                value_type = DataTypeMapper.normalize_type(value_type)
+
+        if target_type and value_type:
+            if not DataTypeMapper.are_types_compatible(target_type, value_type):
+                self.value_selector.setError("Data type must match Target Tag.")
+                is_valid = False
+
         return is_valid
 
     def _validate_trigger_section(self) -> bool:
