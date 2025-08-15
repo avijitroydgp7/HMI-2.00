@@ -59,28 +59,43 @@ class ScreenManagerWidget(QWidget):
     @pyqtSlot()
     def sync_tree_with_service(self):
         self.tree.blockSignals(True)
-        self.tree.clear()
-        self.item_map.clear()
-        self.root_items.clear()
+
+        expanded_ids = {sid for sid, itm in self.item_map.items() if itm.isExpanded()}
+
         self._get_or_create_root_item('base', "Base Screens", 'fa5.clone', '#5dadec')
         self._get_or_create_root_item('window', "Window Screens", 'fa5.window-maximize', '#5dadec')
         self._get_or_create_root_item('report', "Report Screens", 'fa5.file-alt', '#5dadec')
         
         all_screens = screen_service.get_all_screens()
+        existing_ids = set(self.item_map.keys())
+        service_ids = set(all_screens.keys())
+
+        for removed_id in existing_ids - service_ids:
+            item = self.item_map.pop(removed_id)
+            parent = item.parent()
+            if parent: parent.removeChild(item)
+
         for screen_id, screen_data in all_screens.items():
             parent_root = self.root_items.get(screen_data.get('type'))
-            if parent_root: self.item_map[screen_id] = self._create_item(screen_id, screen_data, parent_root)
-        
-        for screen_id, item in self.item_map.items():
-            parent_data = screen_service.get_screen(screen_id)
-            if parent_data:
-                for child_instance in parent_data.get('children', []):
-                    child_id = child_instance.get('screen_id')
-                    child_data = screen_service.get_screen(child_id)
-                    if child_id and child_data: self._create_item(child_id, child_data, item, is_reference=True)
-        
+            item = self.item_map.get(screen_id)
+            if item is None:
+                if parent_root:
+                    item = self._create_item(screen_id, screen_data, parent_root)
+                    self.item_map[screen_id] = item
+            else:
+                if item.parent() != parent_root:
+                    item.parent().removeChild(item)
+                    parent_root.addChild(item)
+                self._update_item(item, screen_id, screen_data)
+
+            if item:
+                self._sync_item_children(item, screen_data)
+
         self.tree.sortItems(0, Qt.SortOrder.AscendingOrder)
-        self.tree.expandAll()
+        for root_item in self.root_items.values():
+            root_item.setExpanded(True)
+        for sid, itm in self.item_map.items():
+            itm.setExpanded(sid in expanded_ids)
         self.tree.blockSignals(False)
 
     @pyqtSlot(str)
@@ -96,6 +111,27 @@ class ScreenManagerWidget(QWidget):
         item.setIcon(0, qta.icon(icon, color=color))
         self.root_items[type_name] = item
         return item
+
+    def _sync_item_children(self, item, screen_data):
+        existing = {item.child(i).data(0, Qt.ItemDataRole.UserRole): item.child(i) for i in range(item.childCount())}
+        desired = []
+        for child in screen_data.get('children', []):
+            child_id = child.get('screen_id')
+            if not child_id:
+                continue
+            child_data = screen_service.get_screen(child_id)
+            if not child_data:
+                if child_id in existing:
+                    item.removeChild(existing[child_id])
+                continue
+            desired.append(child_id)
+            if child_id in existing:
+                self._update_item(existing[child_id], child_id, child_data, is_reference=True)
+            else:
+                self._create_item(child_id, child_data, item, is_reference=True)
+        for cid, citem in existing.items():
+            if cid not in desired:
+                item.removeChild(citem)
 
     def _create_item(self, screen_id, screen_data, parent_widget, is_reference=False):
         item = ScreenTreeItem(parent_widget)

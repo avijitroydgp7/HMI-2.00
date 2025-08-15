@@ -157,6 +157,9 @@ class TagEditorWidget(QWidget):
         
         layout.addWidget(self.tag_tree)
 
+        # Cache to track current tags for incremental updates
+        self._tags_cache: dict[str, dict] = {}
+
         tag_data_service.tags_changed.connect(self._schedule_refresh)
         self._model.itemChanged.connect(self._on_item_changed)
         self.tag_tree.doubleClicked.connect(self._on_item_double_clicked)
@@ -380,21 +383,53 @@ class TagEditorWidget(QWidget):
 
         recurse(QModelIndex(), tuple())
 
+    def _get_tag_row_map(self) -> dict[str, int]:
+        """Map top-level tag names to their row indices."""
+        return {
+            self._model.item(row, 0).text(): row
+            for row in range(self._model.rowCount())
+            if self._model.item(row, 0) is not None
+        }
+
     @pyqtSlot()
     def refresh_table(self):
         self._is_updating_table = True
         expanded_paths, selected_paths = self._save_tree_state()
-        self._model.removeRows(0, self._model.rowCount())
+
         db = tag_data_service.get_tag_database(self.db_id)
         if not db:
             self._is_updating_table = False
             return
-        for tag in db.get('tags', []):
-            self._create_tag_tree_item(tag)
+
+        new_tags = {t.get('name', 'N/A'): t for t in db.get('tags', [])}
+        current_rows = self._get_tag_row_map()
+
+        # Remove tags that no longer exist
+        rows_to_remove = sorted(
+            (current_rows[name] for name in current_rows.keys() - new_tags.keys()),
+            reverse=True,
+        )
+        for row in rows_to_remove:
+            self._model.removeRow(row)
+
+        # Refresh mapping after removals
+        current_rows = self._get_tag_row_map()
+
+        # Add new tags or update changed ones
+        for name, tag in new_tags.items():
+            if name in current_rows:
+                if self._tags_cache.get(name) != tag:
+                    row = current_rows[name]
+                    self._model.removeRow(row)
+                    self._create_tag_tree_item(tag, row)
+            else:
+                self._create_tag_tree_item(tag)
+
+        self._tags_cache = new_tags
         self._restore_tree_state(expanded_paths, selected_paths)
         self._is_updating_table = False
 
-    def _create_tag_tree_item(self, tag):
+    def _create_tag_tree_item(self, tag, row: int | None = None):
         name = tag.get('name', 'N/A')
         data_type = tag.get('data_type', 'N/A')
         comment = tag.get('comment', '')
@@ -423,7 +458,11 @@ class TagEditorWidget(QWidget):
             value_item.setText(value)
             value_item.setEditable(True)
 
-        self._model.appendRow([name_item, type_item, value_item, comment_item])
+        items = [name_item, type_item, value_item, comment_item]
+        if row is None:
+            self._model.appendRow(items)
+        else:
+            self._model.insertRow(row, items)
 
     def _populate_array_children(self, parent_item, tag, data_slice, current_indices):
         if not isinstance(data_slice, list):
