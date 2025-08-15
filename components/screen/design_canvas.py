@@ -137,7 +137,14 @@ class DesignCanvas(QGraphicsView):
         self.setAcceptDrops(True)
         self.setObjectName("DesignCanvas")
         self.setBackgroundBrush(QColor("#1f1f1f"))
-        self.setViewportUpdateMode(QGraphicsView.ViewportUpdateMode.FullViewportUpdate)
+        # Using a more efficient update mode avoids redrawing the entire view for
+        # every small change while still keeping interactions responsive.  The
+        # bounding rect mode updates only the area that actually changed,
+        # ensuring that dragging, zooming and selection continue to refresh
+        # correctly without the overhead of a full viewport repaint.
+        self.setViewportUpdateMode(
+            QGraphicsView.ViewportUpdateMode.BoundingRectViewportUpdate
+        )
         self.viewport().installEventFilter(self)
 
         self.scene.selectionChanged.connect(self._on_selection_changed)
