@@ -706,7 +706,7 @@ class DesignCanvas(QGraphicsView):
                 }
                 
                 # Emit selection changed to update status bar with new size
-                selection_data = [copy.deepcopy(first_item.instance_data)]
+                selection_data = [dict(first_item.instance_data)]
                 self.selection_changed.emit(self.screen_id, selection_data)
 
     def mouseReleaseEvent(self, event: QMouseEvent):
@@ -863,11 +863,11 @@ class DesignCanvas(QGraphicsView):
                     start_rect = start_state['rect'] if isinstance(start_state, dict) else start_state
 
                     base_props = start_state.get('properties', {}) if isinstance(start_state, dict) else {}
-                    old_props = copy.deepcopy(base_props)
+                    old_props = dict(base_props)
                     old_props['position'] = {'x': start_rect.x(), 'y': start_rect.y()}
                     old_props['size'] = {'width': start_rect.width(), 'height': start_rect.height()}
                     
-                    new_props = copy.deepcopy(item.instance_data['properties'])
+                    new_props = dict(item.instance_data['properties'])
                     new_props['position'] = {'x': item.pos().x(), 'y': item.pos().y()}
                     
                     if old_props != new_props:
@@ -1072,7 +1072,7 @@ class DesignCanvas(QGraphicsView):
         selection_data = []
         for item in self.scene.selectedItems():
             if isinstance(item, BaseGraphicsItem):
-                selection_data.append(copy.deepcopy(item.instance_data))
+                selection_data.append(dict(item.instance_data))
         self.selection_changed.emit(self.screen_id, selection_data)
 
     def set_active_tool(self, tool_name: str):
