@@ -1,11 +1,14 @@
 # components/tag_editor_widget.py
 from PyQt6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QTreeWidget, QTreeWidgetItem,
-    QPushButton, QAbstractItemView, QStyledItemDelegate, 
-    QLineEdit, QTreeWidgetItemIterator, QMenu, QFileDialog, QHeaderView
+    QWidget, QVBoxLayout, QHBoxLayout, QTreeView,
+    QPushButton, QAbstractItemView, QStyledItemDelegate,
+    QLineEdit, QMenu, QFileDialog, QHeaderView
 )
-from PyQt6.QtCore import Qt, pyqtSlot, pyqtSignal
-from PyQt6.QtGui import QKeyEvent
+from PyQt6.QtCore import (
+    Qt, pyqtSlot, pyqtSignal, QSortFilterProxyModel,
+    QModelIndex, QItemSelectionModel
+)
+from PyQt6.QtGui import QKeyEvent, QStandardItemModel, QStandardItem
 import copy
 from utils.icon_manager import IconManager
 from services.tag_data_service import tag_data_service
@@ -20,7 +23,6 @@ from dialogs import AddTagDialog
 from dialogs.info_dialog import CustomInfoDialog
 from dialogs.question_dialog import CustomQuestionDialog
 from PyQt6.QtWidgets import QMessageBox
-from .tree_widget import CustomTreeWidget
 from utils import constants
 
 
@@ -40,13 +42,14 @@ class TagTreeDelegate(QStyledItemDelegate):
     def setModelData(self, editor, model, index):
         model.setData(index, editor.text(), Qt.ItemDataRole.EditRole)
 
-class TagTreeWidget(CustomTreeWidget):
+class TagTreeWidget(QTreeView):
 
     delete_pressed = pyqtSignal()
     edit_pressed = pyqtSignal()
 
-    def edit(self, index, trigger, event):
-        if index.column() < 2: return False
+    def edit(self, index, trigger, event=None):
+        if index.column() < 2:
+            return False
         return super().edit(index, trigger, event)
 
     def keyPressEvent(self, event: QKeyEvent):
@@ -58,6 +61,44 @@ class TagTreeWidget(CustomTreeWidget):
             event.accept()
         else:
             super().keyPressEvent(event)
+
+
+class TagFilterProxyModel(QSortFilterProxyModel):
+    """Proxy model to filter tag tree columns without Python iteration."""
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self._name_filter = ""
+        self._type_filter = ""
+        self._comment_filter = ""
+        self.setFilterCaseSensitivity(Qt.CaseInsensitive)
+
+    def set_filters(self, name: str, type_: str, comment: str) -> None:
+        self._name_filter = name.lower()
+        self._type_filter = type_.lower()
+        self._comment_filter = comment.lower()
+        self.invalidateFilter()
+
+    def filterAcceptsRow(self, source_row: int, source_parent) -> bool:  # type: ignore[override]
+        model = self.sourceModel()
+        if model is None:
+            return True
+
+        name_index = model.index(source_row, 0, source_parent)
+        type_index = model.index(source_row, 1, source_parent)
+        comment_index = model.index(source_row, 3, source_parent)
+
+        name_data = (model.data(name_index) or "").lower()
+        type_data = (model.data(type_index) or "").lower()
+        comment_data = (model.data(comment_index) or "").lower()
+
+        if self._name_filter and self._name_filter not in name_data:
+            return False
+        if self._type_filter and self._type_filter not in type_data:
+            return False
+        if self._comment_filter and self._comment_filter not in comment_data:
+            return False
+        return True
 
 class TagEditorWidget(QWidget):
     validation_error_occurred = pyqtSignal(str)
@@ -92,26 +133,35 @@ class TagEditorWidget(QWidget):
         layout.addWidget(filter_widget)
 
         self.tag_tree = TagTreeWidget()
-        self.tag_tree.setObjectName("TagTree"); self.tag_tree.setColumnCount(4)
-        self.tag_tree.setHeaderLabels(["Tag Name", "Data Type", "Live Value", "Comment"])
+        self.tag_tree.setObjectName("TagTree")
         self.tag_tree.setSelectionMode(QAbstractItemView.SelectionMode.ExtendedSelection)
         self.tag_tree.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         self.tag_tree.setAlternatingRowColors(True)
-        self.tag_tree.setEditTriggers(QAbstractItemView.EditTrigger.DoubleClicked | QAbstractItemView.EditTrigger.SelectedClicked | QAbstractItemView.EditTrigger.EditKeyPressed)
+        self.tag_tree.setEditTriggers(
+            QAbstractItemView.EditTrigger.DoubleClicked
+            | QAbstractItemView.EditTrigger.SelectedClicked
+            | QAbstractItemView.EditTrigger.EditKeyPressed
+        )
         self.tag_tree.setItemDelegate(TagTreeDelegate(self.tag_tree))
         self.tag_tree.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+
+        # Model and proxy for efficient filtering
+        self._model = QStandardItemModel(0, 4, self.tag_tree)
+        self._model.setHorizontalHeaderLabels(["Tag Name", "Data Type", "Live Value", "Comment"])
+        self._proxy_model = TagFilterProxyModel(self.tag_tree)
+        self._proxy_model.setSourceModel(self._model)
+        self.tag_tree.setModel(self._proxy_model)
         self.tag_tree.setSortingEnabled(True)
-        
         header = self.tag_tree.header()
         header.setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
         
         layout.addWidget(self.tag_tree)
         
         tag_data_service.tags_changed.connect(self.refresh_table)
-        self.tag_tree.itemChanged.connect(self._on_item_changed)
-        self.tag_tree.itemDoubleClicked.connect(self._on_item_double_clicked)
-        self.tag_tree.itemSelectionChanged.connect(self._update_button_states)
-        self.tag_tree.itemSelectionChanged.connect(self.selection_changed.emit)
+        self._model.itemChanged.connect(self._on_item_changed)
+        self.tag_tree.doubleClicked.connect(self._on_item_double_clicked)
+        self.tag_tree.selectionModel().selectionChanged.connect(lambda *_: self._update_button_states())
+        self.tag_tree.selectionModel().selectionChanged.connect(lambda *_: self.selection_changed.emit())
         self.tag_tree.customContextMenuRequested.connect(self._show_context_menu)
         self.tag_tree.delete_pressed.connect(self._remove_selected_tags)
         self.tag_tree.edit_pressed.connect(self._handle_edit_key)
@@ -120,16 +170,12 @@ class TagEditorWidget(QWidget):
         self._update_button_states()
 
     def _filter_tree(self):
-        name_filter = self.name_filter_input.text().lower()
-        type_filter = self.type_filter_input.text().lower()
-        comment_filter = self.comment_filter_input.text().lower()
-        for i in range(self.tag_tree.topLevelItemCount()):
-            item = self.tag_tree.topLevelItem(i)
-            name_match = name_filter in item.text(0).lower()
-            type_match = type_filter in item.text(1).lower()
-            comment_match = comment_filter in item.text(3).lower()
-            is_visible = name_match and type_match and comment_match
-            item.setHidden(not is_visible)
+        """Update proxy model filters from UI inputs."""
+        self._proxy_model.set_filters(
+            self.name_filter_input.text(),
+            self.type_filter_input.text(),
+            self.comment_filter_input.text(),
+        )
 
     def _import_tags(self):
         file_path, _ = QFileDialog.getOpenFileName(self, "Import Tags from CSV", "", "CSV Files (*.csv)")
@@ -155,29 +201,40 @@ class TagEditorWidget(QWidget):
 
     def _show_context_menu(self, position):
         menu = QMenu()
-        if self.tag_tree.selectedItems():
+        if self.tag_tree.selectionModel().hasSelection():
             menu.addAction("Cut").triggered.connect(self.cut_selected)
             menu.addAction("Copy").triggered.connect(self.copy_selected)
             menu.addAction("Delete").triggered.connect(self._remove_selected_tags)
             menu.addSeparator()
-            edit_action = menu.addAction("Edit Properties..."); edit_action.triggered.connect(self._open_edit_tag_dialog)
+            edit_action = menu.addAction("Edit Properties...")
+            edit_action.triggered.connect(self._open_edit_tag_dialog)
             edit_action.setEnabled(len(self._get_selected_tag_names()) == 1)
             menu.addSeparator()
         paste_action = menu.addAction("Paste"); paste_action.triggered.connect(self.paste)
         content_type, _ = clipboard_service.get_content(); paste_action.setEnabled(content_type == constants.CLIPBOARD_TYPE_TAG)
         menu.exec(self.tag_tree.viewport().mapToGlobal(position))
 
-    def _on_item_double_clicked(self, item, column):
-        if column < 2: self._open_edit_tag_dialog()
+    def _on_item_double_clicked(self, index: QModelIndex):
+        if index.column() < 2:
+            self._open_edit_tag_dialog()
 
     def _handle_edit_key(self):
-        if len(self._get_selected_tag_names()) != 1: return
-        item = self.tag_tree.currentItem(); column = self.tag_tree.currentColumn()
-        if item and column < 2: self._open_edit_tag_dialog();
-        else: self.tag_tree.editItem(item, column)
+        if len(self._get_selected_tag_names()) != 1:
+            return
+        index = self.tag_tree.currentIndex()
+        if index.isValid() and index.column() < 2:
+            self._open_edit_tag_dialog()
+        else:
+            self.tag_tree.edit(index, QAbstractItemView.EditTrigger.EditKeyPressed, None)
 
     def _get_selected_tag_names(self):
-        return list({item.data(1, Qt.ItemDataRole.UserRole) for item in self.tag_tree.selectedItems()})
+        names = set()
+        for proxy_index in self.tag_tree.selectionModel().selectedRows():
+            source_index = self._proxy_model.mapToSource(proxy_index)
+            name = self._model.itemFromIndex(source_index.siblingAtColumn(1)).data(Qt.ItemDataRole.UserRole)
+            if name:
+                names.add(name)
+        return list(names)
 
     def _open_add_tag_dialog(self):
         dialog = AddTagDialog(self.db_id, self)
@@ -217,29 +274,36 @@ class TagEditorWidget(QWidget):
         self.remove_button.setEnabled(selected_count > 0)
         self.edit_button.setEnabled(selected_count == 1)
 
-    @pyqtSlot(QTreeWidgetItem, int)
-    def _on_item_changed(self, item, column):
-        if self._is_updating_table: return
-        tag_name = item.data(1, Qt.ItemDataRole.UserRole)
-        if not tag_name: return
+    @pyqtSlot(QStandardItem)
+    def _on_item_changed(self, item: QStandardItem):
+        if self._is_updating_table:
+            return
+        index = item.index()
+        column = index.column()
+        tag_name = self._model.itemFromIndex(index.siblingAtColumn(1)).data(Qt.ItemDataRole.UserRole)
+        if not tag_name:
+            return
         original_tag_data = tag_data_service.get_tag(self.db_id, tag_name)
-        if not original_tag_data: return
+        if not original_tag_data:
+            return
         try:
             if column == 2:
-                indices = item.data(0, Qt.ItemDataRole.UserRole)
-                validated_value = self._parse_and_validate_value(item.text(2), original_tag_data)
+                indices = self._model.itemFromIndex(index.siblingAtColumn(0)).data(Qt.ItemDataRole.UserRole) or []
+                validated_value = self._parse_and_validate_value(item.text(), original_tag_data)
                 old_value = tag_data_service.get_tag_element_value(self.db_id, tag_name, indices)
                 if validated_value != old_value:
                     command = UpdateTagValueCommand(self.db_id, tag_name, indices, validated_value, old_value)
                     command_history_service.add_command(command)
-            elif column == 3 and not item.parent():
-                new_comment = item.text(3)
+            elif column == 3 and not index.parent().isValid():
+                new_comment = item.text()
                 if new_comment != original_tag_data.get('comment'):
-                    new_tag_data = copy.deepcopy(original_tag_data); new_tag_data['comment'] = new_comment
+                    new_tag_data = copy.deepcopy(original_tag_data)
+                    new_tag_data['comment'] = new_comment
                     command = UpdateTagCommand(self.db_id, tag_name, new_tag_data)
                     command_history_service.add_command(command)
         except ValueError as e:
-            self.validation_error_occurred.emit(str(e)); self.refresh_table()
+            self.validation_error_occurred.emit(str(e))
+            self.refresh_table()
 
     def _parse_and_validate_value(self, value_str, tag_data):
         data_type = tag_data.get('data_type'); value_str = value_str.strip()
@@ -263,82 +327,126 @@ class TagEditorWidget(QWidget):
             raise ValueError(f"String length exceeds defined length.")
         return value
 
-    def _get_item_path(self, item):
-        path = []; current = item
-        while current: path.insert(0, current.text(0)); current = current.parent()
+    def _get_item_path(self, index: QModelIndex):
+        path = []
+        current = index
+        model = self._model
+        while current.isValid():
+            path.insert(0, model.data(current))
+            current = current.parent()
         return tuple(path)
 
     def _save_tree_state(self):
         expanded_paths, selected_paths = set(), set()
-        iterator = QTreeWidgetItemIterator(self.tag_tree)
-        while iterator.value():
-            item = iterator.value(); path = self._get_item_path(item)
-            if item.isExpanded(): expanded_paths.add(path)
-            if item.isSelected(): selected_paths.add(path)
-            iterator += 1
+
+        def recurse(parent_index: QModelIndex, path):
+            model = self._model
+            for row in range(model.rowCount(parent_index)):
+                index = model.index(row, 0, parent_index)
+                new_path = path + (model.data(index),)
+                proxy_index = self._proxy_model.mapFromSource(index)
+                if self.tag_tree.isExpanded(proxy_index):
+                    expanded_paths.add(new_path)
+                if self.tag_tree.selectionModel().isSelected(proxy_index):
+                    selected_paths.add(new_path)
+                recurse(index, new_path)
+
+        recurse(QModelIndex(), tuple())
         return expanded_paths, selected_paths
 
     def _restore_tree_state(self, expanded_paths, selected_paths):
-        iterator = QTreeWidgetItemIterator(self.tag_tree)
-        while iterator.value():
-            item = iterator.value(); path = self._get_item_path(item)
-            if path in expanded_paths: item.setExpanded(True)
-            if path in selected_paths: item.setSelected(True)
-            iterator += 1
+        def recurse(parent_index: QModelIndex, path):
+            model = self._model
+            for row in range(model.rowCount(parent_index)):
+                index = model.index(row, 0, parent_index)
+                new_path = path + (model.data(index),)
+                proxy_index = self._proxy_model.mapFromSource(index)
+                if new_path in expanded_paths:
+                    self.tag_tree.setExpanded(proxy_index, True)
+                if new_path in selected_paths:
+                    self.tag_tree.selectionModel().select(
+                        proxy_index, QItemSelectionModel.SelectionFlag.Select | QItemSelectionModel.SelectionFlag.Rows
+                    )
+                recurse(index, new_path)
+
+        recurse(QModelIndex(), tuple())
 
     @pyqtSlot()
     def refresh_table(self):
         self._is_updating_table = True
         expanded_paths, selected_paths = self._save_tree_state()
-        self.tag_tree.clear()
+        self._model.removeRows(0, self._model.rowCount())
         db = tag_data_service.get_tag_database(self.db_id)
-        if not db: self._is_updating_table = False; return
+        if not db:
+            self._is_updating_table = False
+            return
         for tag in db.get('tags', []):
-            self._create_tag_tree_item(self.tag_tree, tag)
+            self._create_tag_tree_item(tag)
         self._restore_tree_state(expanded_paths, selected_paths)
         self._is_updating_table = False
 
-    def _create_tag_tree_item(self, parent_widget, tag):
-        name = tag.get('name', 'N/A'); data_type = tag.get('data_type', 'N/A')
-        comment = tag.get('comment', ''); is_array = bool(tag.get('array_dims'))
-        item = QTreeWidgetItem(); item.setText(0, name); item.setText(3, comment)
-        item.setData(1, Qt.ItemDataRole.UserRole, name)
-        flags = Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsSelectable
+    def _create_tag_tree_item(self, tag):
+        name = tag.get('name', 'N/A')
+        data_type = tag.get('data_type', 'N/A')
+        comment = tag.get('comment', '')
+        is_array = bool(tag.get('array_dims'))
+
+        name_item = QStandardItem(name)
+        type_item = QStandardItem()
+        value_item = QStandardItem()
+        comment_item = QStandardItem(comment)
+
+        name_item.setEditable(False)
+        type_item.setEditable(False)
+        comment_item.setEditable(True)
+        type_item.setData(name, Qt.ItemDataRole.UserRole)
+        name_item.setData([], Qt.ItemDataRole.UserRole)
+
         if is_array:
             dims_str = 'x'.join(map(str, tag.get('array_dims', [])))
-            item.setText(1, f"{data_type}[{dims_str}]")
-            flags |= Qt.ItemFlag.ItemIsEditable
-            self._populate_array_children(item, tag, tag.get('value', []), [])
+            type_item.setText(f"{data_type}[{dims_str}]")
+            value_item.setEditable(False)
+            self._populate_array_children(name_item, tag, tag.get('value', []), [])
         else:
             value = str(tag.get('value', ''))
             type_str = f"{data_type}[{tag.get('length')}]" if data_type == 'STRING' else data_type
-            item.setText(1, type_str); item.setText(2, value)
-            flags |= Qt.ItemFlag.ItemIsEditable
-            item.setData(0, Qt.ItemDataRole.UserRole, [])
-        item.setFlags(flags)
-        parent_widget.addTopLevelItem(item)
-        return item
+            type_item.setText(type_str)
+            value_item.setText(value)
+            value_item.setEditable(True)
+
+        self._model.appendRow([name_item, type_item, value_item, comment_item])
 
     def _populate_array_children(self, parent_item, tag, data_slice, current_indices):
-        if not isinstance(data_slice, list): return
+        if not isinstance(data_slice, list):
+            return
         for i, value in enumerate(data_slice):
-            new_indices = current_indices + [i]; name = f"[{i}]"
-            child_item = QTreeWidgetItem(); child_item.setText(0, name)
-            child_item.setData(0, Qt.ItemDataRole.UserRole, new_indices)
-            child_item.setData(1, Qt.ItemDataRole.UserRole, tag['name'])
-            flags = Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsSelectable
-            if isinstance(value, list):
-                # Ensure child items have children and are expandable
-                child_item.setChildIndicatorPolicy(QTreeWidgetItem.ChildIndicatorPolicy.ShowIndicator)
-                self._populate_array_children(child_item, tag, value, new_indices)
-            else:
-                child_item.setText(2, str(value))
-                flags |= Qt.ItemFlag.ItemIsEditable
-            child_item.setFlags(flags)
-            parent_item.addChild(child_item)
+            new_indices = current_indices + [i]
+            name_str = f"[{i}]"
+            name_item = QStandardItem(name_str)
+            type_item = QStandardItem()
+            value_item = QStandardItem()
+            comment_item = QStandardItem()
 
-    def has_selection(self): return len(self.tag_tree.selectedItems()) > 0
-    def clear_selection(self): self.tag_tree.clearSelection()
+            name_item.setEditable(False)
+            type_item.setEditable(False)
+            comment_item.setEditable(False)
+            name_item.setData(new_indices, Qt.ItemDataRole.UserRole)
+            type_item.setData(tag['name'], Qt.ItemDataRole.UserRole)
+
+            if isinstance(value, list):
+                value_item.setEditable(False)
+                parent_item.appendRow([name_item, type_item, value_item, comment_item])
+                self._populate_array_children(name_item, tag, value, new_indices)
+            else:
+                value_item.setText(str(value))
+                value_item.setEditable(True)
+                parent_item.appendRow([name_item, type_item, value_item, comment_item])
+
+    def has_selection(self):
+        return self.tag_tree.selectionModel().hasSelection()
+
+    def clear_selection(self):
+        self.tag_tree.clearSelection()
     def copy_selected(self): self._copy_selected_tags()
     def cut_selected(self): self._cut_selected_tags()
     def paste(self): self._paste_tags()
