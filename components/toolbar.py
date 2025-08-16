@@ -100,7 +100,12 @@ class ToolsToolbar(QToolBar):
         for action in self._action_group.actions():
             if action.data() == tool_id:
                 action.setChecked(True)
+                break
 
+    def clear_selection(self):
+        """Clears any active tool selection."""
+        for action in self._action_group.actions():
+            action.setChecked(False)
 
 class DrawingToolbar(QToolBar):
     """A toolbar dedicated to drawing tools."""
@@ -164,3 +169,8 @@ class DrawingToolbar(QToolBar):
             if action.data() == tool_id:
                 action.setChecked(True)
                 break
+
+    def clear_selection(self):
+        """Clears any active drawing tool selection."""
+        for action in self._action_group.actions():
+            action.setChecked(False)

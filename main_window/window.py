@@ -98,10 +98,17 @@ class MainWindow(QMainWindow):
 
     def revert_to_select_tool(self):
         self.tools_toolbar.set_active_tool(constants.TOOL_SELECT)
+        self.drawing_toolbar.clear_selection()
         self.set_active_tool(constants.TOOL_SELECT)
+
+    def on_tools_toolbar_tool_changed(self, tool_name: str):
+        """Handle selection from the tools toolbar."""
+        self.drawing_toolbar.clear_selection()
+        self.set_active_tool(tool_name)
 
     def set_active_drawing_tool(self, tool_name: str):
         """Sets the active tool from the drawing toolbar."""
+        self.tools_toolbar.clear_selection()
         self.set_active_tool(tool_name)
 
     def on_cut(self):
@@ -153,7 +160,7 @@ class MainWindow(QMainWindow):
         self.ribbon.close_tab_action.triggered.connect(lambda: tabs.close_current_tab(self))
         self.ribbon.exit_action.triggered.connect(self.close)
         
-        self.tools_toolbar.tool_changed.connect(self.set_active_tool)
+        self.tools_toolbar.tool_changed.connect(self.on_tools_toolbar_tool_changed)
         self.drawing_toolbar.tool_changed.connect(self.set_active_drawing_tool)
 
         self.undo_action.triggered.connect(command_history_service.undo)
