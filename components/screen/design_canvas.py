@@ -10,6 +10,8 @@ from PyQt6.QtWidgets import (
     QGraphicsLineItem,
     QGraphicsEllipseItem,
     QGraphicsPathItem,
+    QGraphicsSimpleTextItem,
+    QGraphicsItem,
 )
 from PyQt6.QtGui import (
     QPainter,
@@ -102,6 +104,11 @@ class DesignCanvas(QGraphicsView):
         self._start_pos = None
         self._draw_points = []
         self._preview_item = None
+        self._dimension_item = None
+        self._preview_pen = None
+        self._preview_color = None
+        self._update_preview_style()
+        self._update_cursor()
 
         self.scene = QGraphicsScene(self)
         self.scene.setItemIndexMethod(QGraphicsScene.ItemIndexMethod.BspTreeIndex)
@@ -214,6 +221,31 @@ class DesignCanvas(QGraphicsView):
             if self.page_item.graphicsEffect() is self._shadow_effect:
                 self._shadow_effect.setEnabled(False)
 
+    def _update_preview_style(self, theme=None):
+        """Update preview pen and colors based on the active theme."""
+        if theme is None:
+            theme = settings_service.get_value("appearance/theme", "default")
+        if theme == "dark_theme":
+            color = QColor("#FFFFFF")
+        elif theme == "light_theme":
+            color = QColor("#000000")
+        else:
+            color = QColor("#000000")
+        self._preview_color = color
+        self._preview_pen = QPen(self._preview_color, 0, Qt.PenStyle.DashLine)
+        if self._preview_item:
+            self._preview_item.setPen(self._preview_pen)
+        if self._dimension_item:
+            self._dimension_item.setBrush(QBrush(self._preview_color))
+
+    def _update_cursor(self):
+        if self.active_tool == constants.TOOL_TEXT:
+            self.setCursor(QCursor(Qt.CursorShape.IBeamCursor))
+        elif self.active_tool == constants.TOOL_SELECT:
+            self.setCursor(QCursor(Qt.CursorShape.ArrowCursor))
+        else:
+            self.setCursor(QCursor(Qt.CursorShape.CrossCursor))
+
     def _snap_position(self, pos: QPointF) -> QPointF:
         self._snap_lines.clear()
         grid = self.grid_size
@@ -316,15 +348,15 @@ class DesignCanvas(QGraphicsView):
         super().drawForeground(painter, rect)
         if self.snap_lines_visible and self._snap_lines:
             painter.save()
-            painter.setPen(QPen(QColor(200, 200, 255), 1, Qt.PenStyle.DashLine))
+            painter.setPen(self._preview_pen)
             painter.drawLines(self._snap_lines)
             painter.restore()
 
         if self._drag_mode == 'rubberband':
             painter.save()
             painter.resetTransform()
-            painter.setPen(QPen(QColor(200, 200, 255), 1, Qt.PenStyle.DashLine))
-            painter.setBrush(QColor(82, 139, 255, 30))
+            painter.setPen(self._preview_pen)
+            painter.setBrush(QColor(self._preview_color.red(), self._preview_color.green(), self._preview_color.blue(), 30))
             painter.drawRect(self._rubber_band_rect.normalized())
             painter.restore()
 
@@ -397,6 +429,9 @@ class DesignCanvas(QGraphicsView):
                 if not self._drawing and self._preview_item:
                     self.scene.removeItem(self._preview_item)
                     self._preview_item = None
+                    if self._dimension_item:
+                        self.scene.removeItem(self._dimension_item)
+                        self._dimension_item = None
 
                 if self.active_tool == constants.TOOL_BUTTON:
                     default_props = button_tool.get_default_properties()
@@ -423,7 +458,7 @@ class DesignCanvas(QGraphicsView):
                     if not self._drawing:
                         self._drawing = True
                         self._draw_points = [scene_pos]
-                        pen = QPen(QColor(200, 200, 255), 1, Qt.PenStyle.DashLine)
+                        pen = QPen(self._preview_pen)
                         self._preview_item = QGraphicsPathItem()
                         self._preview_item.setPen(pen)
                         self.scene.addItem(self._preview_item)
@@ -432,14 +467,14 @@ class DesignCanvas(QGraphicsView):
                 elif self.active_tool == constants.TOOL_FREEFORM:
                     self._drawing = True
                     self._draw_points = [scene_pos]
-                    pen = QPen(QColor(200, 200, 255), 1, Qt.PenStyle.DashLine)
+                    pen = QPen(self._preview_pen)
                     self._preview_item = QGraphicsPathItem()
                     self._preview_item.setPen(pen)
                     self.scene.addItem(self._preview_item)
                 else:
                     self._drawing = True
                     self._start_pos = scene_pos
-                    pen = QPen(QColor(200, 200, 255), 1, Qt.PenStyle.DashLine)
+                    pen = QPen(self._preview_pen)
                     if self.active_tool == constants.TOOL_LINE:
                         self._preview_item = QGraphicsLineItem()
                     elif self.active_tool in (
@@ -566,6 +601,7 @@ class DesignCanvas(QGraphicsView):
                 ):
                     rect = QRectF(self._start_pos, current_scene_pos).normalized()
                     self._preview_item.setRect(rect)
+                self._update_dimension_label(current_scene_pos)
             return
 
         delta = current_scene_pos - self._last_mouse_scene_pos
@@ -595,6 +631,54 @@ class DesignCanvas(QGraphicsView):
                 self.setCursor(QCursor(Qt.CursorShape.ArrowCursor))
         
         self._last_mouse_scene_pos = current_scene_pos
+
+    def _update_dimension_label(self, current_scene_pos: QPointF):
+        if not self._drawing or not self._preview_item:
+            if self._dimension_item:
+                self.scene.removeItem(self._dimension_item)
+                self._dimension_item = None
+            return
+        if self._dimension_item is None:
+            self._dimension_item = QGraphicsSimpleTextItem()
+            self._dimension_item.setBrush(QBrush(self._preview_color))
+            self._dimension_item.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIgnoresTransformations)
+            self.scene.addItem(self._dimension_item)
+
+        if self.active_tool == constants.TOOL_LINE:
+            line = QLineF(self._start_pos, current_scene_pos)
+            text = f"{int(line.length())}"
+            pos = (self._start_pos + current_scene_pos) / 2
+        elif self.active_tool in (
+            constants.TOOL_RECT,
+            constants.TOOL_TABLE,
+            constants.TOOL_SCALE,
+            constants.TOOL_DXF,
+            constants.TOOL_CIRCLE,
+            constants.TOOL_ARC,
+            constants.TOOL_SECTOR,
+        ):
+            width = abs(current_scene_pos.x() - self._start_pos.x())
+            height = abs(current_scene_pos.y() - self._start_pos.y())
+            text = f"{int(width)} x {int(height)}"
+            pos = QPointF(max(self._start_pos.x(), current_scene_pos.x()),
+                          max(self._start_pos.y(), current_scene_pos.y()))
+        elif self.active_tool in (
+            constants.TOOL_POLYGON,
+            constants.TOOL_FREEFORM,
+        ):
+            pts = self._draw_points + [current_scene_pos]
+            xs = [p.x() for p in pts]
+            ys = [p.y() for p in pts]
+            width = max(xs) - min(xs)
+            height = max(ys) - min(ys)
+            text = f"{int(width)} x {int(height)}"
+            pos = QPointF(max(xs), max(ys))
+        else:
+            return
+
+        offset = QPointF(10 / self.current_zoom, -20 / self.current_zoom)
+        self._dimension_item.setText(text)
+        self._dimension_item.setPos(pos + offset)
 
     def leaveEvent(self, event):
         """Handle mouse leaving the canvas to clear position display."""
@@ -967,6 +1051,9 @@ class DesignCanvas(QGraphicsView):
                     if self._preview_item:
                         self.scene.removeItem(self._preview_item)
                         self._preview_item = None
+                    if self._dimension_item:
+                        self.scene.removeItem(self._dimension_item)
+                        self._dimension_item = None
             return
         if event.button() == Qt.MouseButton.LeftButton:
             if self._drag_mode == 'resize':
@@ -1047,6 +1134,8 @@ class DesignCanvas(QGraphicsView):
             self.view_zoomed.emit(f"{int(self.current_zoom * 100)}%")
             self._update_shadow_for_zoom()
             self._schedule_visible_items_update()
+            if self._dimension_item:
+                self._update_dimension_label(self._last_mouse_scene_pos)
             event.accept()
         else:
             super().wheelEvent(event)
@@ -1091,6 +1180,7 @@ class DesignCanvas(QGraphicsView):
             self.setBackgroundBrush(QColor("#f5f5f5"))
             if not self.screen_data.get('style', {}).get('transparent', False):
                 self.page_item.setBrush(QColor("#f5f5f5"))
+        self._update_preview_style(theme_name)
         self.update()
 
     def _sync_scene_items(self):
@@ -1198,6 +1288,14 @@ class DesignCanvas(QGraphicsView):
         if self.active_tool == constants.TOOL_PATH_EDIT and tool_name != constants.TOOL_PATH_EDIT:
             self.path_edit_tool.deactivate()
         self.active_tool = tool_name
+        if self._preview_item:
+            self.scene.removeItem(self._preview_item)
+            self._preview_item = None
+        if self._dimension_item:
+            self.scene.removeItem(self._dimension_item)
+            self._dimension_item = None
+        self._drawing = False
+        self._draw_points = []
         if tool_name == constants.TOOL_SELECT:
             self.setDragMode(QGraphicsView.DragMode.NoDrag)
         elif tool_name == constants.TOOL_PATH_EDIT:
@@ -1206,6 +1304,7 @@ class DesignCanvas(QGraphicsView):
         else:
             self.setDragMode(QGraphicsView.DragMode.NoDrag)
             self.clear_selection()
+        self._update_cursor()
 
     def _update_path_edit_target(self):
         item = None
@@ -1233,6 +1332,9 @@ class DesignCanvas(QGraphicsView):
             if self._preview_item:
                 self.scene.removeItem(self._preview_item)
                 self._preview_item = None
+            if self._dimension_item:
+                self.scene.removeItem(self._dimension_item)
+                self._dimension_item = None
             return
         item = self.itemAt(event.pos())
         if isinstance(item, ButtonItem):
