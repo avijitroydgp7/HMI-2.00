@@ -39,7 +39,12 @@ class ProjectDock(QDockWidget):
     def __init__(self, parent=None):
         super().__init__("Project", parent)
         self.setObjectName("ProjectDock")
-        self.setAllowedAreas(Qt.DockWidgetArea.LeftDockWidgetArea | Qt.DockWidgetArea.RightDockWidgetArea)
+        self.setAllowedAreas(Qt.DockWidgetArea.AllDockWidgetAreas)
+        self.setFeatures(
+            QDockWidget.DockWidgetFeature.DockWidgetClosable
+            | QDockWidget.DockWidgetFeature.DockWidgetMovable
+            | QDockWidget.DockWidgetFeature.DockWidgetFloatable
+        )
         self.tree = ProjectTreeWidget(self)
         self.tree.itemDoubleClicked.connect(self._on_item_double_clicked)
         self.tree.customContextMenuRequested.connect(self._show_context_menu)
@@ -182,13 +187,23 @@ class SystemDock(QDockWidget):
     def __init__(self, parent=None):
         super().__init__("System", parent)
         self.setObjectName("SystemDock")
-        self.setAllowedAreas(Qt.DockWidgetArea.LeftDockWidgetArea | Qt.DockWidgetArea.RightDockWidgetArea)
+        self.setAllowedAreas(Qt.DockWidgetArea.AllDockWidgetAreas)
+        self.setFeatures(
+            QDockWidget.DockWidgetFeature.DockWidgetClosable
+            | QDockWidget.DockWidgetFeature.DockWidgetMovable
+            | QDockWidget.DockWidgetFeature.DockWidgetFloatable
+        )
 
 class ScreensDock(QDockWidget):
     def __init__(self, parent=None):
         super().__init__("Screens", parent)
         self.setObjectName("ScreensDock")
-        self.setAllowedAreas(Qt.DockWidgetArea.LeftDockWidgetArea | Qt.DockWidgetArea.RightDockWidgetArea)
+        self.setAllowedAreas(Qt.DockWidgetArea.AllDockWidgetAreas)
+        self.setFeatures(
+            QDockWidget.DockWidgetFeature.DockWidgetClosable
+            | QDockWidget.DockWidgetFeature.DockWidgetMovable
+            | QDockWidget.DockWidgetFeature.DockWidgetFloatable
+        )
         from components.screen.screen_manager_widget import ScreenManagerWidget
         self.setWidget(ScreenManagerWidget(self))
     
@@ -203,7 +218,12 @@ def create_docks(parent):
     from components.property_editor import PropertyEditor
     properties_dock = QDockWidget("Properties", parent)
     properties_dock.setObjectName("PropertiesDock")
-    properties_dock.setAllowedAreas(Qt.DockWidgetArea.LeftDockWidgetArea | Qt.DockWidgetArea.RightDockWidgetArea)
+    properties_dock.setAllowedAreas(Qt.DockWidgetArea.AllDockWidgetAreas)
+    properties_dock.setFeatures(
+        QDockWidget.DockWidgetFeature.DockWidgetClosable
+        | QDockWidget.DockWidgetFeature.DockWidgetMovable
+        | QDockWidget.DockWidgetFeature.DockWidgetFloatable
+    )
     properties_dock.setWidget(PropertyEditor(parent))
     return {
         'project': project_dock, 'system': system_dock, 'screens': screens_dock,

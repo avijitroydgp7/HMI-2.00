@@ -6,9 +6,12 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtCore import (
     Qt, pyqtSlot, pyqtSignal, QSortFilterProxyModel,
-    QModelIndex, QItemSelectionModel, QTimer
+    QModelIndex, QItemSelectionModel, QTimer, QRegularExpression
 )
-from PyQt6.QtGui import QKeyEvent, QStandardItemModel, QStandardItem
+from PyQt6.QtGui import (
+    QKeyEvent, QStandardItemModel, QStandardItem,
+    QIntValidator, QDoubleValidator, QRegularExpressionValidator
+)
 import copy
 from utils.icon_manager import IconManager
 from services.tag_data_service import tag_data_service
@@ -33,12 +36,38 @@ DATA_TYPE_RANGES = {
 }
 
 class TagTreeDelegate(QStyledItemDelegate):
+    def __init__(self, parent, db_id):
+        super().__init__(parent)
+        self.db_id = db_id
+
     def createEditor(self, parent, option, index):
         editor = QLineEdit(parent)
         editor.setStyleSheet("padding: 0px; margin: 0px; border: none;")
+
+        tag_name = index.siblingAtColumn(1).data()
+        tag = tag_data_service.get_tag(self.db_id, tag_name) if tag_name else None
+
+        if tag:
+            data_type = tag.get('data_type')
+            if data_type in ("INT", "DINT"):
+                rng = DATA_TYPE_RANGES.get(data_type)
+                if rng:
+                    editor.setValidator(QIntValidator(rng["min"], rng["max"], editor))
+            elif data_type == "REAL":
+                rng = DATA_TYPE_RANGES.get("REAL")
+                if rng:
+                    editor.setValidator(QDoubleValidator(rng["min"], rng["max"], 100, editor))
+            elif data_type == "BOOL":
+                regex = QRegularExpression("^(true|false|0|1)$", QRegularExpression.PatternOption.CaseInsensitiveOption)
+                editor.setValidator(QRegularExpressionValidator(regex, editor))
+            elif data_type == "STRING":
+                editor.setMaxLength(tag.get('length', 0))
+
         return editor
+
     def setEditorData(self, editor, index):
         editor.setText(str(index.model().data(index, Qt.ItemDataRole.EditRole)))
+
     def setModelData(self, editor, model, index):
         model.setData(index, editor.text(), Qt.ItemDataRole.EditRole)
 
@@ -142,7 +171,7 @@ class TagEditorWidget(QWidget):
             | QAbstractItemView.EditTrigger.SelectedClicked
             | QAbstractItemView.EditTrigger.EditKeyPressed
         )
-        self.tag_tree.setItemDelegate(TagTreeDelegate(self.tag_tree))
+        self.tag_tree.setItemDelegate(TagTreeDelegate(self.tag_tree, self.db_id))
         self.tag_tree.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
 
         # Model and proxy for efficient filtering
@@ -298,24 +327,26 @@ class TagEditorWidget(QWidget):
         original_tag_data = tag_data_service.get_tag(self.db_id, tag_name)
         if not original_tag_data:
             return
-        try:
-            if column == 2:
-                indices = self._model.itemFromIndex(index.siblingAtColumn(0)).data(Qt.ItemDataRole.UserRole) or []
+        if column == 2:
+            indices = self._model.itemFromIndex(index.siblingAtColumn(0)).data(Qt.ItemDataRole.UserRole) or []
+            old_value = tag_data_service.get_tag_element_value(self.db_id, tag_name, indices)
+            try:
                 validated_value = self._parse_and_validate_value(item.text(), original_tag_data)
-                old_value = tag_data_service.get_tag_element_value(self.db_id, tag_name, indices)
                 if validated_value != old_value:
                     command = UpdateTagValueCommand(self.db_id, tag_name, indices, validated_value, old_value)
                     command_history_service.add_command(command)
-            elif column == 3 and not index.parent().isValid():
-                new_comment = item.text()
-                if new_comment != original_tag_data.get('comment'):
-                    new_tag_data = copy.deepcopy(original_tag_data)
-                    new_tag_data['comment'] = new_comment
-                    command = UpdateTagCommand(self.db_id, tag_name, new_tag_data)
-                    command_history_service.add_command(command)
-        except ValueError as e:
-            self.validation_error_occurred.emit(str(e))
-            self.refresh_table()
+            except ValueError as e:
+                self.validation_error_occurred.emit(str(e))
+                self._is_updating_table = True
+                item.setText(str(old_value))
+                self._is_updating_table = False
+        elif column == 3 and not index.parent().isValid():
+            new_comment = item.text()
+            if new_comment != original_tag_data.get('comment'):
+                new_tag_data = copy.deepcopy(original_tag_data)
+                new_tag_data['comment'] = new_comment
+                command = UpdateTagCommand(self.db_id, tag_name, new_tag_data)
+                command_history_service.add_command(command)
 
     def _parse_and_validate_value(self, value_str, tag_data):
         data_type = tag_data.get('data_type'); value_str = value_str.strip()
