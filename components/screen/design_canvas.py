@@ -278,8 +278,13 @@ class DesignCanvas(QGraphicsView):
         """Show or hide items based on their intersection with the viewport."""
         scene_rect = self.mapToScene(self.viewport().rect()).boundingRect()
 
-        # Items intersecting the current viewport
-        visible_now = set(self.scene.items(scene_rect))
+        # Items intersecting the current viewport.  Use all scene items so
+        # previously hidden ones can be restored when they re-enter.
+        visible_now = {
+            item
+            for item in self.scene.items()
+            if item.sceneBoundingRect().intersects(scene_rect)
+        }
 
         # On first run, assume everything starts visible so off-screen items get hidden
         if not self._visible_items and not self._hidden_items:
@@ -302,8 +307,11 @@ class DesignCanvas(QGraphicsView):
 
     def _schedule_visible_items_update(self):
         """Schedule a deferred call to update_visible_items."""
-        # Restarting the timer coalesces multiple rapid requests
-        self._visible_update_timer.start(16)
+        # Start the timer only if not already active so updates fire regularly
+        # even during continuous scrolling or zooming, preventing items from
+        # remaining hidden until movement stops.
+        if not self._visible_update_timer.isActive():
+            self._visible_update_timer.start(16)
 
     def drawForeground(self, painter: QPainter, rect):
         super().drawForeground(painter, rect)
