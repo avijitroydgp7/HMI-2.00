@@ -139,9 +139,7 @@ class DesignCanvas(QGraphicsView):
         self.page_item.setZValue(-1)
         self.scene.addItem(self.page_item)
 
-        # Grid snapping / guide visibility
-        self.grid_size = settings_service.get_value("grid_size", 10)
-        self.guides_visible = settings_service.get_value("guides_visible", True)
+        # Object snapping configuration
         self.snap_to_objects = settings_service.get_value("snap_to_objects", True)
         self.snap_lines_visible = settings_service.get_value("snap_lines_visible", True)
         self._snap_lines = []
@@ -169,27 +167,8 @@ class DesignCanvas(QGraphicsView):
         self.update_screen_data()
         
     def drawBackground(self, painter: QPainter, rect: QRectF):
+        """Draw the scene background without grid lines."""
         super().drawBackground(painter, rect)
-        if not self.guides_visible or self.grid_size <= 0:
-            return
-        page_rect = self.page_item.rect()
-        rect = rect.intersected(page_rect)
-        if rect.isNull():
-            return
-        grid = self.grid_size
-        left = int(rect.left()) - (int(rect.left()) % grid)
-        top = int(rect.top()) - (int(rect.top()) % grid)
-        lines = []
-        x = left
-        while x < rect.right():
-            lines.append(QLineF(x, rect.top(), x, rect.bottom()))
-            x += grid
-        y = top
-        while y < rect.bottom():
-            lines.append(QLineF(rect.left(), y, rect.right(), y))
-            y += grid
-        painter.setPen(QPen(QColor(60, 60, 60), 0))
-        painter.drawLines(lines)
 
 
     def eventFilter(self, source, event):
@@ -248,13 +227,7 @@ class DesignCanvas(QGraphicsView):
 
     def _snap_position(self, pos: QPointF) -> QPointF:
         self._snap_lines.clear()
-        grid = self.grid_size
-        x = pos.x()
-        y = pos.y()
-        if grid > 0:
-            x = round(x / grid) * grid
-            y = round(y / grid) * grid
-        snapped = QPointF(x, y)
+        snapped = QPointF(pos.x(), pos.y())
         if self.snap_to_objects:
             snapped = self._snap_to_objects(snapped)
         if self.snap_lines_visible:
@@ -295,14 +268,6 @@ class DesignCanvas(QGraphicsView):
             if snap_line_y:
                 self._snap_lines.append(snap_line_y)
         return QPointF(snap_x, snap_y)
-
-    def set_grid_size(self, size: int):
-        self.grid_size = max(1, int(size))
-        self.viewport().update()
-
-    def set_guides_visible(self, visible: bool):
-        self.guides_visible = visible
-        self.viewport().update()
 
     def set_snap_to_objects(self, enabled: bool):
         self.snap_to_objects = enabled

@@ -1,5 +1,5 @@
 # main_window/ui_setup.py
-from PyQt6.QtWidgets import QStatusBar, QLabel, QWidget, QHBoxLayout, QFrame, QPushButton, QSpinBox, QCheckBox
+from PyQt6.QtWidgets import QStatusBar, QLabel, QWidget, QHBoxLayout, QFrame, QPushButton, QCheckBox
 from PyQt6.QtCore import QByteArray
 from utils.icon_manager import IconManager
 
@@ -77,16 +77,7 @@ def setup_view_actions(win):
     win.ribbon.add_view_action(drawing_action)
     win.quick_access_toolbar.add_view_action(drawing_action)
 
-    # Grid and guide controls
-    win.grid_size_spin = QSpinBox()
-    win.grid_size_spin.setRange(1, 200)
-    win.grid_size_spin.setValue(settings_service.get_value("grid_size", 10))
-    win.grid_size_spin.setToolTip("Grid Size")
-    win.ribbon.view_tab.toolbar.addWidget(win.grid_size_spin)
-
-    win.guides_cb = QCheckBox("Show Grid")
-    win.guides_cb.setChecked(settings_service.get_value("guides_visible", True))
-    win.ribbon.view_tab.toolbar.addWidget(win.guides_cb)
+    # Snapping controls
     win.snap_objects_cb = QCheckBox("Snap to Objects")
     win.snap_objects_cb.setChecked(settings_service.get_value("snap_to_objects", True))
     win.ribbon.view_tab.toolbar.addWidget(win.snap_objects_cb)

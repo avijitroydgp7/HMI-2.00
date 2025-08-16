@@ -2,8 +2,8 @@
 # The main application ribbon (toolbar) for accessing common tools.
 
 from PyQt6.QtWidgets import (
-    QToolBar, QWidget, QVBoxLayout, QTabWidget, QHBoxLayout, 
-    QPushButton, QSpinBox, QCheckBox
+    QToolBar, QWidget, QVBoxLayout, QTabWidget, QHBoxLayout,
+    QPushButton, QCheckBox
 )
 from PyQt6.QtGui import QAction, QIcon, QKeySequence
 from PyQt6.QtCore import QSize, Qt, pyqtSignal
