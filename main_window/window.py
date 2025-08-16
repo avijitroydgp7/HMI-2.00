@@ -2,7 +2,7 @@
 # The core MainWindow class, which orchestrates all UI components and services.
 
 from PyQt6.QtWidgets import QMainWindow, QStackedWidget, QTabWidget, QDockWidget
-from PyQt6.QtCore import Qt
+from PyQt6.QtCore import Qt, pyqtSignal
 
 from components.ribbon import Ribbon
 from components.toolbar import QuickAccessToolBar, ToolsToolbar, DrawingToolbar
@@ -23,6 +23,9 @@ class MainWindow(QMainWindow):
     The main application window. This class is responsible for initializing the UI,
     connecting signals to slots, and managing the overall application state.
     """
+
+    screen_detached = pyqtSignal(object)
+    screen_reattached = pyqtSignal(object)
     def __init__(self, initial_project_path=None):
         super().__init__()
         
@@ -126,6 +129,9 @@ class MainWindow(QMainWindow):
         self.tab_widget.tabCloseRequested.connect(lambda index: tabs.close_tab(self, index))
         self.tab_widget.currentChanged.connect(lambda index: tabs.on_tab_changed(self, index))
         self.tab_widget.customContextMenuRequested.connect(lambda pos: tabs.show_tab_context_menu(self, pos))
+
+        self.screen_detached.connect(lambda w: tabs.focus_detached_screen(self, w))
+        self.screen_reattached.connect(lambda w: tabs.focus_detached_screen(self, w))
         
         self.welcome_widget.new_project_requested.connect(lambda: project_actions.new_project(self))
         self.welcome_widget.open_project_requested.connect(lambda: project_actions.open_project(self))

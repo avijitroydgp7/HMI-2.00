@@ -204,7 +204,7 @@ class DesignCanvas(QGraphicsView):
         """Update preview pen and colors based on the active theme."""
         if theme is None:
             theme = settings_service.get_value("appearance/theme", "default")
-        color = QColor("#ff00ff")
+        color = QColor("#ff00a7")
 
         self._preview_color = color
         self._preview_pen = QPen(self._preview_color, 0, Qt.PenStyle.DashLine)

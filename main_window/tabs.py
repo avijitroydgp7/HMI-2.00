@@ -1,7 +1,8 @@
 # main_window/tabs.py
 # MODIFIED: Ensures the active tool is set when a tab is changed.
 
-from PyQt6.QtWidgets import QMenu, QMessageBox
+from PyQt6.QtWidgets import QMenu, QMessageBox, QDockWidget
+from PyQt6.QtCore import Qt
 from components.screen.screen_widget import ScreenWidget
 from components.tag_editor_widget import TagEditorWidget
 from services.screen_data_service import screen_service
@@ -35,7 +36,11 @@ def _close_all_tabs(win):
 
 def show_tab_context_menu(win, position):
     index = win.tab_widget.tabBar().tabAt(position)
-    if index == -1: return
+    if index == -1:
+        return
+
+    widget = win.tab_widget.widget(index)
+
     menu = QMenu()
     close_action = menu.addAction("Close")
     close_others_action = menu.addAction("Close Others")
@@ -43,17 +48,31 @@ def show_tab_context_menu(win, position):
     menu.addSeparator()
     close_right_action = menu.addAction("Close Tabs to the Right")
     close_left_action = menu.addAction("Close Tabs to the Left")
-    
-    if win.tab_widget.count() <= 1: close_others_action.setEnabled(False)
-    if index == win.tab_widget.count() - 1: close_right_action.setEnabled(False)
-    if index == 0: close_left_action.setEnabled(False)
-    
+
+    detach_action = None
+    if isinstance(widget, ScreenWidget):
+        detach_action = menu.addAction("Detach")
+
+    if win.tab_widget.count() <= 1:
+        close_others_action.setEnabled(False)
+    if index == win.tab_widget.count() - 1:
+        close_right_action.setEnabled(False)
+    if index == 0:
+        close_left_action.setEnabled(False)
+
     action = menu.exec(win.tab_widget.mapToGlobal(position))
-    if action == close_action: close_tab(win, index)
-    elif action == close_others_action: _close_other_tabs(win, index)
-    elif action == close_all_action: _close_all_tabs(win)
-    elif action == close_right_action: _close_tabs_to_right(win, index)
-    elif action == close_left_action: _close_tabs_to_left(win, index)
+    if action == close_action:
+        close_tab(win, index)
+    elif action == close_others_action:
+        _close_other_tabs(win, index)
+    elif action == close_all_action:
+        _close_all_tabs(win)
+    elif action == close_right_action:
+        _close_tabs_to_right(win, index)
+    elif action == close_left_action:
+        _close_tabs_to_left(win, index)
+    elif action == detach_action:
+        detach_tab(win, index)
 
 def _close_other_tabs(win, index_to_keep):
     for i in range(win.tab_widget.count() - 1, -1, -1):
@@ -108,31 +127,31 @@ def open_tag_editor_in_tab(win, db_id: str):
     if not db_data:
         QMessageBox.critical(win, "Error", f"Could not find tag database with ID: {db_id}")
         return
-        
+
     db_name = db_data.get('name', 'Unnamed DB')
     editor_widget = TagEditorWidget(db_id, db_name, win)
     editor_widget.validation_error_occurred.connect(lambda msg: handlers.show_status_bar_message(win, msg))
     editor_widget.selection_changed.connect(lambda: actions.update_clipboard_actions(win))
-    
+
     tab_title = f"Tags: {db_name}"
     tab_index = win.tab_widget.addTab(editor_widget, tab_title)
     win.tab_widget.setCurrentIndex(tab_index)
     win.open_tag_tabs[db_id] = editor_widget
 
-def on_tab_changed(win, index):
+def _update_focus_for_widget(win, widget):
     from . import handlers, actions
     screen_manager = win.docks['screens'].widget()
-    widget = win.tab_widget.widget(index)
-    
+
     if isinstance(widget, ScreenWidget):
         widget.setFocus()
-        # MODIFIED: Set the active tool when the tab is focused
         widget.set_active_tool(win.active_tool)
         win.zoom_level_label.setText(widget.get_zoom_percentage())
         screen_manager.update_active_screen_highlight(widget.screen_id)
         if widget.design_canvas and widget.design_canvas.screen_data:
             size = widget.design_canvas.screen_data.get('size', {})
-            win.screen_dim_label.setText(f"W {size.get('width', '----')}, H {size.get('height', '----')}")
+            win.screen_dim_label.setText(
+                f"W {size.get('width', '----')}, H {size.get('height', '----')}"
+            )
         else:
             win.screen_dim_label.setText("W ----, H ----")
         widget.refresh_selection_status()
@@ -157,3 +176,40 @@ def on_tab_changed(win, index):
         win.docks['properties'].widget().set_current_object(None, None)
         
     actions.update_edit_actions(win)
+
+def on_tab_changed(win, index):
+    widget = win.tab_widget.widget(index)
+    _update_focus_for_widget(win, widget)
+
+def focus_detached_screen(win, screen_widget):
+    _update_focus_for_widget(win, screen_widget)
+
+def detach_tab(win, index):
+    widget = win.tab_widget.widget(index)
+    if not isinstance(widget, ScreenWidget):
+        return
+
+    title = win.tab_widget.tabText(index)
+    win.tab_widget.removeTab(index)
+
+    dock = QDockWidget(title, win)
+    dock.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose)
+    dock.setWidget(widget)
+    dock.setFloating(True)
+
+    original_widget_focus = widget.focusInEvent
+    def _widget_focus(event):
+        focus_detached_screen(win, widget)
+        original_widget_focus(event)
+    widget.focusInEvent = _widget_focus
+
+    def _reattach(event):
+        tab_index = win.tab_widget.addTab(widget, title)
+        win.tab_widget.setCurrentIndex(tab_index)
+        win.screen_reattached.emit(widget)
+        event.accept()
+
+    dock.closeEvent = _reattach
+
+    dock.show()
+    win.screen_detached.emit(widget)
