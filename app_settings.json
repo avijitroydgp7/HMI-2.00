@@ -5,6 +5,6 @@
     "appearance/theme": "dark_theme",
     "grid_size": 1,
     "guides_visible": false,
-    "snap_to_objects": false,
-    "snap_lines_visible": false
+    "snap_to_objects": true,
+    "snap_lines_visible": true
 }

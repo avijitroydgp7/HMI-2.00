@@ -176,6 +176,83 @@ class BulkUpdateChildPropertiesCommand(Command):
         from services.screen_data_service import screen_service
         screen_service.screen_modified.emit(self.screen_id)
 
+
+class AddAnchorCommand(Command):
+    def __init__(self, screen_id, instance_id, index, point, props):
+        super().__init__()
+        self.screen_id = screen_id
+        self.instance_id = instance_id
+        self.index = index
+        self.old_props = copy.deepcopy(props)
+        self.new_props = copy.deepcopy(props)
+        pts = self.new_props.get('points', [])
+        pts.insert(index, copy.deepcopy(point))
+        self.new_props['points'] = pts
+
+    def redo(self):
+        from services.screen_data_service import screen_service
+        screen_service._perform_update_child_properties(self.screen_id, self.instance_id, self.new_props)
+
+    def undo(self):
+        from services.screen_data_service import screen_service
+        screen_service._perform_update_child_properties(self.screen_id, self.instance_id, self.old_props)
+
+    def _notify(self):
+        from services.screen_data_service import screen_service
+        screen_service.screen_modified.emit(self.screen_id)
+
+
+class RemoveAnchorCommand(Command):
+    def __init__(self, screen_id, instance_id, index, props):
+        super().__init__()
+        self.screen_id = screen_id
+        self.instance_id = instance_id
+        self.index = index
+        self.old_props = copy.deepcopy(props)
+        self.new_props = copy.deepcopy(props)
+        pts = self.new_props.get('points', [])
+        if 0 <= index < len(pts):
+            pts.pop(index)
+        self.new_props['points'] = pts
+
+    def redo(self):
+        from services.screen_data_service import screen_service
+        screen_service._perform_update_child_properties(self.screen_id, self.instance_id, self.new_props)
+
+    def undo(self):
+        from services.screen_data_service import screen_service
+        screen_service._perform_update_child_properties(self.screen_id, self.instance_id, self.old_props)
+
+    def _notify(self):
+        from services.screen_data_service import screen_service
+        screen_service.screen_modified.emit(self.screen_id)
+
+
+class MoveAnchorCommand(Command):
+    def __init__(self, screen_id, instance_id, index, point, props):
+        super().__init__()
+        self.screen_id = screen_id
+        self.instance_id = instance_id
+        self.index = index
+        self.old_props = copy.deepcopy(props)
+        self.new_props = copy.deepcopy(props)
+        pts = self.new_props.get('points', [])
+        if 0 <= index < len(pts):
+            pts[index] = copy.deepcopy(point)
+        self.new_props['points'] = pts
+
+    def redo(self):
+        from services.screen_data_service import screen_service
+        screen_service._perform_update_child_properties(self.screen_id, self.instance_id, self.new_props)
+
+    def undo(self):
+        from services.screen_data_service import screen_service
+        screen_service._perform_update_child_properties(self.screen_id, self.instance_id, self.old_props)
+
+    def _notify(self):
+        from services.screen_data_service import screen_service
+        screen_service.screen_modified.emit(self.screen_id)
+
 # --- Tag Database Commands ---
 class AddTagDatabaseCommand(Command):
     def __init__(self, db_data, db_id=None):

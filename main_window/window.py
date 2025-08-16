@@ -157,7 +157,16 @@ class MainWindow(QMainWindow):
         self.cut_action.triggered.connect(self.on_cut)
         self.copy_action.triggered.connect(self.on_copy)
         self.paste_action.triggered.connect(self.on_paste)
-        
+
+        self.align_left_action.triggered.connect(lambda: actions.align_left(self))
+        self.align_center_action.triggered.connect(lambda: actions.align_center(self))
+        self.align_right_action.triggered.connect(lambda: actions.align_right(self))
+        self.align_top_action.triggered.connect(lambda: actions.align_top(self))
+        self.align_middle_action.triggered.connect(lambda: actions.align_middle(self))
+        self.align_bottom_action.triggered.connect(lambda: actions.align_bottom(self))
+        self.distribute_h_action.triggered.connect(lambda: actions.distribute_horizontally(self))
+        self.distribute_v_action.triggered.connect(lambda: actions.distribute_vertically(self))
+
         self.docks['screens'].widget().screen_open_requested.connect(lambda sid: tabs.open_screen_in_tab(self, sid))
         self.docks['screens'].widget().selection_changed.connect(lambda: actions.update_clipboard_actions(self))
         

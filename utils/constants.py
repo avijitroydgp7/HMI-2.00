@@ -25,6 +25,7 @@ TOOL_TABLE = 'table'
 TOOL_SCALE = 'scale'
 TOOL_IMAGE = 'image'
 TOOL_DXF = 'dxf'
+TOOL_PATH_EDIT = 'path_edit'
 # --- Project Tree Item Types ---
 PROJECT_TREE_ITEM_PROJECT_INFO = 'project_info'
 PROJECT_TREE_ITEM_SYSTEM = 'system'

@@ -41,6 +41,7 @@ from tools import (
     image as image_tool,
     dxf as dxf_tool,
     scale as scale_tool,
+    path_edit,
 )
 
 from .graphics_items import (
@@ -82,6 +83,7 @@ class DesignCanvas(QGraphicsView):
         self.active_tool = constants.TOOL_SELECT
         self._item_map = {}
         self.selection_overlay = SelectionOverlay()
+        self.path_edit_tool = path_edit.PathEditTool(self)
 
         self.current_zoom = 1.0
         self.min_zoom = 0.25
@@ -385,6 +387,9 @@ class DesignCanvas(QGraphicsView):
         self._schedule_visible_items_update()
 
     def mousePressEvent(self, event: QMouseEvent):
+        if self.active_tool == constants.TOOL_PATH_EDIT:
+            super().mousePressEvent(event)
+            return
         if self.active_tool != constants.TOOL_SELECT:
             if event.button() == Qt.MouseButton.LeftButton:
                 scene_pos = self._snap_position(self.mapToScene(event.pos()))
@@ -524,6 +529,10 @@ class DesignCanvas(QGraphicsView):
     def mouseMoveEvent(self, event: QMouseEvent):
         current_scene_pos = self._snap_position(self.mapToScene(event.pos()))
         self.mouse_moved_on_scene.emit(current_scene_pos)
+        if self.active_tool == constants.TOOL_PATH_EDIT:
+            super().mouseMoveEvent(event)
+            self._last_mouse_scene_pos = current_scene_pos
+            return
 
         if self.active_tool != constants.TOOL_SELECT:
             if self._drawing and self._preview_item:
@@ -813,6 +822,9 @@ class DesignCanvas(QGraphicsView):
                 self.selection_changed.emit(self.screen_id, selection_data)
 
     def mouseReleaseEvent(self, event: QMouseEvent):
+        if self.active_tool == constants.TOOL_PATH_EDIT:
+            super().mouseReleaseEvent(event)
+            return
         if self.active_tool != constants.TOOL_SELECT:
             if event.button() == Qt.MouseButton.LeftButton and self._drawing:
                 scene_pos = self._snap_position(self.mapToScene(event.pos()))
@@ -1179,17 +1191,34 @@ class DesignCanvas(QGraphicsView):
             if isinstance(item, BaseGraphicsItem):
                 selection_data.append(dict(item.instance_data))
         self.selection_changed.emit(self.screen_id, selection_data)
+        if self.active_tool == constants.TOOL_PATH_EDIT:
+            self._update_path_edit_target()
 
     def set_active_tool(self, tool_name: str):
+        if self.active_tool == constants.TOOL_PATH_EDIT and tool_name != constants.TOOL_PATH_EDIT:
+            self.path_edit_tool.deactivate()
         self.active_tool = tool_name
         if tool_name == constants.TOOL_SELECT:
-            # Use NoDrag mode since we handle selection manually
             self.setDragMode(QGraphicsView.DragMode.NoDrag)
+        elif tool_name == constants.TOOL_PATH_EDIT:
+            self.setDragMode(QGraphicsView.DragMode.NoDrag)
+            self._update_path_edit_target()
         else:
             self.setDragMode(QGraphicsView.DragMode.NoDrag)
             self.clear_selection()
 
+    def _update_path_edit_target(self):
+        item = None
+        for obj in self.scene.selectedItems():
+            if isinstance(obj, (PolygonItem, FreeformItem)):
+                item = obj
+                break
+        self.path_edit_tool.activate(item)
+
     def mouseDoubleClickEvent(self, event: QMouseEvent):
+        if self.active_tool == constants.TOOL_PATH_EDIT:
+            self.path_edit_tool.add_anchor(self.mapToScene(event.pos()))
+            return
         if self.active_tool == constants.TOOL_POLYGON and self._drawing:
             scene_pos = self.mapToScene(event.pos())
             self._draw_points.append(scene_pos)
@@ -1278,6 +1307,13 @@ class DesignCanvas(QGraphicsView):
         menu.exec(event.globalPos())
 
     def keyPressEvent(self, event: QKeyEvent):
+        if self.active_tool == constants.TOOL_PATH_EDIT:
+            if event.key() in (Qt.Key.Key_Delete, Qt.Key.Key_Backspace):
+                if self.path_edit_tool.delete_selected_anchor():
+                    event.accept()
+                    return
+            super().keyPressEvent(event)
+            return
         # Handle arrow key movement for selected items
         if event.key() in (Qt.Key.Key_Left, Qt.Key.Key_Right, Qt.Key.Key_Up, Qt.Key.Key_Down):
             self._move_selected_items(event.key())
