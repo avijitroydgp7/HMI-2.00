@@ -29,45 +29,6 @@ from PyQt6.QtCore import Qt, QPoint, QPointF, pyqtSignal, QRectF, QRect, QEvent,
 import copy
 import uuid
 
-try:
-    import sys
-    import os
-    sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..', 'Release'))
-    import scene_utils  # type: ignore
-    BoundingBox = scene_utils.BoundingBox
-    _snap_impl = scene_utils.snap_to_objects
-except ModuleNotFoundError:  # pragma: no cover - fallback path
-    from dataclasses import dataclass
-
-    @dataclass
-    class BoundingBox:
-        left: float
-        top: float
-        right: float
-        bottom: float
-
-    def _snap_impl(boxes, cursor_x, cursor_y, threshold):
-        snap_x = cursor_x
-        snap_y = cursor_y
-        best_dx = threshold
-        best_dy = threshold
-        line_x = None
-        line_y = None
-        for b in boxes:
-            for xv in (b.left, (b.left + b.right) / 2.0, b.right):
-                dx = abs(cursor_x - xv)
-                if dx < best_dx:
-                    best_dx = dx
-                    snap_x = xv
-                    line_x = xv
-            for yv in (b.top, (b.top + b.bottom) / 2.0, b.bottom):
-                dy = abs(cursor_y - yv)
-                if dy < best_dy:
-                    best_dy = dy
-                    snap_y = yv
-                    line_y = yv
-        return snap_x, snap_y, line_x, line_y
-
 from utils.icon_manager import IconManager
 from services.screen_data_service import screen_service
 from services.clipboard_service import clipboard_service
@@ -276,27 +237,36 @@ class DesignCanvas(QGraphicsView):
     def _snap_to_objects(self, pos: QPointF) -> QPointF:
         threshold = 5 / self.transform().m11()
         page_rect = self.page_item.rect()
-        boxes = []
+        snap_x = pos.x()
+        snap_y = pos.y()
+        best_dx = threshold
+        best_dy = threshold
+        snap_line_x = None
+        snap_line_y = None
+
         for item in self.scene.items():
             if item is self.page_item or item is self._preview_item or item in self.scene.selectedItems():
                 continue
             rect = item.sceneBoundingRect()
-            boxes.append(BoundingBox(rect.left(), rect.top(), rect.right(), rect.bottom()))
-
-        snap_x, snap_y, line_x, line_y = _snap_impl(
-            boxes, pos.x(), pos.y(), threshold
-        )
+            for x_val in (rect.left(), rect.center().x(), rect.right()):
+                dx = abs(pos.x() - x_val)
+                if dx < best_dx:
+                    best_dx = dx
+                    snap_x = x_val
+                    snap_line_x = QLineF(x_val, page_rect.top(), x_val, page_rect.bottom())
+            for y_val in (rect.top(), rect.center().y(), rect.bottom()):
+                dy = abs(pos.y() - y_val)
+                if dy < best_dy:
+                    best_dy = dy
+                    snap_y = y_val
+                    snap_line_y = QLineF(page_rect.left(), y_val, page_rect.right(), y_val)
 
         if self.snap_lines_visible:
             self._snap_lines.clear()
-            if line_x is not None:
-                self._snap_lines.append(
-                    QLineF(line_x, page_rect.top(), line_x, page_rect.bottom())
-                )
-            if line_y is not None:
-                self._snap_lines.append(
-                    QLineF(page_rect.left(), line_y, page_rect.right(), line_y)
-                )
+            if snap_line_x:
+                self._snap_lines.append(snap_line_x)
+            if snap_line_y:
+                self._snap_lines.append(snap_line_y)
         return QPointF(snap_x, snap_y)
 
     def set_snap_to_objects(self, enabled: bool):
