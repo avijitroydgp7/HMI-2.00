@@ -9,15 +9,18 @@ from PyQt6.QtWidgets import (
     QLineEdit,
     QStyledItemDelegate,
     QCompleter,
+    QToolBar,
+    QToolButton,
+    QColorDialog,
 )
-from PyQt6.QtGui import QKeySequence, QAction
+from PyQt6.QtGui import QKeySequence, QAction, QPen, QColor
 from PyQt6.QtCore import Qt
 from services.comment_data_service import comment_data_service
 from .comment_table_model import CommentTableModel
 
 
-class FormulaDelegate(QStyledItemDelegate):
-    """Delegate providing cell reference auto-completion for formulas."""
+class CommentItemDelegate(QStyledItemDelegate):
+    """Delegate providing auto-completion and formatting support."""
 
     def createEditor(self, parent, option, index):  # noqa: N802 - Qt naming convention
         editor = QLineEdit(parent)
@@ -30,6 +33,19 @@ class FormulaDelegate(QStyledItemDelegate):
         completer.setCaseSensitivity(Qt.CaseSensitivity.CaseInsensitive)
         editor.setCompleter(completer)
         return editor
+
+    def paint(self, painter, option, index):  # noqa: N802 - Qt naming convention
+        super().paint(painter, option, index)
+        fmt = index.data(Qt.ItemDataRole.UserRole) or {}
+        border = fmt.get("border")
+        if border:
+            pen = QPen(QColor("black"))
+            if border == "dashed":
+                pen.setStyle(Qt.PenStyle.DashLine)
+            painter.save()
+            painter.setPen(pen)
+            painter.drawRect(option.rect.adjusted(0, 0, -1, -1))
+            painter.restore()
 
 
 class CommentTableView(QTableView):
@@ -176,11 +192,79 @@ class CommentTableWidget(QWidget):
         button_layout.addStretch()
         main_layout.addLayout(button_layout)
 
+        # Formatting toolbar -------------------------------------------------
+        self.format_toolbar = QToolBar()
+        main_layout.addWidget(self.format_toolbar)
+
+        self.bold_action = QAction("B", self)
+        self.bold_action.setCheckable(True)
+        self.bold_action.triggered.connect(
+            lambda: self._apply_format_to_selection(bold=self.bold_action.isChecked())
+        )
+        self.format_toolbar.addAction(self.bold_action)
+
+        self.italic_action = QAction("I", self)
+        self.italic_action.setCheckable(True)
+        self.italic_action.triggered.connect(
+            lambda: self._apply_format_to_selection(italic=self.italic_action.isChecked())
+        )
+        self.format_toolbar.addAction(self.italic_action)
+
+        self.underline_action = QAction("U", self)
+        self.underline_action.setCheckable(True)
+        self.underline_action.triggered.connect(
+            lambda: self._apply_format_to_selection(underline=self.underline_action.isChecked())
+        )
+        self.format_toolbar.addAction(self.underline_action)
+
+        self.fill_action = QAction("Fill", self)
+        self.fill_action.triggered.connect(self._choose_fill_color)
+        self.format_toolbar.addAction(self.fill_action)
+
+        self.align_left_action = QAction("Left", self)
+        self.align_left_action.triggered.connect(
+            lambda: self._apply_format_to_selection(
+                align=int(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
+            )
+        )
+        self.format_toolbar.addAction(self.align_left_action)
+
+        self.align_center_action = QAction("Center", self)
+        self.align_center_action.triggered.connect(
+            lambda: self._apply_format_to_selection(
+                align=int(Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignVCenter)
+            )
+        )
+        self.format_toolbar.addAction(self.align_center_action)
+
+        self.align_right_action = QAction("Right", self)
+        self.align_right_action.triggered.connect(
+            lambda: self._apply_format_to_selection(
+                align=int(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+            )
+        )
+        self.format_toolbar.addAction(self.align_right_action)
+
+        border_menu = QMenu(self)
+        border_none = border_menu.addAction("No Border")
+        border_solid = border_menu.addAction("Solid Border")
+        border_dashed = border_menu.addAction("Dashed Border")
+        border_none.triggered.connect(lambda: self._apply_format_to_selection(border=None))
+        border_solid.triggered.connect(lambda: self._apply_format_to_selection(border="solid"))
+        border_dashed.triggered.connect(
+            lambda: self._apply_format_to_selection(border="dashed")
+        )
+        self.border_button = QToolButton()
+        self.border_button.setText("Border")
+        self.border_button.setMenu(border_menu)
+        self.border_button.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
+        self.format_toolbar.addWidget(self.border_button)
+
         self.table = CommentTableView(self)
         self.table.setSelectionBehavior(QTableView.SelectionBehavior.SelectItems)
         self.table.setSelectionMode(QTableView.SelectionMode.ExtendedSelection)
         main_layout.addWidget(self.table)
-        self.table.setItemDelegate(FormulaDelegate(self.table))
+        self.table.setItemDelegate(CommentItemDelegate(self.table))
 
         self._model = CommentTableModel(self.columns, self)
         self.table.setModel(self._model)
@@ -209,7 +293,7 @@ class CommentTableWidget(QWidget):
     def add_comment(self, values=None) -> None:
         """Append a new comment row."""
         if values is None:
-            values = [""] * len(self.columns)
+            values = [dict(raw="", format={}) for _ in self.columns]
         self._model.set_row_values(values)
 
     def remove_selected_rows(self) -> None:
@@ -243,6 +327,24 @@ class CommentTableWidget(QWidget):
         for row in range(model.rowCount()):
             row_data = []
             for col in range(1, model.columnCount()):
-                row_data.append(model.get_raw(row, col) or "")
+                cell = {
+                    "raw": model.get_raw(row, col) or "",
+                    "format": model.get_format(row, col),
+                }
+                row_data.append(cell)
             comments.append(row_data)
         comment_data_service.update_comments(self.group_id, comments, self.columns)
+
+    # Formatting helpers ---------------------------------------------
+    def _choose_fill_color(self):
+        color = QColorDialog.getColor(parent=self)
+        if color.isValid():
+            self._apply_format_to_selection(bg_color=color.name())
+
+    def _apply_format_to_selection(self, **fmt):
+        indexes = self.table.selectionModel().selectedIndexes()
+        for idx in indexes:
+            if idx.column() == 0:
+                continue
+            self._model.set_cell_format(idx.row(), idx.column(), fmt)
+        self._sync_to_service()

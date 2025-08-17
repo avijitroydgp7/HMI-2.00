@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Any, List
 
 from PyQt6.QtCore import QAbstractTableModel, QModelIndex, Qt
+from PyQt6.QtGui import QFont, QColor
 
 try:
     from asteval import Interpreter
@@ -16,6 +17,7 @@ class CommentTableModel(QAbstractTableModel):
     def __init__(self, columns: List[str], parent=None):
         super().__init__(parent)
         self.columns = columns
+        # each cell stores {'raw': str, 'value': str, 'format': {}}
         self._data: List[List[dict[str, Any]]] = []
         self._headers = ["Serial No."] + columns
         self._asteval = Interpreter() if Interpreter else None
@@ -36,11 +38,28 @@ class CommentTableModel(QAbstractTableModel):
         if not index.isValid():
             return None
         row, col = index.row(), index.column()
+        cell = self._data[row][col]
+        fmt = cell.get("format", {})
         if role in (Qt.ItemDataRole.DisplayRole, Qt.ItemDataRole.EditRole):
-            cell = self._data[row][col]
             if role == Qt.ItemDataRole.DisplayRole:
                 return cell.get("value", "")
             return cell.get("raw", "")
+        if role == Qt.ItemDataRole.FontRole:
+            font = QFont()
+            font.setBold(fmt.get("bold", False))
+            font.setItalic(fmt.get("italic", False))
+            font.setUnderline(fmt.get("underline", False))
+            return font
+        if role == Qt.ItemDataRole.BackgroundRole:
+            color = fmt.get("bg_color")
+            if color:
+                return QColor(color)
+        if role == Qt.ItemDataRole.TextAlignmentRole:
+            align = fmt.get("align")
+            if align is not None:
+                return Qt.AlignmentFlag(align)
+        if role == Qt.ItemDataRole.UserRole:
+            return fmt
         return None
 
     def setData(self, index: QModelIndex, value: Any, role: int = Qt.ItemDataRole.EditRole):  # noqa: D401
@@ -49,7 +68,17 @@ class CommentTableModel(QAbstractTableModel):
         row, col = index.row(), index.column()
         self._data[row][col]["raw"] = value
         self._evaluate_all()
-        self.dataChanged.emit(index, index, [Qt.ItemDataRole.DisplayRole, Qt.ItemDataRole.EditRole])
+        self.dataChanged.emit(
+            index,
+            index,
+            [
+                Qt.ItemDataRole.DisplayRole,
+                Qt.ItemDataRole.EditRole,
+                Qt.ItemDataRole.FontRole,
+                Qt.ItemDataRole.BackgroundRole,
+                Qt.ItemDataRole.TextAlignmentRole,
+            ],
+        )
         return True
 
     def flags(self, index: QModelIndex) -> Qt.ItemFlag:  # noqa: D401
@@ -63,7 +92,7 @@ class CommentTableModel(QAbstractTableModel):
     def insertRow(self, row: int, parent: QModelIndex = QModelIndex()):  # noqa: D401
         self.beginInsertRows(parent, row, row)
         cols = self.columnCount()
-        new_row = [dict(raw="", value="") for _ in range(cols)]
+        new_row = [dict(raw="", value="", format={}) for _ in range(cols)]
         self._data.insert(row, new_row)
         self.endInsertRows()
         self._reindex_serials()
@@ -82,7 +111,7 @@ class CommentTableModel(QAbstractTableModel):
         self.beginInsertColumns(parent, column, column)
         self._headers.insert(column, f"Column {column}")
         for row in self._data:
-            row.insert(column, dict(raw="", value=""))
+            row.insert(column, dict(raw="", value="", format={}))
         self.endInsertColumns()
         return True
 
@@ -100,12 +129,37 @@ class CommentTableModel(QAbstractTableModel):
     def get_raw(self, row: int, col: int) -> Any:
         return self._data[row][col].get("raw", "")
 
+    def get_format(self, row: int, col: int) -> dict[str, Any]:
+        return self._data[row][col].get("format", {}).copy()
+
+    def set_cell_format(self, row: int, col: int, fmt: dict[str, Any]):
+        cell = self._data[row][col]
+        current = cell.setdefault("format", {})
+        current.update(fmt)
+        idx = self.index(row, col)
+        self.dataChanged.emit(
+            idx,
+            idx,
+            [
+                Qt.ItemDataRole.FontRole,
+                Qt.ItemDataRole.BackgroundRole,
+                Qt.ItemDataRole.TextAlignmentRole,
+                Qt.ItemDataRole.DisplayRole,
+            ],
+        )
+
     def set_row_values(self, values):
         row = self.rowCount()
         self.insertRow(row)
-        for col, text in enumerate(values, start=1):
+        for col, cell in enumerate(values, start=1):
             idx = self.index(row, col)
-            self.setData(idx, text)
+            if isinstance(cell, dict):
+                self.setData(idx, cell.get("raw", ""))
+                fmt = cell.get("format")
+                if fmt:
+                    self.set_cell_format(row, col, fmt)
+            else:
+                self.setData(idx, cell)
 
     def _reindex_serials(self):
         for i, row in enumerate(self._data, start=1):
