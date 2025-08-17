@@ -4,10 +4,71 @@ from PyQt6.QtWidgets import (
     QHBoxLayout,
     QTableView,
     QPushButton,
+    QApplication,
 )
-from PyQt6.QtGui import QStandardItemModel, QStandardItem
+from PyQt6.QtGui import QStandardItemModel, QStandardItem, QKeySequence
 from PyQt6.QtCore import Qt, QModelIndex
 from services.comment_data_service import comment_data_service
+
+
+class CommentTableView(QTableView):
+    """Table view with basic clipboard support for comment cells."""
+
+    def keyPressEvent(self, event):  # noqa: N802 - Qt naming convention
+        clipboard = QApplication.clipboard()
+        model = self.model()
+        selection_model = self.selectionModel()
+        indexes = sorted(selection_model.selectedIndexes(), key=lambda i: (i.row(), i.column()))
+
+        if event.matches(QKeySequence.StandardKey.Copy):
+            if indexes:
+                rows = {}
+                for idx in indexes:
+                    rows.setdefault(idx.row(), {})[idx.column()] = idx.data() or ""
+                lines = []
+                for row in sorted(rows.keys()):
+                    cols = rows[row]
+                    line = "\t".join(cols[col] for col in sorted(cols.keys()))
+                    lines.append(line)
+                clipboard.setText("\n".join(lines))
+            event.accept()
+            return
+        if event.matches(QKeySequence.StandardKey.Cut):
+            if indexes:
+                rows = {}
+                for idx in indexes:
+                    rows.setdefault(idx.row(), {})[idx.column()] = idx.data() or ""
+                lines = []
+                for row in sorted(rows.keys()):
+                    cols = rows[row]
+                    line = "\t".join(cols[col] for col in sorted(cols.keys()))
+                    lines.append(line)
+                clipboard.setText("\n".join(lines))
+                for idx in indexes:
+                    model.setData(idx, "")
+                parent = self.parent()
+                if parent and hasattr(parent, "_sync_to_service"):
+                    parent._sync_to_service()
+            event.accept()
+            return
+        if event.matches(QKeySequence.StandardKey.Paste):
+            text = clipboard.text()
+            if text and indexes:
+                start_row = indexes[0].row()
+                start_col = indexes[0].column()
+                lines = text.splitlines()
+                for r, line in enumerate(lines):
+                    for c, cell in enumerate(line.split("\t")):
+                        row = start_row + r
+                        col = start_col + c
+                        if row < model.rowCount() and col < model.columnCount():
+                            model.setData(model.index(row, col), cell)
+                parent = self.parent()
+                if parent and hasattr(parent, "_sync_to_service"):
+                    parent._sync_to_service()
+            event.accept()
+            return
+        super().keyPressEvent(event)
 
 
 class CommentTableWidget(QWidget):
@@ -36,7 +97,7 @@ class CommentTableWidget(QWidget):
         button_layout.addStretch()
         main_layout.addLayout(button_layout)
 
-        self.table = QTableView(self)
+        self.table = CommentTableView(self)
         self.table.setSelectionBehavior(QTableView.SelectionBehavior.SelectItems)
         self.table.setSelectionMode(QTableView.SelectionMode.ExtendedSelection)
         main_layout.addWidget(self.table)
