@@ -15,6 +15,7 @@ import copy
 from services.command_history_service import command_history_service
 # FIX: Removed unused MoveChildCommand import
 from services.commands import UpdateChildPropertiesCommand
+from services.screen_data_service import screen_service
 from utils import constants
 
 class PropertyEditor(QStackedWidget):
@@ -42,6 +43,23 @@ class PropertyEditor(QStackedWidget):
         self.addWidget(self.multi_select_page)
 
         self.setCurrentWidget(self.blank_page)
+
+        # Refresh properties when the underlying screen data changes
+        screen_service.screen_modified.connect(self._on_screen_modified)
+
+    @pyqtSlot(str)
+    def _on_screen_modified(self, screen_id: str):
+        """Refresh the editor when the parent screen's data changes."""
+        if screen_id != self.current_parent_id:
+            return
+        if self.current_object_id:
+            instance = screen_service.get_child_instance(
+                self.current_parent_id, self.current_object_id
+            )
+            if instance is not None:
+                self.set_current_object(self.current_parent_id, instance)
+            else:
+                self.set_current_object(None, None)
 
     def set_active_tool(self, tool_id: str):
         """Update the active tool."""
