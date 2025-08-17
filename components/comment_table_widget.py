@@ -20,6 +20,7 @@ class CommentTableWidget(QWidget):
         self.group_label = f"[{group.get('number', '')}] - {group.get('name', '')}".strip()
         self.setObjectName("CommentTableWidget")
 
+
         self.columns = list(group.get("columns", ["Comment"]))
 
         main_layout = QVBoxLayout(self)
@@ -44,6 +45,7 @@ class CommentTableWidget(QWidget):
         headers = ["Serial No."] + self.columns
         self._model.setHorizontalHeaderLabels(headers)
         self.table.setModel(self._model)
+        self.table.setSortingEnabled(True)
 
         self.table.horizontalHeader().setStretchLastSection(True)
         self.table.verticalHeader().setVisible(False)
@@ -56,6 +58,7 @@ class CommentTableWidget(QWidget):
         self._model.rowsRemoved.connect(self._on_structure_changed)
         self._model.columnsInserted.connect(self._on_structure_changed)
         self._model.columnsRemoved.connect(self._on_structure_changed)
+        self._model.layoutChanged.connect(self._on_layout_changed)
 
         self.add_row_btn.clicked.connect(lambda: self.add_comment())
         self.remove_row_btn.clicked.connect(self.remove_selected_rows)
@@ -106,6 +109,10 @@ class CommentTableWidget(QWidget):
         self._reindex_rows()
         self._sync_to_service()
 
+    def _on_layout_changed(self) -> None:
+        self._reindex_rows()
+        self._sync_to_service()
+
     def _reindex_rows(self) -> None:
         for row in range(self._model.rowCount()):
             item = self._model.item(row, 0)
@@ -117,11 +124,12 @@ class CommentTableWidget(QWidget):
             item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
 
     def _sync_to_service(self) -> None:
+        model = self.table.model()
         comments = []
-        for row in range(self._model.rowCount()):
+        for row in range(model.rowCount()):
             row_data = []
-            for col in range(1, self._model.columnCount()):
-                item = self._model.item(row, col)
-                row_data.append(item.text() if item else "")
+            for col in range(1, model.columnCount()):
+                index = model.index(row, col)
+                row_data.append(index.data() or "")
             comments.append(row_data)
         comment_data_service.update_comments(self.group_id, comments, self.columns)
