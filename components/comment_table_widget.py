@@ -10,10 +10,9 @@ from PyQt6.QtWidgets import (
     QStyledItemDelegate,
     QCompleter,
     QToolBar,
-    QToolButton,
     QColorDialog,
 )
-from PyQt6.QtGui import QKeySequence, QAction, QPen, QColor
+from PyQt6.QtGui import QKeySequence, QAction
 from PyQt6.QtCore import Qt
 from services.comment_data_service import comment_data_service
 from services.command_history_service import command_history_service
@@ -27,7 +26,7 @@ from .comment_table_model import CommentTableModel
 
 
 class CommentItemDelegate(QStyledItemDelegate):
-    """Delegate providing auto-completion and formatting support."""
+    """Delegate providing auto-completion support."""
 
     def createEditor(self, parent, option, index):  # noqa: N802 - Qt naming convention
         editor = QLineEdit(parent)
@@ -40,19 +39,6 @@ class CommentItemDelegate(QStyledItemDelegate):
         completer.setCaseSensitivity(Qt.CaseSensitivity.CaseInsensitive)
         editor.setCompleter(completer)
         return editor
-
-    def paint(self, painter, option, index):  # noqa: N802 - Qt naming convention
-        super().paint(painter, option, index)
-        fmt = index.data(Qt.ItemDataRole.UserRole) or {}
-        border = fmt.get("border")
-        if border:
-            pen = QPen(QColor("black"))
-            if border == "dashed":
-                pen.setStyle(Qt.PenStyle.DashLine)
-            painter.save()
-            painter.setPen(pen)
-            painter.drawRect(option.rect.adjusted(0, 0, -1, -1))
-            painter.restore()
 
 
 class CommentTableView(QTableView):
@@ -262,45 +248,6 @@ class CommentTableWidget(QWidget):
         self.fill_action = QAction("Fill", self)
         self.fill_action.triggered.connect(self._choose_fill_color)
         self.format_toolbar.addAction(self.fill_action)
-
-        self.align_left_action = QAction("Left", self)
-        self.align_left_action.triggered.connect(
-            lambda: self._apply_format_to_selection(
-                align=int(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
-            )
-        )
-        self.format_toolbar.addAction(self.align_left_action)
-
-        self.align_center_action = QAction("Center", self)
-        self.align_center_action.triggered.connect(
-            lambda: self._apply_format_to_selection(
-                align=int(Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignVCenter)
-            )
-        )
-        self.format_toolbar.addAction(self.align_center_action)
-
-        self.align_right_action = QAction("Right", self)
-        self.align_right_action.triggered.connect(
-            lambda: self._apply_format_to_selection(
-                align=int(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
-            )
-        )
-        self.format_toolbar.addAction(self.align_right_action)
-
-        border_menu = QMenu(self)
-        border_none = border_menu.addAction("No Border")
-        border_solid = border_menu.addAction("Solid Border")
-        border_dashed = border_menu.addAction("Dashed Border")
-        border_none.triggered.connect(lambda: self._apply_format_to_selection(border=None))
-        border_solid.triggered.connect(lambda: self._apply_format_to_selection(border="solid"))
-        border_dashed.triggered.connect(
-            lambda: self._apply_format_to_selection(border="dashed")
-        )
-        self.border_button = QToolButton()
-        self.border_button.setText("Border")
-        self.border_button.setMenu(border_menu)
-        self.border_button.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
-        self.format_toolbar.addWidget(self.border_button)
 
         self.table = CommentTableView(self)
         self.table.setSelectionBehavior(QTableView.SelectionBehavior.SelectItems)

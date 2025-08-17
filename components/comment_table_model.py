@@ -61,10 +61,6 @@ class CommentTableModel(QAbstractTableModel):
             color = fmt.get("bg_color")
             if color:
                 return QColor(color)
-        if role == Qt.ItemDataRole.TextAlignmentRole:
-            align = fmt.get("align")
-            if align is not None:
-                return Qt.AlignmentFlag(align)
         if role == Qt.ItemDataRole.UserRole:
             return fmt
         return None
@@ -84,7 +80,6 @@ class CommentTableModel(QAbstractTableModel):
                     Qt.ItemDataRole.EditRole,
                     Qt.ItemDataRole.FontRole,
                     Qt.ItemDataRole.BackgroundRole,
-                    Qt.ItemDataRole.TextAlignmentRole,
                 ],
             )
             return True
@@ -162,7 +157,6 @@ class CommentTableModel(QAbstractTableModel):
             [
                 Qt.ItemDataRole.FontRole,
                 Qt.ItemDataRole.BackgroundRole,
-                Qt.ItemDataRole.TextAlignmentRole,
                 Qt.ItemDataRole.DisplayRole,
             ],
         )

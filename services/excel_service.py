@@ -3,8 +3,7 @@ from __future__ import annotations
 from typing import Dict, Any, List
 
 from openpyxl import Workbook, load_workbook
-from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
-from PyQt6.QtCore import Qt
+from openpyxl.styles import Font, PatternFill
 
 from services.comment_data_service import comment_data_service
 
@@ -32,18 +31,7 @@ class ExcelService:
                     rgb = cell.fill.fgColor.rgb
                     if rgb and rgb != "00000000":
                         fmt["bg_color"] = f"#{rgb[-6:]}"
-                if cell.alignment and cell.alignment.horizontal:
-                    horiz = cell.alignment.horizontal
-                    if horiz == "center":
-                        fmt["align"] = int(Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignVCenter)
-                    elif horiz == "right":
-                        fmt["align"] = int(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
-                    else:
-                        fmt["align"] = int(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
-                if cell.border:
-                    style = cell.border.left.style or cell.border.top.style or cell.border.right.style or cell.border.bottom.style
-                    if style:
-                        fmt["border"] = "dashed" if "dash" in style else "solid"
+                # Alignment and border styles are ignored
                 row_data.append({"raw": raw, "format": fmt})
             comments.append(row_data)
         return {
@@ -83,21 +71,7 @@ class ExcelService:
                     if "bg_color" in fmt:
                         color = fmt["bg_color"].lstrip("#")
                         cell.fill = PatternFill(start_color=color, end_color=color, fill_type="solid")
-                    align = fmt.get("align")
-                    if align is not None:
-                        qalign = Qt.AlignmentFlag(align)
-                        if qalign & Qt.AlignmentFlag.AlignHCenter:
-                            horiz = "center"
-                        elif qalign & Qt.AlignmentFlag.AlignRight:
-                            horiz = "right"
-                        else:
-                            horiz = "left"
-                        cell.alignment = Alignment(horizontal=horiz, vertical="center")
-                    border = fmt.get("border")
-                    if border:
-                        style = "dashed" if border == "dashed" else "thin"
-                        side = Side(style=style)
-                        cell.border = Border(left=side, right=side, top=side, bottom=side)
+                    # Alignment and border styles are not exported
         wb.save(file_path)
         return True
 
