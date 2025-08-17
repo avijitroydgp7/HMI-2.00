@@ -25,13 +25,19 @@ class CommentTableWidget(QWidget):
         main_layout = QVBoxLayout(self)
         button_layout = QHBoxLayout()
         self.add_row_btn = QPushButton("Add Row")
+        self.remove_row_btn = QPushButton("Remove Row")
         self.add_col_btn = QPushButton("Add Column")
+        self.remove_col_btn = QPushButton("Remove Column")
         button_layout.addWidget(self.add_row_btn)
+        button_layout.addWidget(self.remove_row_btn)
         button_layout.addWidget(self.add_col_btn)
+        button_layout.addWidget(self.remove_col_btn)
         button_layout.addStretch()
         main_layout.addLayout(button_layout)
 
         self.table = QTableView(self)
+        self.table.setSelectionBehavior(QTableView.SelectionBehavior.SelectRows)
+        self.table.setSelectionMode(QTableView.SelectionMode.ExtendedSelection)
         main_layout.addWidget(self.table)
 
         self._model = QStandardItemModel(0, len(self.columns) + 1, self)
@@ -52,7 +58,9 @@ class CommentTableWidget(QWidget):
         self._model.columnsRemoved.connect(self._on_structure_changed)
 
         self.add_row_btn.clicked.connect(lambda: self.add_comment())
+        self.remove_row_btn.clicked.connect(self.remove_selected_rows)
         self.add_col_btn.clicked.connect(self.add_column)
+        self.remove_col_btn.clicked.connect(self.remove_column)
 
         self._reindex_rows()
 
@@ -68,6 +76,12 @@ class CommentTableWidget(QWidget):
         for col, text in enumerate(values, start=1):
             self._model.setItem(row, col, QStandardItem(text))
 
+    def remove_selected_rows(self) -> None:
+        """Remove all currently selected rows."""
+        selection = self.table.selectionModel().selectedRows()
+        for index in sorted(selection, key=lambda i: i.row(), reverse=True):
+            self._model.removeRow(index.row())
+
     def add_column(self) -> None:
         """Append a new editable column to the table."""
         col_index = self._model.columnCount()
@@ -78,6 +92,15 @@ class CommentTableWidget(QWidget):
             self._model.setItem(row, col_index, QStandardItem(""))
         self.columns.append(column_name)
         self._sync_to_service()
+
+    def remove_column(self) -> None:
+        """Remove the last column if more than one data column exists."""
+        if self._model.columnCount() <= 2:
+            return  # Keep at least one data column besides the serial number
+        col_index = self._model.columnCount() - 1
+        self._model.removeColumn(col_index)
+        if self.columns:
+            self.columns.pop()
 
     def _on_structure_changed(self, parent: QModelIndex, first: int, last: int) -> None:
         self._reindex_rows()
