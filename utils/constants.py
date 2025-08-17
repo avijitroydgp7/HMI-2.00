@@ -31,3 +31,7 @@ PROJECT_TREE_ITEM_PROJECT_INFO = 'project_info'
 PROJECT_TREE_ITEM_SYSTEM = 'system'
 PROJECT_TREE_ITEM_SCREENS = 'screens'
 PROJECT_TREE_ITEM_TAGS_ROOT = 'tags_root'
+# Root node for comment tables in the Project tree
+PROJECT_TREE_ITEM_COMMENT_ROOT = 'comment_root'
+# Individual comment table/group node in the Project tree
+PROJECT_TREE_ITEM_COMMENT_GROUP = 'comment_group'

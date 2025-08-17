@@ -31,6 +31,7 @@ class MainWindow(QMainWindow):
         
         self.open_screen_tabs = {}
         self.open_tag_tabs = {}
+        self.open_comment_tabs = {}
         self.last_focused_copypaste_widget = None
         self.active_tool = constants.TOOL_SELECT
 
@@ -188,6 +189,7 @@ class MainWindow(QMainWindow):
         
         project_dock = self.docks['project']
         project_dock.tag_database_open_requested.connect(lambda db_id: tabs.open_tag_editor_in_tab(self, db_id))
+        project_dock.comment_table_open_requested.connect(lambda gid: tabs.open_comment_table_in_tab(self, gid))
         project_dock.project_info_requested.connect(lambda: project_actions.edit_project_info(self))
         project_dock.tree.itemSelectionChanged.connect(lambda: actions.update_clipboard_actions(self))
         project_dock.system_tab_requested.connect(self.docks['system'].raise_)

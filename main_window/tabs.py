@@ -5,6 +5,7 @@ from PyQt6.QtWidgets import QMenu, QMessageBox, QDockWidget
 from PyQt6.QtCore import Qt
 from components.screen.screen_widget import ScreenWidget
 from components.tag_editor_widget import TagEditorWidget
+from components.comment_table_widget import CommentTableWidget
 from services.screen_data_service import screen_service
 from services.tag_data_service import tag_data_service
 from services.project_service import project_service
@@ -28,6 +29,9 @@ def close_tab(win, index):
     elif isinstance(widget, TagEditorWidget):
         if widget.db_id in win.open_tag_tabs:
             del win.open_tag_tabs[widget.db_id]
+    elif isinstance(widget, CommentTableWidget):
+        if hasattr(widget, 'group_id') and widget.group_id in getattr(win, 'open_comment_tabs', {}):
+            del win.open_comment_tabs[widget.group_id]
     win.tab_widget.removeTab(index)
 
 def _close_all_tabs(win):
@@ -138,6 +142,19 @@ def open_tag_editor_in_tab(win, db_id: str):
     win.tab_widget.setCurrentIndex(tab_index)
     win.open_tag_tabs[db_id] = editor_widget
 
+def open_comment_table_in_tab(win, group_id: str):
+    from services.comment_data_service import comment_data_service
+    if group_id in win.open_comment_tabs:
+        win.tab_widget.setCurrentWidget(win.open_comment_tabs[group_id])
+        return
+
+    widget = CommentTableWidget(group_id, win)
+    group = comment_data_service.get_group(group_id)
+    label = f"Comments: [{group.get('number','')}] - {group.get('name','')}" if group else "Comment Table"
+    tab_index = win.tab_widget.addTab(widget, label)
+    win.tab_widget.setCurrentIndex(tab_index)
+    win.open_comment_tabs[group_id] = widget
+
 def _update_focus_for_widget(win, widget):
     from . import handlers, actions
     screen_manager = win.docks['screens'].widget()
@@ -157,6 +174,9 @@ def _update_focus_for_widget(win, widget):
         widget.refresh_selection_status()
     elif isinstance(widget, TagEditorWidget):
         widget.tag_tree.setFocus()
+        win.screen_dim_label.setText("W ----, H ----")
+    elif isinstance(widget, CommentTableWidget):
+        widget.setFocus()
         win.screen_dim_label.setText("W ----, H ----")
         win.object_size_label.setText("W ----, H ----")
         win.object_pos_label.setText("X ----, Y ----")

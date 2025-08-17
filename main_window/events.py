@@ -4,6 +4,7 @@ from components.docks import ProjectDock
 # MODIFIED: Direct import
 from components.screen.screen_widget import ScreenWidget
 from components.tag_editor_widget import TagEditorWidget
+from components.comment_table_widget import CommentTableWidget
 
 def closeEvent(win, event):
     """Handles the main window's close event, prompting to save if necessary."""
@@ -18,7 +19,7 @@ def _get_selectable_parent(win, widget):
     """Finds the main selectable widget containing the currently focused widget."""
     current = widget
     while current:
-        if isinstance(current, (ProjectDock, ScreenWidget, TagEditorWidget)):
+        if isinstance(current, (ProjectDock, ScreenWidget, TagEditorWidget, CommentTableWidget)):
             return current
         current = current.parent()
     return None
@@ -47,6 +48,10 @@ def on_focus_changed(win, old, new):
         new_selectable.refresh_selection_status()
     elif isinstance(new_selectable, TagEditorWidget):
         win.active_area_label.setText(f"Tag Editor: {new_selectable.db_name}")
+    elif isinstance(new_selectable, CommentTableWidget):
+        label = getattr(new_selectable, 'group_label', 'Comment Table')
+        win.active_area_label.setText(f"Comment Table: {label}")
+        handlers.update_selection_status(win, None)
     else:
         win.active_area_label.setText("None")
         handlers.update_selection_status(win, None)

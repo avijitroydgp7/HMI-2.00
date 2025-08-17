@@ -6,10 +6,11 @@ import qtawesome as qta
 import copy
 
 from services.tag_data_service import tag_data_service
+from services.comment_data_service import comment_data_service
 from services.clipboard_service import clipboard_service
 from services.command_history_service import command_history_service
 from services.commands import AddTagDatabaseCommand, RemoveTagDatabaseCommand, RenameTagDatabaseCommand
-from dialogs import NewTagDatabaseDialog
+from dialogs import NewTagDatabaseDialog, NewCommentTableDialog
 from utils import constants
 from components.tree_widget import CustomTreeWidget
 
@@ -32,6 +33,7 @@ class ProjectTreeWidget(CustomTreeWidget):
 
 class ProjectDock(QDockWidget):
     tag_database_open_requested = pyqtSignal(str)
+    comment_table_open_requested = pyqtSignal(str)
     project_info_requested = pyqtSignal()
     system_tab_requested = pyqtSignal()
     screens_tab_requested = pyqtSignal()
@@ -56,6 +58,7 @@ class ProjectDock(QDockWidget):
         self.setWidget(container)
         self._populate_tree()
         tag_data_service.database_list_changed.connect(self._populate_tree)
+        comment_data_service.comment_group_list_changed.connect(self._populate_tree)
 
     def _populate_tree(self):
         self.tree.clear()
@@ -68,6 +71,15 @@ class ProjectDock(QDockWidget):
         screens_item = QTreeWidgetItem(self.tree, ["Screens"])
         screens_item.setIcon(0, qta.icon('fa5.clone', color='#5dadec'))
         screens_item.setData(0, Qt.ItemDataRole.UserRole, constants.PROJECT_TREE_ITEM_SCREENS)
+        comment_root = QTreeWidgetItem(self.tree, ["Comment Tables"])
+        comment_root.setIcon(0, qta.icon('fa5s.comments', color='#5dadec'))
+        comment_root.setData(0, Qt.ItemDataRole.UserRole, constants.PROJECT_TREE_ITEM_COMMENT_ROOT)
+        for gid, gdata in comment_data_service.get_all_groups().items():
+            label = f"[{gdata.get('number','')}] - {gdata.get('name','')}"
+            item = QTreeWidgetItem(comment_root, [label])
+            item.setIcon(0, qta.icon('fa5s.comment', color='#c8cdd4'))
+            item.setData(0, Qt.ItemDataRole.UserRole, gid)
+        comment_root.setExpanded(True)
         tags_root = QTreeWidgetItem(self.tree, ["Tag Databases"])
         tags_root.setIcon(0, qta.icon('fa5s.tags', color='#5dadec'))
         tags_root.setData(0, Qt.ItemDataRole.UserRole, constants.PROJECT_TREE_ITEM_TAGS_ROOT)
@@ -104,6 +116,10 @@ class ProjectDock(QDockWidget):
             paste_action = menu.addAction("Paste")
             paste_action.triggered.connect(self.paste)
             paste_action.setEnabled(content_type == constants.CLIPBOARD_TYPE_TAG_DATABASE)
+        elif item_id == constants.PROJECT_TREE_ITEM_COMMENT_ROOT:
+            menu.addAction("New Comment Table...").triggered.connect(self._add_new_comment_table)
+        elif parent_type == constants.PROJECT_TREE_ITEM_COMMENT_ROOT:
+            menu.addAction("Open Comment Table").triggered.connect(lambda: self.comment_table_open_requested.emit(item_id))
         elif parent_type == constants.PROJECT_TREE_ITEM_TAGS_ROOT:
             menu.addAction("Open Tag Editor").triggered.connect(lambda: self.tag_database_open_requested.emit(item_id))
             menu.addSeparator()
@@ -120,6 +136,7 @@ class ProjectDock(QDockWidget):
         if item_id == constants.PROJECT_TREE_ITEM_PROJECT_INFO: self.project_info_requested.emit()
         elif item_id == constants.PROJECT_TREE_ITEM_SYSTEM: self.system_tab_requested.emit()
         elif item_id == constants.PROJECT_TREE_ITEM_SCREENS: self.screens_tab_requested.emit()
+        elif parent_type == constants.PROJECT_TREE_ITEM_COMMENT_ROOT: self.comment_table_open_requested.emit(item_id)
         elif parent_type == constants.PROJECT_TREE_ITEM_TAGS_ROOT: self.tag_database_open_requested.emit(item_id)
 
     def _add_new_tag_database(self):
@@ -129,6 +146,12 @@ class ProjectDock(QDockWidget):
             if db_name:
                 command = AddTagDatabaseCommand({"name": db_name, "tags": []})
                 command_history_service.add_command(command)
+
+    def _add_new_comment_table(self):
+        dialog = NewCommentTableDialog(self)
+        if dialog.exec():
+            number, name = dialog.get_values()
+            comment_data_service.add_group(number, name)
 
     def _delete_databases(self, db_ids, db_names):
         count = len(db_ids)
@@ -151,10 +174,25 @@ class ProjectDock(QDockWidget):
     def clear_selection(self): self.tree.clearSelection()
 
     def get_selected_item_data(self):
+        selected_items = self.tree.selectedItems()
+        if not selected_items:
+            return None
+
+        item = selected_items[0]
+        item_id = item.data(0, Qt.ItemDataRole.UserRole)
+        parent_type = item.parent().data(0, Qt.ItemDataRole.UserRole) if item.parent() else None
+        if item_id == constants.PROJECT_TREE_ITEM_COMMENT_ROOT:
+            return {'name': 'Comment Tables', 'type': 'Comment Tables'}
+        if parent_type == constants.PROJECT_TREE_ITEM_COMMENT_ROOT:
+            return {'name': item.text(0), 'type': 'Comment Table'}
+
         db_ids, db_names = self._get_selected_db_ids_and_names()
-        if not db_ids: return None
-        if len(db_ids) > 1: return {'name': f"{len(db_ids)} Databases", 'type': 'Tag Databases'}
-        else: return {'name': db_names[0], 'type': 'Tag Database'}
+        if not db_ids:
+            return None
+        if len(db_ids) > 1:
+            return {'name': f"{len(db_ids)} Databases", 'type': 'Tag Databases'}
+        else:
+            return {'name': db_names[0], 'type': 'Tag Database'}
 
     def copy_selected(self):
         db_ids, _ = self._get_selected_db_ids_and_names()

@@ -5,6 +5,7 @@ import datetime
 from PyQt6.QtCore import QObject, pyqtSignal
 from services.screen_data_service import screen_service
 from services.tag_data_service import tag_data_service
+from services.comment_data_service import comment_data_service
 from services.settings_service import settings_service
 
 class ProjectService(QObject):
@@ -50,6 +51,7 @@ class ProjectService(QObject):
             self.project_info = project_data.get("project_info", self._get_default_project_info())
             screen_service.load_from_project(project_data)
             tag_data_service.load_from_project(project_data)
+            comment_data_service.load_from_project(project_data)
 
             self.project_file_path = file_path
             self.set_dirty(False)
@@ -75,10 +77,12 @@ class ProjectService(QObject):
 
             screen_data = screen_service.serialize_for_project()
             tag_data = tag_data_service.serialize_for_project()
+            comment_data = comment_data_service.serialize_for_project()
             project_data = {
                 "project_info": self.project_info,
-                **screen_data, 
-                **tag_data
+                **screen_data,
+                **tag_data,
+                **comment_data,
             }
 
             with open(file_path, 'w') as f:
@@ -118,6 +122,7 @@ class ProjectService(QObject):
         self.project_info = self._get_default_project_info()
         screen_service.clear_all()
         tag_data_service.clear_all()
+        comment_data_service.clear_all()
         command_history_service.clear()
         
     def _perform_update_project_info(self, full_new_info):
