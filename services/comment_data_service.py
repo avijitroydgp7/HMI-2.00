@@ -37,6 +37,7 @@ class CommentDataService(QObject):
             "name": name,
             "columns": ["Comment"],
             "comments": [],
+            "excel": {},
         }
         self._number_index[number] = group_id
         self.comment_group_list_changed.emit()
@@ -64,6 +65,7 @@ class CommentDataService(QObject):
             if comments and isinstance(comments[0], str):
                 g["comments"] = [[c] for c in comments]
             g.setdefault("columns", ["Comment"])
+            g.setdefault("excel", {})
         self._groups = groups
         self._number_index = {
             g.get("number", ""): gid for gid, g in groups.items() if g.get("number")

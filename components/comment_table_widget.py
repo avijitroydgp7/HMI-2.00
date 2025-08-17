@@ -12,10 +12,13 @@ from PyQt6.QtWidgets import (
     QToolBar,
     QToolButton,
     QColorDialog,
+    QFileDialog,
 )
 from PyQt6.QtGui import QKeySequence, QAction, QPen, QColor
 from PyQt6.QtCore import Qt
 from services.comment_data_service import comment_data_service
+from dialogs.info_dialog import CustomInfoDialog
+from utils.icon_manager import IconManager
 from .comment_table_model import CommentTableModel
 
 
@@ -185,10 +188,18 @@ class CommentTableWidget(QWidget):
         self.remove_row_btn = QPushButton("Remove Row")
         self.add_col_btn = QPushButton("Add Column")
         self.remove_col_btn = QPushButton("Remove Column")
+        self.import_excel_btn = QPushButton(
+            IconManager.create_icon("fa5s.file-import"), " Import"
+        )
+        self.export_excel_btn = QPushButton(
+            IconManager.create_icon("fa5s.file-export"), " Export"
+        )
         button_layout.addWidget(self.add_row_btn)
         button_layout.addWidget(self.remove_row_btn)
         button_layout.addWidget(self.add_col_btn)
         button_layout.addWidget(self.remove_col_btn)
+        button_layout.addWidget(self.import_excel_btn)
+        button_layout.addWidget(self.export_excel_btn)
         button_layout.addStretch()
         main_layout.addLayout(button_layout)
 
@@ -286,6 +297,8 @@ class CommentTableWidget(QWidget):
         self.remove_row_btn.clicked.connect(self.remove_selected_rows)
         self.add_col_btn.clicked.connect(self.add_column)
         self.remove_col_btn.clicked.connect(self.remove_column)
+        self.import_excel_btn.clicked.connect(self.import_from_excel)
+        self.export_excel_btn.clicked.connect(self.export_to_excel)
 
     def setFocus(self):  # noqa: N802 - Qt naming convention
         self.table.setFocus()
@@ -320,6 +333,72 @@ class CommentTableWidget(QWidget):
         if self.columns:
             self.columns.pop()
         self._sync_to_service()
+
+    # Excel import/export --------------------------------------------
+    def _apply_loaded_data(self, data):
+        self.columns = data.get("columns", ["Comment"])
+        self._model = CommentTableModel(self.columns, self)
+        self.table.setModel(self._model)
+        for row in data.get("comments", []):
+            self._model.set_row_values(row)
+        comment_data_service.update_comments(
+            self.group_id, data.get("comments", []), self.columns
+        )
+        group = comment_data_service.get_group(self.group_id)
+        if group is not None:
+            group["excel"] = data.get("excel", {})
+
+    def load_worksheet(self, worksheet) -> None:
+        from services.excel_service import excel_service
+
+        data = excel_service.read_comments_from_sheet(worksheet)
+        self._apply_loaded_data(data)
+
+    def import_from_excel(self) -> None:
+        file_path, _ = QFileDialog.getOpenFileName(
+            self, "Import Comments from Excel", "", "Excel Files (*.xlsx)"
+        )
+        if file_path:
+            from services.excel_service import excel_service
+
+            try:
+                data = excel_service.read_comments_from_file(file_path)
+                self._apply_loaded_data(data)
+                CustomInfoDialog.show_info(
+                    self,
+                    "Import Successful",
+                    f"Imported {len(data.get('comments', []))} rows.",
+                )
+            except Exception as e:  # pragma: no cover - runtime
+                CustomInfoDialog.show_info(
+                    self,
+                    "Import Error",
+                    f"An error occurred: {e}",
+                )
+
+    def export_to_excel(self) -> None:
+        file_path, _ = QFileDialog.getSaveFileName(
+            self,
+            "Export Comments to Excel",
+            f"{self.group_label}.xlsx",
+            "Excel Files (*.xlsx)",
+        )
+        if file_path:
+            from services.excel_service import excel_service
+
+            try:
+                excel_service.write_comments_to_file(self.group_id, file_path)
+                CustomInfoDialog.show_info(
+                    self,
+                    "Export Successful",
+                    f"Comments exported to:\n{file_path}",
+                )
+            except Exception as e:  # pragma: no cover - runtime
+                CustomInfoDialog.show_info(
+                    self,
+                    "Export Error",
+                    f"An error occurred: {e}",
+                )
 
     def _sync_to_service(self) -> None:
         model = self.table.model()
