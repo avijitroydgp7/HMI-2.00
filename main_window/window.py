@@ -100,6 +100,7 @@ class MainWindow(QMainWindow):
         self.tools_toolbar.set_active_tool(constants.TOOL_SELECT)
         self.drawing_toolbar.clear_selection()
         self.set_active_tool(constants.TOOL_SELECT)
+        self.docks['properties'].widget().set_active_tool(constants.TOOL_SELECT)
 
     def on_tools_toolbar_tool_changed(self, tool_name: str):
         """Handle selection from the tools toolbar."""
@@ -162,6 +163,8 @@ class MainWindow(QMainWindow):
         
         self.tools_toolbar.tool_changed.connect(self.on_tools_toolbar_tool_changed)
         self.drawing_toolbar.tool_changed.connect(self.set_active_drawing_tool)
+        self.tools_toolbar.tool_changed.connect(self.docks['properties'].widget().set_active_tool)
+        self.drawing_toolbar.tool_changed.connect(self.docks['properties'].widget().set_active_tool)
 
         self.undo_action.triggered.connect(command_history_service.undo)
 

@@ -15,6 +15,7 @@ import copy
 from services.command_history_service import command_history_service
 # FIX: Removed unused MoveChildCommand import
 from services.commands import UpdateChildPropertiesCommand
+from utils import constants
 
 class PropertyEditor(QStackedWidget):
     """
@@ -26,6 +27,7 @@ class PropertyEditor(QStackedWidget):
         self.current_object_id = None
         self.current_parent_id = None
         self.current_properties = {}
+        self.active_tool = constants.TOOL_SELECT
 
         # --- Create Pages ---
         self.blank_page = QWidget()
@@ -41,6 +43,61 @@ class PropertyEditor(QStackedWidget):
 
         self.setCurrentWidget(self.blank_page)
 
+    def set_active_tool(self, tool_id: str):
+        """Update the active tool and show its default properties when appropriate."""
+        self.active_tool = tool_id
+        if self.current_object_id is None:
+            self._show_active_tool_defaults()
+
+    def _show_active_tool_defaults(self):
+        """Display the editor for the active tool's default properties."""
+        # Remove any existing editor page beyond the default ones
+        if self.count() > 2:
+            old_widget = self.widget(2)
+            self.removeWidget(old_widget)
+            old_widget.deleteLater()
+
+        if self.active_tool == constants.TOOL_SELECT:
+            self.setCurrentWidget(self.blank_page)
+            return
+
+        editor = None
+        if self.active_tool == constants.TOOL_BUTTON:
+            from tools import button
+
+            self.current_properties = button.get_default_properties()
+            editor = self._create_button_editor()
+        elif self.active_tool == constants.TOOL_LINE:
+            from tools import line as line_tool
+
+            self.current_properties = line_tool.get_default_properties()
+            editor = self._create_line_editor()
+        elif self.active_tool == constants.TOOL_TEXT:
+            from tools import text as text_tool
+
+            self.current_properties = text_tool.get_default_properties()
+            editor = self._create_text_editor()
+        elif self.active_tool == constants.TOOL_POLYGON:
+            from tools import polygon as polygon_tool
+
+            self.current_properties = polygon_tool.get_default_properties()
+            editor = self._create_polygon_editor()
+        elif self.active_tool == constants.TOOL_IMAGE:
+            from tools import image as image_tool
+
+            self.current_properties = image_tool.get_default_properties("")
+            editor = self._create_image_editor()
+        elif self.active_tool == constants.TOOL_SCALE:
+            from tools import scale as scale_tool
+
+            self.current_properties = scale_tool.get_default_properties()
+            editor = self._create_scale_editor()
+
+        if editor:
+            self.addWidget(editor)
+            self.setCurrentWidget(editor)
+        else:
+            self.setCurrentWidget(self.blank_page)
     @pyqtSlot(str, object)
     def set_current_object(self, parent_id: str, selection_data: object):
         """
@@ -53,9 +110,10 @@ class PropertyEditor(QStackedWidget):
             old_widget.deleteLater()
 
         if not selection_data:
-            self.setCurrentWidget(self.blank_page)
             self.current_object_id = None
             self.current_parent_id = None
+            self.current_properties = {}
+            self._show_active_tool_defaults()
             return
 
         if isinstance(selection_data, list):
@@ -144,7 +202,8 @@ class PropertyEditor(QStackedWidget):
 
     def _create_button_editor(self):
         """Creates a property editor widget specifically for buttons."""
-        from tools import button_styles
+        from tools import button, button_styles
+
         editor_widget = QWidget()
         layout = QFormLayout(editor_widget)
         layout.setContentsMargins(5, 5, 5, 5)
@@ -185,13 +244,16 @@ class PropertyEditor(QStackedWidget):
                 text_color_edit.setText(new_props['text_color'])
 
             if new_props != self.current_properties:
-                command = UpdateChildPropertiesCommand(
-                    self.current_parent_id,
-                    self.current_object_id,
-                    new_props,
-                    self.current_properties,
-                )
-                command_history_service.add_command(command)
+                if self.current_object_id:
+                    command = UpdateChildPropertiesCommand(
+                        self.current_parent_id,
+                        self.current_object_id,
+                        new_props,
+                        self.current_properties,
+                    )
+                    command_history_service.add_command(command)
+                else:
+                    button.set_default_properties(new_props)
                 self.current_properties = new_props
         
         label_edit.editingFinished.connect(on_property_changed)
@@ -203,6 +265,8 @@ class PropertyEditor(QStackedWidget):
 
     def _create_line_editor(self):
         """Creates a property editor widget for lines."""
+        from tools import line as line_tool
+
         editor_widget = QWidget()
         layout = QFormLayout(editor_widget)
         layout.setContentsMargins(5, 5, 5, 5)
@@ -238,13 +302,16 @@ class PropertyEditor(QStackedWidget):
             new_props['width'] = int(width_edit.text() or 0)
             new_props['style'] = style_edit.text()
             if new_props != self.current_properties:
-                command = UpdateChildPropertiesCommand(
-                    self.current_parent_id,
-                    self.current_object_id,
-                    new_props,
-                    self.current_properties,
-                )
-                command_history_service.add_command(command)
+                if self.current_object_id:
+                    command = UpdateChildPropertiesCommand(
+                        self.current_parent_id,
+                        self.current_object_id,
+                        new_props,
+                        self.current_properties,
+                    )
+                    command_history_service.add_command(command)
+                else:
+                    line_tool.set_default_properties(new_props)
                 self.current_properties = new_props
 
         for widget in (start_x, start_y, end_x, end_y, color_edit, width_edit, style_edit):
@@ -254,6 +321,8 @@ class PropertyEditor(QStackedWidget):
 
     def _create_text_editor(self):
         """Creates a property editor widget for text."""
+        from tools import text as text_tool
+
         editor_widget = QWidget()
         layout = QFormLayout(editor_widget)
         layout.setContentsMargins(5, 5, 5, 5)
@@ -288,13 +357,16 @@ class PropertyEditor(QStackedWidget):
             }
             new_props['color'] = color_edit.text()
             if new_props != self.current_properties:
-                command = UpdateChildPropertiesCommand(
-                    self.current_parent_id,
-                    self.current_object_id,
-                    new_props,
-                    self.current_properties,
-                )
-                command_history_service.add_command(command)
+                if self.current_object_id:
+                    command = UpdateChildPropertiesCommand(
+                        self.current_parent_id,
+                        self.current_object_id,
+                        new_props,
+                        self.current_properties,
+                    )
+                    command_history_service.add_command(command)
+                else:
+                    text_tool.set_default_properties(new_props)
                 self.current_properties = new_props
 
         content_edit.editingFinished.connect(on_property_changed)
@@ -308,6 +380,8 @@ class PropertyEditor(QStackedWidget):
 
     def _create_polygon_editor(self):
         """Creates a property editor widget for polygons."""
+        from tools import polygon as polygon_tool
+
         editor_widget = QWidget()
         layout = QFormLayout(editor_widget)
         layout.setContentsMargins(5, 5, 5, 5)
@@ -330,13 +404,16 @@ class PropertyEditor(QStackedWidget):
             new_props['stroke_width'] = int(stroke_width.text() or 0)
             new_props['stroke_style'] = stroke_style.text()
             if new_props != self.current_properties:
-                command = UpdateChildPropertiesCommand(
-                    self.current_parent_id,
-                    self.current_object_id,
-                    new_props,
-                    self.current_properties,
-                )
-                command_history_service.add_command(command)
+                if self.current_object_id:
+                    command = UpdateChildPropertiesCommand(
+                        self.current_parent_id,
+                        self.current_object_id,
+                        new_props,
+                        self.current_properties,
+                    )
+                    command_history_service.add_command(command)
+                else:
+                    polygon_tool.set_default_properties(new_props)
                 self.current_properties = new_props
 
         for widget in (fill_color, stroke_color, stroke_width, stroke_style):
@@ -346,6 +423,8 @@ class PropertyEditor(QStackedWidget):
 
     def _create_image_editor(self):
         """Creates a property editor widget for images."""
+        from tools import image as image_tool
+
         editor_widget = QWidget()
         layout = QFormLayout(editor_widget)
         layout.setContentsMargins(5, 5, 5, 5)
@@ -367,13 +446,16 @@ class PropertyEditor(QStackedWidget):
                 'height': int(height_edit.text() or 0),
             }
             if new_props != self.current_properties:
-                command = UpdateChildPropertiesCommand(
-                    self.current_parent_id,
-                    self.current_object_id,
-                    new_props,
-                    self.current_properties,
-                )
-                command_history_service.add_command(command)
+                if self.current_object_id:
+                    command = UpdateChildPropertiesCommand(
+                        self.current_parent_id,
+                        self.current_object_id,
+                        new_props,
+                        self.current_properties,
+                    )
+                    command_history_service.add_command(command)
+                else:
+                    image_tool.set_default_properties(new_props)
                 self.current_properties = new_props
 
         for widget in (path_edit, width_edit, height_edit):
@@ -383,6 +465,8 @@ class PropertyEditor(QStackedWidget):
 
     def _create_scale_editor(self):
         """Creates a property editor widget for scales."""
+        from tools import scale as scale_tool
+
         editor_widget = QWidget()
         layout = QFormLayout(editor_widget)
         layout.setContentsMargins(5, 5, 5, 5)
@@ -419,13 +503,16 @@ class PropertyEditor(QStackedWidget):
             new_props['units'] = units_edit.text()
             new_props['color'] = color_edit.text()
             if new_props != self.current_properties:
-                command = UpdateChildPropertiesCommand(
-                    self.current_parent_id,
-                    self.current_object_id,
-                    new_props,
-                    self.current_properties,
-                )
-                command_history_service.add_command(command)
+                if self.current_object_id:
+                    command = UpdateChildPropertiesCommand(
+                        self.current_parent_id,
+                        self.current_object_id,
+                        new_props,
+                        self.current_properties,
+                    )
+                    command_history_service.add_command(command)
+                else:
+                    scale_tool.set_default_properties(new_props)
                 self.current_properties = new_props
 
         orientation_combo.currentIndexChanged.connect(on_property_changed)
