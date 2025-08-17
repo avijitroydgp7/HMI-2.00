@@ -36,7 +36,7 @@ class CommentTableWidget(QWidget):
         main_layout.addLayout(button_layout)
 
         self.table = QTableView(self)
-        self.table.setSelectionBehavior(QTableView.SelectionBehavior.SelectRows)
+        self.table.setSelectionBehavior(QTableView.SelectionBehavior.SelectItems)
         self.table.setSelectionMode(QTableView.SelectionMode.ExtendedSelection)
         main_layout.addWidget(self.table)
 
