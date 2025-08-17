@@ -57,7 +57,7 @@ class PropertyEditor(QStackedWidget):
                 self.current_parent_id, self.current_object_id
             )
             if instance is not None:
-                self.set_current_object(self.current_parent_id, instance)
+                self.set_current_object(self.current_parent_id, copy.deepcopy(instance))
             else:
                 self.set_current_object(None, None)
 
@@ -97,7 +97,10 @@ class PropertyEditor(QStackedWidget):
                 self.set_current_object(None, None)
                 return
         
-        self.current_object_id = selection_data.get('instance_id')
+        # Preserve the existing current_object_id if the instance still exists
+        instance_id = selection_data.get('instance_id')
+        if instance_id is not None:
+            self.current_object_id = instance_id
         self.current_parent_id = parent_id
         
         if 'screen_id' in selection_data:
