@@ -4,3 +4,4 @@ ezdxf==1.4.2
 pybind11==2.13.5
 cmake==4.1.0
 ninja==1.13.0
+asteval==0.9.31

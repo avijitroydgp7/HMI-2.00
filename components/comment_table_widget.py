@@ -5,10 +5,31 @@ from PyQt6.QtWidgets import (
     QTableView,
     QPushButton,
     QApplication,
+    QMenu,
+    QLineEdit,
+    QStyledItemDelegate,
+    QCompleter,
 )
-from PyQt6.QtGui import QStandardItemModel, QStandardItem, QKeySequence
-from PyQt6.QtCore import Qt, QModelIndex
+from PyQt6.QtGui import QKeySequence, QAction
+from PyQt6.QtCore import Qt
 from services.comment_data_service import comment_data_service
+from .comment_table_model import CommentTableModel
+
+
+class FormulaDelegate(QStyledItemDelegate):
+    """Delegate providing cell reference auto-completion for formulas."""
+
+    def createEditor(self, parent, option, index):  # noqa: N802 - Qt naming convention
+        editor = QLineEdit(parent)
+        model = index.model()
+        refs = []
+        for r in range(model.rowCount()):
+            for c in range(1, model.columnCount()):
+                refs.append(model._cell_name(r, c))
+        completer = QCompleter(refs, editor)
+        completer.setCaseSensitivity(Qt.CaseSensitivity.CaseInsensitive)
+        editor.setCompleter(completer)
+        return editor
 
 
 class CommentTableView(QTableView):
@@ -68,7 +89,65 @@ class CommentTableView(QTableView):
                     parent._sync_to_service()
             event.accept()
             return
+        if event.key() == Qt.Key.Key_F2:
+            self.edit(self.currentIndex())
+            event.accept()
+            return
+        if event.text() == "=" and not self.state() == QTableView.State.EditingState:
+            index = self.currentIndex()
+            self.edit(index)
+            editor = self.focusWidget()
+            if isinstance(editor, QLineEdit):
+                editor.setText("=")
+            event.accept()
+            return
         super().keyPressEvent(event)
+
+    # Context menu ---------------------------------------------------
+    def contextMenuEvent(self, event):  # noqa: N802 - Qt naming convention
+        menu = QMenu(self)
+        insert_row = QAction("Insert Row", self)
+        delete_row = QAction("Delete Row", self)
+        insert_col = QAction("Insert Column", self)
+        delete_col = QAction("Delete Column", self)
+        merge_cells = QAction("Merge Cells", self)
+        unmerge_cells = QAction("Unmerge Cells", self)
+        freeze = QAction("Freeze Panes", self)
+        menu.addActions([insert_row, delete_row, insert_col, delete_col, merge_cells, unmerge_cells, freeze])
+
+        action = menu.exec(event.globalPos())
+        parent = self.parent()
+        if not parent:
+            return
+        if action == insert_row:
+            parent.add_comment()
+        elif action == delete_row:
+            parent.remove_selected_rows()
+        elif action == insert_col:
+            parent.add_column()
+        elif action == delete_col:
+            parent.remove_column()
+        elif action == merge_cells:
+            self._merge_selected()
+        elif action == unmerge_cells:
+            self._unmerge_selected()
+        elif action == freeze:
+            setattr(parent, "_frozen", True)
+
+    def _merge_selected(self):
+        indexes = self.selectionModel().selectedIndexes()
+        if not indexes:
+            return
+        rows = [i.row() for i in indexes]
+        cols = [i.column() for i in indexes]
+        top, left = min(rows), min(cols)
+        bottom, right = max(rows), max(cols)
+        self.setSpan(top, left, bottom - top + 1, right - left + 1)
+
+    def _unmerge_selected(self):
+        indexes = self.selectionModel().selectedIndexes()
+        for index in indexes:
+            self.setSpan(index.row(), index.column(), 1, 1)
 
 
 class CommentTableWidget(QWidget):
@@ -101,10 +180,9 @@ class CommentTableWidget(QWidget):
         self.table.setSelectionBehavior(QTableView.SelectionBehavior.SelectItems)
         self.table.setSelectionMode(QTableView.SelectionMode.ExtendedSelection)
         main_layout.addWidget(self.table)
+        self.table.setItemDelegate(FormulaDelegate(self.table))
 
-        self._model = QStandardItemModel(0, len(self.columns) + 1, self)
-        headers = ["Serial No."] + self.columns
-        self._model.setHorizontalHeaderLabels(headers)
+        self._model = CommentTableModel(self.columns, self)
         self.table.setModel(self._model)
         self.table.setSortingEnabled(True)
 
@@ -115,18 +193,15 @@ class CommentTableWidget(QWidget):
             self.add_comment(row_data)
 
         self._model.dataChanged.connect(lambda *_: self._sync_to_service())
-        self._model.rowsInserted.connect(self._on_structure_changed)
-        self._model.rowsRemoved.connect(self._on_structure_changed)
-        self._model.columnsInserted.connect(self._on_structure_changed)
-        self._model.columnsRemoved.connect(self._on_structure_changed)
-        self._model.layoutChanged.connect(self._on_layout_changed)
+        self._model.rowsInserted.connect(lambda *_: self._sync_to_service())
+        self._model.rowsRemoved.connect(lambda *_: self._sync_to_service())
+        self._model.columnsInserted.connect(lambda *_: self._sync_to_service())
+        self._model.columnsRemoved.connect(lambda *_: self._sync_to_service())
 
         self.add_row_btn.clicked.connect(lambda: self.add_comment())
         self.remove_row_btn.clicked.connect(self.remove_selected_rows)
         self.add_col_btn.clicked.connect(self.add_column)
         self.remove_col_btn.clicked.connect(self.remove_column)
-
-        self._reindex_rows()
 
     def setFocus(self):  # noqa: N802 - Qt naming convention
         self.table.setFocus()
@@ -135,10 +210,7 @@ class CommentTableWidget(QWidget):
         """Append a new comment row."""
         if values is None:
             values = [""] * len(self.columns)
-        row = self._model.rowCount()
-        self._model.insertRow(row)
-        for col, text in enumerate(values, start=1):
-            self._model.setItem(row, col, QStandardItem(text))
+        self._model.set_row_values(values)
 
     def remove_selected_rows(self) -> None:
         """Remove all currently selected rows."""
@@ -152,8 +224,6 @@ class CommentTableWidget(QWidget):
         column_name = f"Column {col_index}"
         self._model.insertColumn(col_index)
         self._model.setHeaderData(col_index, Qt.Orientation.Horizontal, column_name)
-        for row in range(self._model.rowCount()):
-            self._model.setItem(row, col_index, QStandardItem(""))
         self.columns.append(column_name)
         self._sync_to_service()
 
@@ -165,24 +235,7 @@ class CommentTableWidget(QWidget):
         self._model.removeColumn(col_index)
         if self.columns:
             self.columns.pop()
-
-    def _on_structure_changed(self, parent: QModelIndex, first: int, last: int) -> None:
-        self._reindex_rows()
         self._sync_to_service()
-
-    def _on_layout_changed(self) -> None:
-        self._reindex_rows()
-        self._sync_to_service()
-
-    def _reindex_rows(self) -> None:
-        for row in range(self._model.rowCount()):
-            item = self._model.item(row, 0)
-            if item is None:
-                item = QStandardItem()
-                self._model.setItem(row, 0, item)
-            item.setEditable(False)
-            item.setText(str(row + 1))
-            item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
 
     def _sync_to_service(self) -> None:
         model = self.table.model()
@@ -190,7 +243,6 @@ class CommentTableWidget(QWidget):
         for row in range(model.rowCount()):
             row_data = []
             for col in range(1, model.columnCount()):
-                index = model.index(row, col)
-                row_data.append(index.data() or "")
+                row_data.append(model.get_raw(row, col) or "")
             comments.append(row_data)
         comment_data_service.update_comments(self.group_id, comments, self.columns)
