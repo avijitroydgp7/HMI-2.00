@@ -1,10 +1,16 @@
-from PyQt6.QtWidgets import QTableView
+from PyQt6.QtWidgets import (
+    QWidget,
+    QVBoxLayout,
+    QHBoxLayout,
+    QTableView,
+    QPushButton,
+)
 from PyQt6.QtGui import QStandardItemModel, QStandardItem
 from PyQt6.QtCore import Qt, QModelIndex
 from services.comment_data_service import comment_data_service
 
 
-class CommentTableWidget(QTableView):
+class CommentTableWidget(QWidget):
     """Table for managing comments within a comment group."""
 
     def __init__(self, group_id: str, parent=None):
@@ -14,28 +20,66 @@ class CommentTableWidget(QTableView):
         self.group_label = f"[{group.get('number', '')}] - {group.get('name', '')}".strip()
         self.setObjectName("CommentTableWidget")
 
-        self._model = QStandardItemModel(0, 2, self)
-        self._model.setHorizontalHeaderLabels(["Serial No.", "Comment"])
-        self.setModel(self._model)
+        self.columns = list(group.get("columns", ["Comment"]))
 
-        self.horizontalHeader().setStretchLastSection(True)
-        self.verticalHeader().setVisible(False)
+        main_layout = QVBoxLayout(self)
+        button_layout = QHBoxLayout()
+        self.add_row_btn = QPushButton("Add Row")
+        self.add_col_btn = QPushButton("Add Column")
+        button_layout.addWidget(self.add_row_btn)
+        button_layout.addWidget(self.add_col_btn)
+        button_layout.addStretch()
+        main_layout.addLayout(button_layout)
 
-        # Load existing comments
-        for comment in group.get("comments", []):
-            self.add_comment(comment)
+        self.table = QTableView(self)
+        main_layout.addWidget(self.table)
+
+        self._model = QStandardItemModel(0, len(self.columns) + 1, self)
+        headers = ["Serial No."] + self.columns
+        self._model.setHorizontalHeaderLabels(headers)
+        self.table.setModel(self._model)
+
+        self.table.horizontalHeader().setStretchLastSection(True)
+        self.table.verticalHeader().setVisible(False)
+
+        for row_data in group.get("comments", []):
+            self.add_comment(row_data)
 
         self._model.dataChanged.connect(lambda *_: self._sync_to_service())
-        self._model.rowsInserted.connect(self._on_rows_changed)
-        self._model.rowsRemoved.connect(self._on_rows_changed)
+        self._model.rowsInserted.connect(self._on_structure_changed)
+        self._model.rowsRemoved.connect(self._on_structure_changed)
+        self._model.columnsInserted.connect(self._on_structure_changed)
+        self._model.columnsRemoved.connect(self._on_structure_changed)
 
-    def add_comment(self, text: str = "") -> None:
+        self.add_row_btn.clicked.connect(lambda: self.add_comment())
+        self.add_col_btn.clicked.connect(self.add_column)
+
+        self._reindex_rows()
+
+    def setFocus(self):  # noqa: N802 - Qt naming convention
+        self.table.setFocus()
+
+    def add_comment(self, values=None) -> None:
         """Append a new comment row."""
+        if values is None:
+            values = [""] * len(self.columns)
         row = self._model.rowCount()
         self._model.insertRow(row)
-        self._model.setItem(row, 1, QStandardItem(text))
+        for col, text in enumerate(values, start=1):
+            self._model.setItem(row, col, QStandardItem(text))
 
-    def _on_rows_changed(self, parent: QModelIndex, first: int, last: int) -> None:
+    def add_column(self) -> None:
+        """Append a new editable column to the table."""
+        col_index = self._model.columnCount()
+        column_name = f"Column {col_index}"
+        self._model.insertColumn(col_index)
+        self._model.setHeaderData(col_index, Qt.Orientation.Horizontal, column_name)
+        for row in range(self._model.rowCount()):
+            self._model.setItem(row, col_index, QStandardItem(""))
+        self.columns.append(column_name)
+        self._sync_to_service()
+
+    def _on_structure_changed(self, parent: QModelIndex, first: int, last: int) -> None:
         self._reindex_rows()
         self._sync_to_service()
 
@@ -52,6 +96,9 @@ class CommentTableWidget(QTableView):
     def _sync_to_service(self) -> None:
         comments = []
         for row in range(self._model.rowCount()):
-            item = self._model.item(row, 1)
-            comments.append(item.text() if item else "")
-        comment_data_service.update_comments(self.group_id, comments)
+            row_data = []
+            for col in range(1, self._model.columnCount()):
+                item = self._model.item(row, col)
+                row_data.append(item.text() if item else "")
+            comments.append(row_data)
+        comment_data_service.update_comments(self.group_id, comments, self.columns)

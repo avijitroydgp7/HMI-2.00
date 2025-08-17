@@ -35,6 +35,7 @@ class CommentDataService(QObject):
             "id": group_id,
             "number": number,
             "name": name,
+            "columns": ["Comment"],
             "comments": [],
         }
         self._number_index[number] = group_id
@@ -42,9 +43,13 @@ class CommentDataService(QObject):
         return group_id
 
     # --- Comment management -----------------------------------------------
-    def update_comments(self, group_id: str, comments: List[str]) -> None:
+    def update_comments(
+        self, group_id: str, comments: List[List[str]], columns: List[str] | None = None
+    ) -> None:
         if group_id in self._groups:
             self._groups[group_id]["comments"] = comments
+            if columns is not None:
+                self._groups[group_id]["columns"] = columns
             self.comments_changed.emit(group_id)
 
     # --- Serialization ----------------------------------------------------
@@ -54,8 +59,15 @@ class CommentDataService(QObject):
     def load_from_project(self, project_data: Dict[str, Any]) -> None:
         self.clear_all()
         groups = project_data.get("comment_groups", {})
+        for g in groups.values():
+            comments = g.get("comments", [])
+            if comments and isinstance(comments[0], str):
+                g["comments"] = [[c] for c in comments]
+            g.setdefault("columns", ["Comment"])
         self._groups = groups
-        self._number_index = {g.get("number", ""): gid for gid, g in groups.items() if g.get("number")}
+        self._number_index = {
+            g.get("number", ""): gid for gid, g in groups.items() if g.get("number")
+        }
         self.comment_group_list_changed.emit()
 
 
