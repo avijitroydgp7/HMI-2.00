@@ -1110,25 +1110,38 @@ class DesignCanvas(QGraphicsView):
             super().wheelEvent(event)
 
     def update_screen_data(self):
+        selected_ids = [
+            item.instance_data.get('instance_id')
+            for item in self.scene.selectedItems()
+            if isinstance(item, BaseGraphicsItem)
+        ]
+
         self.screen_data = screen_service.get_screen(self.screen_id)
         if not self.screen_data:
             self.scene.clear()
             return
-            
+
         size = self.screen_data.get('size', {'width': 1920, 'height': 1080})
         self.scene.setSceneRect(0, 0, size['width'], size['height'])
-        
+
         style = self.screen_data.get('style', {})
         self.page_item.setRect(self.scene.sceneRect())
         self.page_item.setPen(QPen(Qt.PenStyle.NoPen))
-        
+
         if style.get('transparent', False):
             self.page_item.setBrush(QBrush(Qt.BrushStyle.NoBrush))
         else:
             color = style.get('color1', "#FFFFFF")
             self.page_item.setBrush(QBrush(QColor(color)))
 
+        self.scene.blockSignals(True)
         self._sync_scene_items()
+        for inst_id in selected_ids:
+            item = self._item_map.get(inst_id)
+            if item:
+                item.setSelected(True)
+        self.scene.blockSignals(False)
+        self._on_selection_changed()
         self.update()
         self._update_shadow_for_zoom()
         self.update_visible_items()

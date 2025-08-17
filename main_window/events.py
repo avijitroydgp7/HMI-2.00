@@ -29,7 +29,10 @@ def on_focus_changed(win, old, new):
     from . import actions, handlers
     if new is None: return
     new_selectable = _get_selectable_parent(win, new)
-    
+    properties_dock = win.docks.get('properties')
+    if properties_dock and properties_dock.isAncestorOf(new):
+        new_selectable = win.last_focused_copypaste_widget
+
     if win.last_focused_copypaste_widget and win.last_focused_copypaste_widget != new_selectable:
         if hasattr(win.last_focused_copypaste_widget, 'clear_selection'):
              win.last_focused_copypaste_widget.clear_selection()

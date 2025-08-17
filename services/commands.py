@@ -365,3 +365,85 @@ class UpdateTagValueCommand(Command):
     def _notify(self):
         from services.tag_data_service import tag_data_service
         tag_data_service.tags_changed.emit()
+
+# --- Comment Table Commands ---
+class UpdateCommentCellCommand(Command):
+    def __init__(self, model, row, col, new_value, old_value, notify):
+        super().__init__(); self.model = model; self.row = row; self.col = col; self.new_value = new_value; self.old_value = old_value; self.notify = notify
+    def redo(self):
+        self.model._suspend_history = True; self.model.setData(self.model.index(self.row, self.col), self.new_value); self.model._suspend_history = False
+    def undo(self):
+        self.model._suspend_history = True; self.model.setData(self.model.index(self.row, self.col), self.old_value); self.model._suspend_history = False
+    def _notify(self):
+        if self.notify: self.notify()
+
+class UpdateCommentFormatCommand(Command):
+    def __init__(self, model, row, col, new_fmt, old_fmt, notify):
+        super().__init__(); self.model = model; self.row = row; self.col = col; self.new_fmt = copy.deepcopy(new_fmt); self.old_fmt = copy.deepcopy(old_fmt); self.notify = notify
+    def redo(self):
+        self.model._suspend_history = True; self.model.set_cell_format(self.row, self.col, self.new_fmt); self.model._suspend_history = False
+    def undo(self):
+        self.model._suspend_history = True; self.model.set_cell_format(self.row, self.col, self.old_fmt); self.model._suspend_history = False
+    def _notify(self):
+        if self.notify: self.notify()
+
+class InsertCommentRowCommand(Command):
+    def __init__(self, model, row, values, notify):
+        super().__init__(); self.model = model; self.row = row; self.values = copy.deepcopy(values); self.notify = notify
+    def redo(self):
+        self.model._suspend_history = True; self.model.insertRow(self.row)
+        for c, cell in enumerate(self.values, start=1):
+            self.model.setData(self.model.index(self.row, c), cell.get('raw', ''))
+            fmt = cell.get('format');
+            if fmt: self.model.set_cell_format(self.row, c, fmt)
+        self.model._suspend_history = False
+    def undo(self):
+        self.model._suspend_history = True; self.model.removeRow(self.row); self.model._suspend_history = False
+    def _notify(self):
+        if self.notify: self.notify()
+
+class RemoveCommentRowsCommand(Command):
+    def __init__(self, model, rows, rows_data, notify):
+        super().__init__(); self.model = model; self.rows = rows; self.rows_data = copy.deepcopy(rows_data); self.notify = notify
+    def redo(self):
+        self.model._suspend_history = True
+        for r in sorted(self.rows, reverse=True): self.model.removeRow(r)
+        self.model._suspend_history = False
+    def undo(self):
+        self.model._suspend_history = True
+        for r, data in sorted(zip(self.rows, self.rows_data)):
+            self.model.insertRow(r)
+            for c, cell in enumerate(data, start=1):
+                self.model.setData(self.model.index(r, c), cell.get('raw', ''))
+                fmt = cell.get('format');
+                if fmt: self.model.set_cell_format(r, c, fmt)
+        self.model._suspend_history = False
+    def _notify(self):
+        if self.notify: self.notify()
+
+class InsertCommentColumnCommand(Command):
+    def __init__(self, model, column, header, columns_list, notify):
+        super().__init__(); self.model = model; self.column = column; self.header = header; self.columns_list = columns_list; self.notify = notify
+    def redo(self):
+        from PyQt6.QtCore import Qt
+        self.model._suspend_history = True; self.model.insertColumn(self.column); self.model.setHeaderData(self.column, Qt.Orientation.Horizontal, self.header); self.model._suspend_history = False; self.columns_list.insert(self.column - 1, self.header)
+    def undo(self):
+        self.model._suspend_history = True; self.model.removeColumn(self.column); self.model._suspend_history = False; self.columns_list.pop(self.column - 1)
+    def _notify(self):
+        if self.notify: self.notify()
+
+class RemoveCommentColumnCommand(Command):
+    def __init__(self, model, column, header, column_data, columns_list, notify):
+        super().__init__(); self.model = model; self.column = column; self.header = header; self.column_data = copy.deepcopy(column_data); self.columns_list = columns_list; self.notify = notify
+    def redo(self):
+        self.model._suspend_history = True; self.model.removeColumn(self.column); self.model._suspend_history = False; self.columns_list.pop(self.column - 1)
+    def undo(self):
+        from PyQt6.QtCore import Qt
+        self.model._suspend_history = True; self.model.insertColumn(self.column); self.model.setHeaderData(self.column, Qt.Orientation.Horizontal, self.header)
+        for r, cell in enumerate(self.column_data):
+            self.model.setData(self.model.index(r, self.column), cell.get('raw', ''))
+            fmt = cell.get('format');
+            if fmt: self.model.set_cell_format(r, self.column, fmt)
+        self.model._suspend_history = False; self.columns_list.insert(self.column - 1, self.header)
+    def _notify(self):
+        if self.notify: self.notify()

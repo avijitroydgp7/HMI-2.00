@@ -12,13 +12,17 @@ from PyQt6.QtWidgets import (
     QToolBar,
     QToolButton,
     QColorDialog,
-    QFileDialog,
 )
 from PyQt6.QtGui import QKeySequence, QAction, QPen, QColor
 from PyQt6.QtCore import Qt
 from services.comment_data_service import comment_data_service
-from dialogs.info_dialog import CustomInfoDialog
-from utils.icon_manager import IconManager
+from services.command_history_service import command_history_service
+from services.commands import (
+    InsertCommentRowCommand,
+    RemoveCommentRowsCommand,
+    InsertCommentColumnCommand,
+    RemoveCommentColumnCommand,
+)
 from .comment_table_model import CommentTableModel
 
 
@@ -60,6 +64,30 @@ class CommentTableView(QTableView):
         selection_model = self.selectionModel()
         indexes = sorted(selection_model.selectedIndexes(), key=lambda i: (i.row(), i.column()))
 
+        if event.matches(QKeySequence.StandardKey.Undo):
+            command_history_service.undo()
+            event.accept()
+            return
+        if event.matches(QKeySequence.StandardKey.Redo):
+            command_history_service.redo()
+            event.accept()
+            return
+        if (
+            event.modifiers() == Qt.KeyboardModifier.ControlModifier
+            and event.key() in (Qt.Key.Key_Up, Qt.Key.Key_Down, Qt.Key.Key_Left, Qt.Key.Key_Right)
+        ):
+            self._ctrl_arrow(event.key())
+            event.accept()
+            return
+        if (
+            event.modifiers()
+            == (Qt.KeyboardModifier.ControlModifier | Qt.KeyboardModifier.ShiftModifier)
+            and event.key() == Qt.Key.Key_L
+        ):
+            self._toggle_filter()
+            event.accept()
+            return
+
         if event.matches(QKeySequence.StandardKey.Copy):
             if indexes:
                 rows = {}
@@ -86,9 +114,6 @@ class CommentTableView(QTableView):
                 clipboard.setText("\n".join(lines))
                 for idx in indexes:
                     model.setData(idx, "")
-                parent = self.parent()
-                if parent and hasattr(parent, "_sync_to_service"):
-                    parent._sync_to_service()
             event.accept()
             return
         if event.matches(QKeySequence.StandardKey.Paste):
@@ -103,9 +128,6 @@ class CommentTableView(QTableView):
                         col = start_col + c
                         if row < model.rowCount() and col < model.columnCount():
                             model.setData(model.index(row, col), cell)
-                parent = self.parent()
-                if parent and hasattr(parent, "_sync_to_service"):
-                    parent._sync_to_service()
             event.accept()
             return
         if event.key() == Qt.Key.Key_F2:
@@ -121,6 +143,23 @@ class CommentTableView(QTableView):
             event.accept()
             return
         super().keyPressEvent(event)
+
+    def _ctrl_arrow(self, key):
+        model = self.model()
+        idx = self.currentIndex()
+        row, col = idx.row(), idx.column()
+        if key == Qt.Key.Key_Up:
+            row = 0
+        elif key == Qt.Key.Key_Down:
+            row = model.rowCount() - 1
+        elif key == Qt.Key.Key_Left:
+            col = 0
+        elif key == Qt.Key.Key_Right:
+            col = model.columnCount() - 1
+        self.setCurrentIndex(model.index(row, col))
+
+    def _toggle_filter(self):
+        self.setSortingEnabled(not self.isSortingEnabled())
 
     # Context menu ---------------------------------------------------
     def contextMenuEvent(self, event):  # noqa: N802 - Qt naming convention
@@ -188,18 +227,10 @@ class CommentTableWidget(QWidget):
         self.remove_row_btn = QPushButton("Remove Row")
         self.add_col_btn = QPushButton("Add Column")
         self.remove_col_btn = QPushButton("Remove Column")
-        self.import_excel_btn = QPushButton(
-            IconManager.create_icon("fa5s.file-import"), " Import"
-        )
-        self.export_excel_btn = QPushButton(
-            IconManager.create_icon("fa5s.file-export"), " Export"
-        )
         button_layout.addWidget(self.add_row_btn)
         button_layout.addWidget(self.remove_row_btn)
         button_layout.addWidget(self.add_col_btn)
         button_layout.addWidget(self.remove_col_btn)
-        button_layout.addWidget(self.import_excel_btn)
-        button_layout.addWidget(self.export_excel_btn)
         button_layout.addStretch()
         main_layout.addLayout(button_layout)
 
@@ -276,8 +307,9 @@ class CommentTableWidget(QWidget):
         self.table.setSelectionMode(QTableView.SelectionMode.ExtendedSelection)
         main_layout.addWidget(self.table)
         self.table.setItemDelegate(CommentItemDelegate(self.table))
-
+        
         self._model = CommentTableModel(self.columns, self)
+        self._model.history_sync_cb = self._sync_to_service
         self.table.setModel(self._model)
         self.table.setSortingEnabled(True)
 
@@ -285,120 +317,64 @@ class CommentTableWidget(QWidget):
         self.table.verticalHeader().setVisible(False)
 
         for row_data in group.get("comments", []):
-            self.add_comment(row_data)
-
-        self._model.dataChanged.connect(lambda *_: self._sync_to_service())
-        self._model.rowsInserted.connect(lambda *_: self._sync_to_service())
-        self._model.rowsRemoved.connect(lambda *_: self._sync_to_service())
-        self._model.columnsInserted.connect(lambda *_: self._sync_to_service())
-        self._model.columnsRemoved.connect(lambda *_: self._sync_to_service())
+            self.add_comment(row_data, record_history=False)
 
         self.add_row_btn.clicked.connect(lambda: self.add_comment())
         self.remove_row_btn.clicked.connect(self.remove_selected_rows)
         self.add_col_btn.clicked.connect(self.add_column)
         self.remove_col_btn.clicked.connect(self.remove_column)
-        self.import_excel_btn.clicked.connect(self.import_from_excel)
-        self.export_excel_btn.clicked.connect(self.export_to_excel)
 
     def setFocus(self):  # noqa: N802 - Qt naming convention
         self.table.setFocus()
 
-    def add_comment(self, values=None) -> None:
+    def add_comment(self, values=None, record_history=True) -> None:
         """Append a new comment row."""
         if values is None:
             values = [dict(raw="", format={}) for _ in self.columns]
-        self._model.set_row_values(values)
+        if record_history:
+            row = self._model.rowCount()
+            cmd = InsertCommentRowCommand(self._model, row, values, self._sync_to_service)
+            command_history_service.add_command(cmd)
+        else:
+            self._model._suspend_history = True
+            self._model.set_row_values(values)
+            self._model._suspend_history = False
+            self._sync_to_service()
 
     def remove_selected_rows(self) -> None:
         """Remove all currently selected rows."""
         selection = self.table.selectionModel().selectedRows()
-        for index in sorted(selection, key=lambda i: i.row(), reverse=True):
-            self._model.removeRow(index.row())
+        rows = sorted({index.row() for index in selection})
+        if not rows:
+            return
+        rows_data = []
+        for r in rows:
+            data = []
+            for c in range(1, self._model.columnCount()):
+                data.append({"raw": self._model.get_raw(r, c), "format": self._model.get_format(r, c)})
+            rows_data.append(data)
+        cmd = RemoveCommentRowsCommand(self._model, rows, rows_data, self._sync_to_service)
+        command_history_service.add_command(cmd)
 
     def add_column(self) -> None:
         """Append a new editable column to the table."""
         col_index = self._model.columnCount()
         column_name = f"Column {col_index}"
-        self._model.insertColumn(col_index)
-        self._model.setHeaderData(col_index, Qt.Orientation.Horizontal, column_name)
-        self.columns.append(column_name)
-        self._sync_to_service()
+        cmd = InsertCommentColumnCommand(self._model, col_index, column_name, self.columns, self._sync_to_service)
+        command_history_service.add_command(cmd)
 
     def remove_column(self) -> None:
         """Remove the last column if more than one data column exists."""
         if self._model.columnCount() <= 2:
             return  # Keep at least one data column besides the serial number
         col_index = self._model.columnCount() - 1
-        self._model.removeColumn(col_index)
-        if self.columns:
-            self.columns.pop()
-        self._sync_to_service()
-
-    # Excel import/export --------------------------------------------
-    def _apply_loaded_data(self, data):
-        self.columns = data.get("columns", ["Comment"])
-        self._model = CommentTableModel(self.columns, self)
-        self.table.setModel(self._model)
-        for row in data.get("comments", []):
-            self._model.set_row_values(row)
-        comment_data_service.update_comments(
-            self.group_id, data.get("comments", []), self.columns
-        )
-        group = comment_data_service.get_group(self.group_id)
-        if group is not None:
-            group["excel"] = data.get("excel", {})
-
-    def load_worksheet(self, worksheet) -> None:
-        from services.excel_service import excel_service
-
-        data = excel_service.read_comments_from_sheet(worksheet)
-        self._apply_loaded_data(data)
-
-    def import_from_excel(self) -> None:
-        file_path, _ = QFileDialog.getOpenFileName(
-            self, "Import Comments from Excel", "", "Excel Files (*.xlsx)"
-        )
-        if file_path:
-            from services.excel_service import excel_service
-
-            try:
-                data = excel_service.read_comments_from_file(file_path)
-                self._apply_loaded_data(data)
-                CustomInfoDialog.show_info(
-                    self,
-                    "Import Successful",
-                    f"Imported {len(data.get('comments', []))} rows.",
-                )
-            except Exception as e:  # pragma: no cover - runtime
-                CustomInfoDialog.show_info(
-                    self,
-                    "Import Error",
-                    f"An error occurred: {e}",
-                )
-
-    def export_to_excel(self) -> None:
-        file_path, _ = QFileDialog.getSaveFileName(
-            self,
-            "Export Comments to Excel",
-            f"{self.group_label}.xlsx",
-            "Excel Files (*.xlsx)",
-        )
-        if file_path:
-            from services.excel_service import excel_service
-
-            try:
-                excel_service.write_comments_to_file(self.group_id, file_path)
-                CustomInfoDialog.show_info(
-                    self,
-                    "Export Successful",
-                    f"Comments exported to:\n{file_path}",
-                )
-            except Exception as e:  # pragma: no cover - runtime
-                CustomInfoDialog.show_info(
-                    self,
-                    "Export Error",
-                    f"An error occurred: {e}",
-                )
+        header = self.columns[col_index - 1]
+        column_data = [
+            {"raw": self._model.get_raw(r, col_index), "format": self._model.get_format(r, col_index)}
+            for r in range(self._model.rowCount())
+        ]
+        cmd = RemoveCommentColumnCommand(self._model, col_index, header, column_data, self.columns, self._sync_to_service)
+        command_history_service.add_command(cmd)
 
     def _sync_to_service(self) -> None:
         model = self.table.model()
@@ -426,4 +402,3 @@ class CommentTableWidget(QWidget):
             if idx.column() == 0:
                 continue
             self._model.set_cell_format(idx.row(), idx.column(), fmt)
-        self._sync_to_service()

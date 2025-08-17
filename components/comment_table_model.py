@@ -4,6 +4,11 @@ from typing import Any, List
 
 from PyQt6.QtCore import QAbstractTableModel, QModelIndex, Qt
 from PyQt6.QtGui import QFont, QColor
+from services.command_history_service import command_history_service
+from services.commands import (
+    UpdateCommentCellCommand,
+    UpdateCommentFormatCommand,
+)
 
 try:
     from asteval import Interpreter
@@ -21,6 +26,8 @@ class CommentTableModel(QAbstractTableModel):
         self._data: List[List[dict[str, Any]]] = []
         self._headers = ["Serial No."] + columns
         self._asteval = Interpreter() if Interpreter else None
+        self._suspend_history = False
+        self.history_sync_cb = lambda: None
 
     # Basic model API -------------------------------------------------
     def rowCount(self, parent: QModelIndex = QModelIndex()) -> int:  # noqa: D401
@@ -66,19 +73,26 @@ class CommentTableModel(QAbstractTableModel):
         if not index.isValid() or role != Qt.ItemDataRole.EditRole:
             return False
         row, col = index.row(), index.column()
-        self._data[row][col]["raw"] = value
-        self._evaluate_all()
-        self.dataChanged.emit(
-            index,
-            index,
-            [
-                Qt.ItemDataRole.DisplayRole,
-                Qt.ItemDataRole.EditRole,
-                Qt.ItemDataRole.FontRole,
-                Qt.ItemDataRole.BackgroundRole,
-                Qt.ItemDataRole.TextAlignmentRole,
-            ],
-        )
+        if self._suspend_history:
+            self._data[row][col]["raw"] = value
+            self._evaluate_all()
+            self.dataChanged.emit(
+                index,
+                index,
+                [
+                    Qt.ItemDataRole.DisplayRole,
+                    Qt.ItemDataRole.EditRole,
+                    Qt.ItemDataRole.FontRole,
+                    Qt.ItemDataRole.BackgroundRole,
+                    Qt.ItemDataRole.TextAlignmentRole,
+                ],
+            )
+            return True
+        old = self._data[row][col].get("raw", "")
+        if old == value:
+            return True
+        cmd = UpdateCommentCellCommand(self, row, col, value, old, self.history_sync_cb)
+        command_history_service.add_command(cmd)
         return True
 
     def flags(self, index: QModelIndex) -> Qt.ItemFlag:  # noqa: D401
@@ -133,6 +147,11 @@ class CommentTableModel(QAbstractTableModel):
         return self._data[row][col].get("format", {}).copy()
 
     def set_cell_format(self, row: int, col: int, fmt: dict[str, Any]):
+        if not self._suspend_history:
+            old_fmt = self.get_format(row, col)
+            cmd = UpdateCommentFormatCommand(self, row, col, fmt, old_fmt, self.history_sync_cb)
+            command_history_service.add_command(cmd)
+            return
         cell = self._data[row][col]
         current = cell.setdefault("format", {})
         current.update(fmt)
