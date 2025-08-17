@@ -44,60 +44,11 @@ class PropertyEditor(QStackedWidget):
         self.setCurrentWidget(self.blank_page)
 
     def set_active_tool(self, tool_id: str):
-        """Update the active tool and show its default properties when appropriate."""
+        """Update the active tool."""
         self.active_tool = tool_id
         if self.current_object_id is None:
-            self._show_active_tool_defaults()
-
-    def _show_active_tool_defaults(self):
-        """Display the editor for the active tool's default properties."""
-        # Remove any existing editor page beyond the default ones
-        if self.count() > 2:
-            old_widget = self.widget(2)
-            self.removeWidget(old_widget)
-            old_widget.deleteLater()
-
-        if self.active_tool == constants.TOOL_SELECT:
             self.setCurrentWidget(self.blank_page)
-            return
 
-        editor = None
-        if self.active_tool == constants.TOOL_BUTTON:
-            from tools import button
-
-            self.current_properties = button.get_default_properties()
-            editor = self._create_button_editor()
-        elif self.active_tool == constants.TOOL_LINE:
-            from tools import line as line_tool
-
-            self.current_properties = line_tool.get_default_properties()
-            editor = self._create_line_editor()
-        elif self.active_tool == constants.TOOL_TEXT:
-            from tools import text as text_tool
-
-            self.current_properties = text_tool.get_default_properties()
-            editor = self._create_text_editor()
-        elif self.active_tool == constants.TOOL_POLYGON:
-            from tools import polygon as polygon_tool
-
-            self.current_properties = polygon_tool.get_default_properties()
-            editor = self._create_polygon_editor()
-        elif self.active_tool == constants.TOOL_IMAGE:
-            from tools import image as image_tool
-
-            self.current_properties = image_tool.get_default_properties("")
-            editor = self._create_image_editor()
-        elif self.active_tool == constants.TOOL_SCALE:
-            from tools import scale as scale_tool
-
-            self.current_properties = scale_tool.get_default_properties()
-            editor = self._create_scale_editor()
-
-        if editor:
-            self.addWidget(editor)
-            self.setCurrentWidget(editor)
-        else:
-            self.setCurrentWidget(self.blank_page)
     @pyqtSlot(str, object)
     def set_current_object(self, parent_id: str, selection_data: object):
         """
@@ -113,7 +64,7 @@ class PropertyEditor(QStackedWidget):
             self.current_object_id = None
             self.current_parent_id = None
             self.current_properties = {}
-            self._show_active_tool_defaults()
+            self.setCurrentWidget(self.blank_page)
             return
 
         if isinstance(selection_data, list):
