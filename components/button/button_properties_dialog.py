@@ -13,6 +13,13 @@ from dialogs.actions.select_action_type_dialog import SelectActionTypeDialog
 from dialogs.actions.bit_action_dialog import BitActionDialog
 from dialogs.actions.word_action_dialog import WordActionDialog
 
+from .conditional_style import (
+    ConditionalStyleManager,
+    ConditionalStyle,
+    StyleCondition,
+)
+from .conditional_style_editor_dialog import ConditionalStyleEditorDialog
+
 
 class ButtonPropertiesDialog(QDialog):
     def __init__(self, properties: Dict[str, Any], parent=None):
@@ -20,6 +27,14 @@ class ButtonPropertiesDialog(QDialog):
         self.properties = copy.deepcopy(properties)
         if 'actions' not in self.properties:
             self.properties['actions'] = []
+
+        # Initialize conditional style manager
+        self.style_manager = ConditionalStyleManager()
+        for style_data in self.properties.get('conditional_styles', []):
+            try:
+                self.style_manager.add_style(ConditionalStyle.from_dict(style_data))
+            except Exception:
+                pass
         
         self.setWindowTitle("Button Properties")
         self.setMinimumWidth(1000)  # Increased width for better layout
@@ -473,7 +488,99 @@ class ButtonPropertiesDialog(QDialog):
         button_layout.addWidget(move_up_btn)
         button_layout.addWidget(move_down_btn)
         layout.addLayout(button_layout)
-        
+
+        self.style_table.cellDoubleClicked.connect(self._on_style_double_click)
+        self._refresh_style_table()
+
+    def _format_conditions_for_display(self, conditions):
+        parts = []
+        for cond in conditions:
+            segment = f"{cond.tag_path} {cond.operator} {cond.value}"
+            if cond.operator in ("between", "outside") and cond.value2 not in (None, ""):
+                segment += f" {cond.value2}"
+            parts.append(segment)
+        return ", ".join(parts)
+
+    def _refresh_style_table(self):
+        self.style_table.setRowCount(0)
+        for i, style in enumerate(self.style_manager.conditional_styles):
+            self.style_table.insertRow(i)
+            self.style_table.setItem(i, 0, QTableWidgetItem(str(i + 1)))
+            self.style_table.setItem(i, 1, QTableWidgetItem(style.name))
+            self.style_table.setItem(i, 2, QTableWidgetItem(style.style_id))
+            self.style_table.setItem(i, 3, QTableWidgetItem(str(style.priority)))
+            cond_str = self._format_conditions_for_display(style.conditions)
+            self.style_table.setItem(i, 4, QTableWidgetItem(cond_str))
+
+    def _add_style(self):
+        dialog = ConditionalStyleEditorDialog(self)
+        if dialog.exec():
+            new_style = dialog.get_style()
+            if new_style:
+                self.style_manager.add_style(new_style)
+                self._refresh_style_table()
+
+    def _edit_style(self):
+        selected_rows = self.style_table.selectionModel().selectedRows()
+        if not selected_rows:
+            return
+        row = selected_rows[0].row()
+        if row >= len(self.style_manager.conditional_styles):
+            return
+        style = self.style_manager.conditional_styles[row]
+        dialog = ConditionalStyleEditorDialog(self, style)
+        if dialog.exec():
+            updated_style = dialog.get_style()
+            if updated_style:
+                self.style_manager.conditional_styles[row] = updated_style
+                self._refresh_style_table()
+
+    def _remove_style(self):
+        selected_rows = self.style_table.selectionModel().selectedRows()
+        if not selected_rows:
+            return
+        row = selected_rows[0].row()
+        if 0 <= row < len(self.style_manager.conditional_styles):
+            del self.style_manager.conditional_styles[row]
+            self._refresh_style_table()
+
+    def _duplicate_style(self):
+        selected_rows = self.style_table.selectionModel().selectedRows()
+        if not selected_rows:
+            return
+        row = selected_rows[0].row()
+        if 0 <= row < len(self.style_manager.conditional_styles):
+            original = self.style_manager.conditional_styles[row]
+            duplicated = copy.deepcopy(original)
+            self.style_manager.conditional_styles.insert(row + 1, duplicated)
+            self._refresh_style_table()
+            self.style_table.selectRow(row + 1)
+
+    def _move_style_up(self):
+        selected_rows = self.style_table.selectionModel().selectedRows()
+        if not selected_rows:
+            return
+        row = selected_rows[0].row()
+        styles = self.style_manager.conditional_styles
+        if row > 0:
+            styles.insert(row - 1, styles.pop(row))
+            self._refresh_style_table()
+            self.style_table.selectRow(row - 1)
+
+    def _move_style_down(self):
+        selected_rows = self.style_table.selectionModel().selectedRows()
+        if not selected_rows:
+            return
+        row = selected_rows[0].row()
+        styles = self.style_manager.conditional_styles
+        if row < len(styles) - 1:
+            styles.insert(row + 1, styles.pop(row))
+            self._refresh_style_table()
+            self.style_table.selectRow(row + 1)
+
+    def _on_style_double_click(self, row, column):
+        self._edit_style()
+
     def _populate_extended_style_tab(self):
         pass
 
@@ -499,4 +606,7 @@ class ButtonPropertiesDialog(QDialog):
         # Save label and text color fallback
         updated_props["label"] = self.properties.get("label", "Button")
         updated_props["text_color"] = self.properties.get("text_color", "#ffffff")
+        updated_props["conditional_styles"] = [
+            style.to_dict() for style in self.style_manager.conditional_styles
+        ]
         return updated_props
