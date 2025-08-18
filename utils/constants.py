@@ -9,6 +9,7 @@ CLIPBOARD_TYPE_HMI_OBJECTS = 'hmi_objects'
 CLIPBOARD_TYPE_TAG = 'tag'
 CLIPBOARD_TYPE_TAG_DATABASE = 'tag_database'
 CLIPBOARD_TYPE_SCREEN = 'screen'
+CLIPBOARD_TYPE_COMMENT_GROUP = 'comment_group'
 
 # --- Tool Names ---
 TOOL_SELECT = 'select'

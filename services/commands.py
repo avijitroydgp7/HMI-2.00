@@ -253,6 +253,47 @@ class MoveAnchorCommand(Command):
         from services.screen_data_service import screen_service
         screen_service.screen_modified.emit(self.screen_id)
 
+# --- Comment Group Commands ---
+class AddCommentGroupCommand(Command):
+    def __init__(self, group_data, group_id=None):
+        super().__init__(); self.group_data = copy.deepcopy(group_data); self.group_id = group_id
+    def redo(self):
+        from services.comment_data_service import comment_data_service
+        self.group_id = comment_data_service._perform_add_group(self.group_data, self.group_id); self.group_data['id'] = self.group_id
+    def undo(self):
+        from services.comment_data_service import comment_data_service
+        if self.group_id: comment_data_service._perform_remove_group(self.group_id)
+    def _notify(self):
+        from services.comment_data_service import comment_data_service
+        comment_data_service.comment_group_list_changed.emit()
+
+class RemoveCommentGroupCommand(Command):
+    def __init__(self, group_id):
+        from services.comment_data_service import comment_data_service
+        super().__init__(); self.group_id = group_id; self.group_data = copy.deepcopy(comment_data_service.get_group(group_id))
+    def redo(self):
+        from services.comment_data_service import comment_data_service
+        comment_data_service._perform_remove_group(self.group_id)
+    def undo(self):
+        from services.comment_data_service import comment_data_service
+        if self.group_data: comment_data_service._perform_add_group(self.group_data, self.group_id)
+    def _notify(self):
+        from services.comment_data_service import comment_data_service
+        comment_data_service.comment_group_list_changed.emit()
+
+class RenameCommentGroupCommand(Command):
+    def __init__(self, group_id, new_name, new_number, old_name, old_number):
+        super().__init__(); self.group_id = group_id; self.new_name = new_name; self.new_number = new_number; self.old_name = old_name; self.old_number = old_number
+    def redo(self):
+        from services.comment_data_service import comment_data_service
+        comment_data_service._perform_rename_group(self.group_id, self.new_name, self.new_number)
+    def undo(self):
+        from services.comment_data_service import comment_data_service
+        comment_data_service._perform_rename_group(self.group_id, self.old_name, self.old_number)
+    def _notify(self):
+        from services.comment_data_service import comment_data_service
+        comment_data_service.comment_group_list_changed.emit()
+
 # --- Tag Database Commands ---
 class AddTagDatabaseCommand(Command):
     def __init__(self, db_data, db_id=None):

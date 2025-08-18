@@ -71,12 +71,21 @@ class NewCommentTableDialog(QDialog):
             self.error_label.setText(f"A table with number '{number}' already exists.")
             self.error_label.setVisible(True)
             ok_button.setEnabled(False)
+        elif not self.edit_group and not comment_data_service.is_group_name_unique(name):
+            self.error_label.setText(f"A table named '{name}' already exists.")
+            self.error_label.setVisible(True)
+            ok_button.setEnabled(False)
         elif self.edit_group:
-            # Check if new number is unique (excluding current group)
             group_data = comment_data_service.get_group(self.edit_group)
-            if group_data and number != group_data.get('number', ''):
-                if not comment_data_service.is_group_number_unique(number):
+            if group_data:
+                number_changed = number != group_data.get('number', '')
+                name_changed = name != group_data.get('name', '')
+                if number_changed and not comment_data_service.is_group_number_unique(number):
                     self.error_label.setText(f"A table with number '{number}' already exists.")
+                    self.error_label.setVisible(True)
+                    ok_button.setEnabled(False)
+                elif name_changed and not comment_data_service.is_group_name_unique(name):
+                    self.error_label.setText(f"A table named '{name}' already exists.")
                     self.error_label.setVisible(True)
                     ok_button.setEnabled(False)
                 else:
