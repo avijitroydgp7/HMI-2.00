@@ -40,6 +40,9 @@ class ConditionalStyle:
     style_id: str = ""
     conditions: List[StyleCondition] = None
     properties: Dict[str, Any] = None
+    tooltip: str = ""
+    hover_properties: Dict[str, Any] = None
+    click_properties: Dict[str, Any] = None
     animation: AnimationProperties = None
     priority: int = 0  # Higher priority wins when multiple conditions match
     
@@ -48,6 +51,10 @@ class ConditionalStyle:
             self.conditions = []
         if self.properties is None:
             self.properties = {}
+        if self.hover_properties is None:
+            self.hover_properties = {}
+        if self.click_properties is None:
+            self.click_properties = {}
         if self.animation is None:
             self.animation = AnimationProperties()
     
@@ -57,6 +64,9 @@ class ConditionalStyle:
             'style_id': self.style_id,
             'conditions': [cond.to_dict() for cond in self.conditions],
             'properties': self.properties,
+            'tooltip': self.tooltip,
+            'hover_properties': self.hover_properties,
+            'click_properties': self.click_properties,
             'animation': self.animation.to_dict(),
             'priority': self.priority
         }
@@ -68,6 +78,9 @@ class ConditionalStyle:
             style_id=data.get('style_id', ''),
             conditions=[StyleCondition.from_dict(cond) for cond in data.get('conditions', [])],
             properties=data.get('properties', {}),
+            tooltip=data.get('tooltip', ''),
+            hover_properties=data.get('hover_properties', {}),
+            click_properties=data.get('click_properties', {}),
             priority=data.get('priority', 0)
         )
         if 'animation' in data:
@@ -100,8 +113,17 @@ class ConditionalStyleManager(QObject):
             self.conditional_styles[index] = style
             self.styles_changed.emit()
     
-    def get_active_style(self, tag_values: Dict[str, Any]) -> Dict[str, Any]:
-        """Determine which style should be active based on tag values"""
+    def get_active_style(self, tag_values: Dict[str, Any], state: Optional[str] = None) -> Dict[str, Any]:
+        """Determine which style should be active based on tag values.
+
+        Parameters
+        ----------
+        tag_values: Dict[str, Any]
+            Current tag values.
+        state: Optional[str]
+            Optional state for which to retrieve additional properties.
+            Supported states: ``"hover"`` and ``"click"``.
+        """
         matching_styles = []
         
         for style in self.conditional_styles:
@@ -111,9 +133,16 @@ class ConditionalStyleManager(QObject):
         if matching_styles:
             # Return the highest priority style
             best_style = max(matching_styles, key=lambda s: s.priority)
-            return best_style.properties
-        
-        return self.default_style
+            props = dict(best_style.properties)
+            if state == 'hover':
+                props.update(best_style.hover_properties)
+            elif state == 'click':
+                props.update(best_style.click_properties)
+            if best_style.tooltip:
+                props['tooltip'] = best_style.tooltip
+            return props
+
+        return dict(self.default_style)
     
     def _evaluate_conditions(self, conditions: List[StyleCondition], tag_values: Dict[str, Any]) -> bool:
         """Evaluate if all conditions are met"""
