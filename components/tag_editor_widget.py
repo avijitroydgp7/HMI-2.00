@@ -42,7 +42,9 @@ class TagTreeDelegate(QStyledItemDelegate):
 
     def createEditor(self, parent, option, index):
         editor = QLineEdit(parent)
-        editor.setStyleSheet("padding: 0px; margin: 0px; border: none;")
+        editor.setFrame(False)
+        editor.setContentsMargins(0, 0, 0, 0)
+        editor.setTextMargins(0, 0, 0, 0)
 
         tag_name = index.siblingAtColumn(1).data()
         tag = tag_data_service.get_tag(self.db_id, tag_name) if tag_name else None
