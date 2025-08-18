@@ -5,7 +5,7 @@ from PyQt6.QtWidgets import (
     QDialogButtonBox, QCheckBox, QDialog
 )
 from PyQt6.QtCore import Qt
-from PyQt6.QtGui import QIntValidator, QColor
+from PyQt6.QtGui import QIntValidator, QColor, QPalette
 from typing import Optional, Dict, Any
 from services.screen_data_service import screen_service
 
@@ -128,9 +128,15 @@ class ScreenPropertiesDialog(QDialog):
     def _set_button_color(self, button, color_hex):
         color = QColor(color_hex)
         lightness = color.lightnessF()
-        text_color = "#ffffff" if lightness < 0.5 else "#000000"
-        button.setStyleSheet(f"background-color: {color_hex}; color: {text_color}; border: 1px solid #5a6270; padding: 5px; border-radius: 4px;")
+        text_color = QColor("#ffffff" if lightness < 0.5 else "#000000")
+
+        palette = button.palette()
+        palette.setColor(QPalette.ColorRole.Button, color)
+        palette.setColor(QPalette.ColorRole.ButtonText, text_color)
+        button.setAutoFillBackground(True)
+        button.setPalette(palette)
         button.setProperty("color", color_hex)
+        button.update()
 
     def validate_inputs(self):
         num_text = self.num_input.text()
