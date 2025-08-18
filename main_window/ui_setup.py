@@ -12,17 +12,6 @@ def setup_window(win):
     win.setWindowIcon(app_icon)
     win.resize(1600, 900)
 
-    # Style toolbar buttons to highlight on hover and when checked
-    win.setStyleSheet("""
-        QToolButton:hover {
-            background-color: #00350e;
-        }
-        QToolButton:checked {
-            background-color: #00791f;
-        }
-    """)
-
-
 def setup_status_bar(win):
     win.status_bar = QStatusBar()
     win.setStatusBar(win.status_bar)
