@@ -200,10 +200,8 @@ class DesignCanvas(QGraphicsView):
             if self.page_item.graphicsEffect() is self._shadow_effect:
                 self._shadow_effect.setEnabled(False)
 
-    def _update_preview_style(self, theme=None):
-        """Update preview pen and colors based on the active theme."""
-        if theme is None:
-            theme = settings_service.get_value("appearance/theme", "default")
+    def _update_preview_style(self):
+        """Set preview pen and colors to a fixed value."""
         color = QColor("#ff00a7")
 
         self._preview_color = color
@@ -1146,23 +1144,12 @@ class DesignCanvas(QGraphicsView):
         self._update_shadow_for_zoom()
         self.update_visible_items()
 
-    def update_theme_colors(self, theme_name):
-        """Update canvas colors based on the current theme."""
-        if theme_name == 'dark_theme':
-            self.setBackgroundBrush(QColor("#1e1e1e"))
-            # Update page item color for dark theme
-            if not self.screen_data.get('style', {}).get('transparent', False):
-                self.page_item.setBrush(QColor("#252526"))
-        elif theme_name == 'light_theme':
-            self.setBackgroundBrush(QColor("#ffffff"))
-            # Update page item color for light theme
-            if not self.screen_data.get('style', {}).get('transparent', False):
-                self.page_item.setBrush(QColor("#ffffff"))
-        else:  # default theme
-            self.setBackgroundBrush(QColor("#f5f5f5"))
-            if not self.screen_data.get('style', {}).get('transparent', False):
-                self.page_item.setBrush(QColor("#f5f5f5"))
-        self._update_preview_style(theme_name)
+    def update_theme_colors(self):
+        """Apply a fixed palette to the canvas."""
+        self.setBackgroundBrush(QColor("#1e1e1e"))
+        if not self.screen_data.get('style', {}).get('transparent', False):
+            self.page_item.setBrush(QColor("#252526"))
+        self._update_preview_style()
         self.update()
 
     def _sync_scene_items(self):
