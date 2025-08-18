@@ -2,6 +2,7 @@ from PyQt6.QtWidgets import (
     QFormLayout, QLineEdit, QDialogButtonBox, QLabel, QVBoxLayout, QDialog
 )
 from PyQt6.QtCore import pyqtSlot
+from PyQt6.QtGui import QIntValidator
 from services.comment_data_service import comment_data_service
 
 class NewCommentTableDialog(QDialog):
@@ -22,6 +23,10 @@ class NewCommentTableDialog(QDialog):
 
         self.number_edit = QLineEdit()
         self.name_edit = QLineEdit()
+        
+        # Set numeric input only for group number
+        self.number_edit.setValidator(QIntValidator())
+        self.number_edit.setPlaceholderText("Enter comment table number")
         
         if edit_group:
             group_data = comment_data_service.get_group(edit_group)
@@ -59,7 +64,7 @@ class NewCommentTableDialog(QDialog):
         ok_button = self.button_box.button(QDialogButtonBox.StandardButton.Ok)
         
         if not number or not name:
-            self.error_label.setText("Both number and name are required.")
+            self.error_label.setText("Both comment number and name are required.")
             self.error_label.setVisible(True)
             ok_button.setEnabled(False)
         elif not self.edit_group and not comment_data_service.is_group_number_unique(number):
