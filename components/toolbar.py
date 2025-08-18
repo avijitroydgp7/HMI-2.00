@@ -17,13 +17,22 @@ class QuickAccessToolBar(QToolBar):
         self.setIconSize(QSize(20, 20))
 
         icon_sz = self.iconSize().width()
-        self.new_action = QAction(IconManager.create_icon('fa5s.file', size=icon_sz), "New", self)
+        self.new_icon = IconManager.create_animated_icon('fa5s.file', size=icon_sz)
+        self.new_action = QAction(self.new_icon.icon, "New", self)
+        self.new_icon.add_target(self.new_action)
+        self.new_action._animated_icon = self.new_icon
         self.new_action.setShortcut(QKeySequence.StandardKey.New)
         self.new_action.setToolTip(f"New ({self.new_action.shortcut().toString()})")
-        self.open_action = QAction(IconManager.create_icon('fa5s.folder-open', size=icon_sz), "Open", self)
+        self.open_icon = IconManager.create_animated_icon('fa5s.folder-open', size=icon_sz)
+        self.open_action = QAction(self.open_icon.icon, "Open", self)
+        self.open_icon.add_target(self.open_action)
+        self.open_action._animated_icon = self.open_icon
         self.open_action.setShortcut(QKeySequence.StandardKey.Open)
         self.open_action.setToolTip(f"Open ({self.open_action.shortcut().toString()})")
-        self.save_action = QAction(IconManager.create_icon('fa5s.save', size=icon_sz), "Save", self)
+        self.save_icon = IconManager.create_animated_icon('fa5s.save', size=icon_sz)
+        self.save_action = QAction(self.save_icon.icon, "Save", self)
+        self.save_icon.add_target(self.save_action)
+        self.save_action._animated_icon = self.save_icon
         self.save_action.setShortcut(QKeySequence.StandardKey.Save)
         self.save_action.setToolTip(f"Save ({self.save_action.shortcut().toString()})")
 

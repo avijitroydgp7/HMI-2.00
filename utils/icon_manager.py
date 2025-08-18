@@ -96,33 +96,44 @@ class IconManager:
             return QIcon()
 
     @staticmethod
-    def create_animated_icon(path: str):
-        """Create an animated icon from a GIF or APNG file.
+    def create_animated_icon(
+        source: str,
+        color: Optional[str] = None,
+        active_color: Optional[str] = None,
+        size: Optional[int] = None,
+    ):
+        """Create an animated icon or gracefully fall back to a static one.
 
-        The returned :class:`AnimatedIcon` manages a :class:`QMovie` and
-        automatically updates assigned widgets or actions as the animation
-        progresses. If the environment lacks animation support or the file
-        cannot be loaded, a static icon is used instead.
+        ``source`` can either be a path to a GIF/APNG file or a qtawesome
+        icon name. If the movie cannot be created the method returns a
+        :class:`AnimatedIcon` wrapping a static icon created via
+        :func:`create_icon`.
 
         Args:
-            path (str): Path to the GIF or APNG file.
+            source (str): Path to an animated image or a qtawesome icon name.
+            color (str, optional): Color for qtawesome icons.
+            active_color (str, optional): Active color for qtawesome icons.
+            size (int, optional): Desired size of the icon.
 
         Returns:
-            AnimatedIcon: Helper object that keeps the animation running and
+            AnimatedIcon: Helper object that keeps animations running and
             updates any registered targets.
 
         Example:
             >>> spinner = IconManager.create_animated_icon("spinner.gif")
             >>> spinner.add_target(my_button)
-
         """
-        movie = QMovie(path)
-        if not movie.isValid():
-            # Fallback to a static icon when animation isn't supported
-            return AnimatedIcon(None, QIcon(path))
 
-        movie.jumpToFrame(0)
-        return AnimatedIcon(movie, QIcon(movie.currentPixmap()))
+        movie = QMovie(source)
+        if movie.isValid():
+            movie.jumpToFrame(0)
+            return AnimatedIcon(movie, QIcon(movie.currentPixmap()))
+
+        # Fallback: treat ``source`` as a qtawesome icon name
+        static_icon = IconManager.create_icon(
+            source, color=color, active_color=active_color, size=size
+        )
+        return AnimatedIcon(None, static_icon)
 
 
 class AnimatedIcon(QObject):

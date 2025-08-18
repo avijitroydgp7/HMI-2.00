@@ -35,7 +35,9 @@ class CustomDialog(QDialog):
         self.title_label = QLabel("Dialog")
         self.title_label.setObjectName("TitleLabel")
         
-        self.close_button = QPushButton(IconManager.create_icon('fa5s.times'), "")
+        self.close_icon = IconManager.create_animated_icon('fa5s.times')
+        self.close_button = QPushButton(self.close_icon.icon, "")
+        self.close_icon.add_target(self.close_button)
         self.close_button.setObjectName("CloseButton")
         self.close_button.clicked.connect(self.reject) # Default close action is reject/cancel
         

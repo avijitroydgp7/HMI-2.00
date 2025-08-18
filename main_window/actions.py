@@ -12,42 +12,33 @@ from utils import constants
 
 def create_actions(win):
     """Creates all global QAction objects for the main window."""
-    win.cut_action = QAction(IconManager.create_icon('fa5s.cut'), "Cut", win)
+    def _animated_action(icon_name: str, text: str):
+        anim = IconManager.create_animated_icon(icon_name)
+        action = QAction(anim.icon, text, win)
+        anim.add_target(action)
+        action._animated_icon = anim
+        return action
+
+    win.cut_action = _animated_action('fa5s.cut', "Cut")
     win.cut_action.setShortcut(QKeySequence.StandardKey.Cut)
-    win.copy_action = QAction(IconManager.create_icon('fa5s.copy'), "Copy", win)
+    win.copy_action = _animated_action('fa5s.copy', "Copy")
     win.copy_action.setShortcut(QKeySequence.StandardKey.Copy)
-    win.paste_action = QAction(IconManager.create_icon('fa5s.paste'), "Paste", win)
+    win.paste_action = _animated_action('fa5s.paste', "Paste")
     win.paste_action.setShortcut(QKeySequence.StandardKey.Paste)
-    win.undo_action = QAction(IconManager.create_icon('fa5s.undo'), "Undo", win)
+    win.undo_action = _animated_action('fa5s.undo', "Undo")
     win.undo_action.setShortcut(QKeySequence.StandardKey.Undo)
-    win.redo_action = QAction(IconManager.create_icon('fa5s.redo'), "Redo", win)
+    win.redo_action = _animated_action('fa5s.redo', "Redo")
     win.redo_action.setShortcut(QKeySequence.StandardKey.Redo)
 
     # Alignment and distribution actions
-    win.align_left_action = QAction(
-        IconManager.create_icon('mdi.align-horizontal-left'), "Align Left", win
-    )
-    win.align_center_action = QAction(
-        IconManager.create_icon('mdi.align-horizontal-center'), "Align Center", win
-    )
-    win.align_right_action = QAction(
-        IconManager.create_icon('mdi.align-horizontal-right'), "Align Right", win
-    )
-    win.align_top_action = QAction(
-        IconManager.create_icon('mdi.align-vertical-top'), "Align Top", win
-    )
-    win.align_middle_action = QAction(
-        IconManager.create_icon('mdi.align-vertical-center'), "Align Middle", win
-    )
-    win.align_bottom_action = QAction(
-        IconManager.create_icon('mdi.align-vertical-bottom'), "Align Bottom", win
-    )
-    win.distribute_h_action = QAction(
-        IconManager.create_icon('mdi.format-horizontal-align-center'), "Distribute Horizontally", win
-    )
-    win.distribute_v_action = QAction(
-        IconManager.create_icon('mdi.format-vertical-align-center'), "Distribute Vertically", win
-    )
+    win.align_left_action = _animated_action('mdi.align-horizontal-left', "Align Left")
+    win.align_center_action = _animated_action('mdi.align-horizontal-center', "Align Center")
+    win.align_right_action = _animated_action('mdi.align-horizontal-right', "Align Right")
+    win.align_top_action = _animated_action('mdi.align-vertical-top', "Align Top")
+    win.align_middle_action = _animated_action('mdi.align-vertical-center', "Align Middle")
+    win.align_bottom_action = _animated_action('mdi.align-vertical-bottom', "Align Bottom")
+    win.distribute_h_action = _animated_action('mdi.format-horizontal-align-center', "Distribute Horizontally")
+    win.distribute_v_action = _animated_action('mdi.format-vertical-align-center', "Distribute Vertically")
 
     win.addActions([
         win.cut_action,

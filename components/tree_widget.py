@@ -118,7 +118,7 @@ class CustomTreeWidget(QTreeWidget):
         is_expanded = self.isExpanded(index)
 
         icon_name = 'fa5s.minus-square' if is_expanded else 'fa5s.plus-square'
-        icon = IconManager.create_icon(icon_name)
+        icon = IconManager.create_animated_icon(icon_name).icon
         icon_size = 16
 
         # Calculate the exact position for the icon based on tree level

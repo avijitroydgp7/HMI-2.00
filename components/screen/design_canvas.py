@@ -1316,7 +1316,10 @@ class DesignCanvas(QGraphicsView):
         item = self.itemAt(event.pos())
         if not isinstance(item, BaseGraphicsItem):
             menu = QMenu(self)
-            paste_action = menu.addAction(IconManager.create_icon('fa5s.paste'), "Paste")
+            paste_anim = IconManager.create_animated_icon('fa5s.paste')
+            paste_action = menu.addAction(paste_anim.icon, "Paste")
+            paste_anim.add_target(paste_action)
+            paste_action._animated_icon = paste_anim
             paste_action.triggered.connect(self.paste)
             content_type, _ = clipboard_service.get_content()
             paste_action.setEnabled(content_type == constants.CLIPBOARD_TYPE_HMI_OBJECTS)
@@ -1330,10 +1333,19 @@ class DesignCanvas(QGraphicsView):
         selection_count = len(selected_items)
         
         menu = QMenu(self)
-        cut_action = menu.addAction(IconManager.create_icon('fa5s.cut'), "Cut")
-        copy_action = menu.addAction(IconManager.create_icon('fa5s.copy'), "Copy")
+        cut_anim = IconManager.create_animated_icon('fa5s.cut')
+        cut_action = menu.addAction(cut_anim.icon, "Cut")
+        cut_anim.add_target(cut_action)
+        cut_action._animated_icon = cut_anim
+        copy_anim = IconManager.create_animated_icon('fa5s.copy')
+        copy_action = menu.addAction(copy_anim.icon, "Copy")
+        copy_anim.add_target(copy_action)
+        copy_action._animated_icon = copy_anim
         duplicate_action = menu.addAction("Duplicate")
-        delete_action = menu.addAction(IconManager.create_icon('fa5s.trash-alt'), "Delete")
+        delete_anim = IconManager.create_animated_icon('fa5s.trash-alt')
+        delete_action = menu.addAction(delete_anim.icon, "Delete")
+        delete_anim.add_target(delete_action)
+        delete_action._animated_icon = delete_anim
         menu.addSeparator()
         
         stacking_menu = menu.addMenu("Stacking Order")
@@ -1359,7 +1371,10 @@ class DesignCanvas(QGraphicsView):
         
         if selection_count == 1:
             if isinstance(item, EmbeddedScreenItem):
-                open_action = menu.addAction(IconManager.create_icon('fa5s.external-link-alt'), "Open Base Screen")
+                open_anim = IconManager.create_animated_icon('fa5s.external-link-alt')
+                open_action = menu.addAction(open_anim.icon, "Open Base Screen")
+                open_anim.add_target(open_action)
+                open_action._animated_icon = open_anim
                 open_action.triggered.connect(self.open_selected_child)
             elif isinstance(item, ButtonItem):
                 props_action = menu.addAction("Properties...")

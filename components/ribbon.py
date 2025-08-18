@@ -38,7 +38,6 @@ class Ribbon(QToolBar):
         self.tab_widget.setFont(font)
         self.addWidget(self.tab_widget)
 
-        # --- Create Tabs ---
         self.project_tab = RibbonTab()
         self.edit_tab = RibbonTab()
         self.search_tab = RibbonTab()
@@ -63,24 +62,42 @@ class Ribbon(QToolBar):
 
     def _populate_project_tab(self):
         tb = self.project_tab.toolbar
-        self.new_action = QAction(IconManager.create_icon('fa5s.file'), "New", self)
+        self.new_anim = IconManager.create_animated_icon('fa5s.file')
+        self.new_action = QAction(self.new_anim.icon, "New", self)
+        self.new_anim.add_target(self.new_action)
+        self.new_action._animated_icon = self.new_anim
         self.new_action.setShortcut(QKeySequence.StandardKey.New)
         tb.addAction(self.new_action)
-        self.open_action = QAction(IconManager.create_icon('fa5s.folder-open'), "Open", self)
+        self.open_anim = IconManager.create_animated_icon('fa5s.folder-open')
+        self.open_action = QAction(self.open_anim.icon, "Open", self)
+        self.open_anim.add_target(self.open_action)
+        self.open_action._animated_icon = self.open_anim
         self.open_action.setShortcut(QKeySequence.StandardKey.Open)
         tb.addAction(self.open_action)
-        self.save_action = QAction(IconManager.create_icon('fa5s.save'), "Save", self)
+        self.save_anim = IconManager.create_animated_icon('fa5s.save')
+        self.save_action = QAction(self.save_anim.icon, "Save", self)
+        self.save_anim.add_target(self.save_action)
+        self.save_action._animated_icon = self.save_anim
         self.save_action.setShortcut(QKeySequence.StandardKey.Save)
         tb.addAction(self.save_action)
-        self.save_as_action = QAction(IconManager.create_icon('fa5s.save'), "Save As...", self)
+        self.save_as_anim = IconManager.create_animated_icon('fa5s.save')
+        self.save_as_action = QAction(self.save_as_anim.icon, "Save As...", self)
+        self.save_as_anim.add_target(self.save_as_action)
+        self.save_as_action._animated_icon = self.save_as_anim
         self.save_as_action.setShortcut(QKeySequence.StandardKey.SaveAs)
         tb.addAction(self.save_as_action)
         tb.addSeparator()
-        self.close_tab_action = QAction(IconManager.create_icon('fa5s.window-close'), "Close Tab", self)
+        self.close_tab_anim = IconManager.create_animated_icon('fa5s.window-close')
+        self.close_tab_action = QAction(self.close_tab_anim.icon, "Close Tab", self)
+        self.close_tab_anim.add_target(self.close_tab_action)
+        self.close_tab_action._animated_icon = self.close_tab_anim
         self.close_tab_action.setShortcut(QKeySequence.StandardKey.Close)
         tb.addAction(self.close_tab_action)
         tb.addSeparator()
-        self.exit_action = QAction(IconManager.create_icon('fa5s.sign-out-alt'), "Exit", self)
+        self.exit_anim = IconManager.create_animated_icon('fa5s.sign-out-alt')
+        self.exit_action = QAction(self.exit_anim.icon, "Exit", self)
+        self.exit_anim.add_target(self.exit_action)
+        self.exit_action._animated_icon = self.exit_anim
         self.exit_action.setShortcut(QKeySequence.StandardKey.Quit)
         tb.addAction(self.exit_action)
 
