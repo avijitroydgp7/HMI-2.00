@@ -2,10 +2,10 @@
 # Contains custom, reusable widgets for various dialogs.
 
 from PyQt6.QtWidgets import (
-    QLineEdit, QWidget, QHBoxLayout, QVBoxLayout, QComboBox, 
+    QLineEdit, QWidget, QHBoxLayout, QVBoxLayout, QComboBox,
     QStackedWidget, QLabel, QFormLayout, QToolButton, QFrame, QSizePolicy
 )
-from PyQt6.QtGui import QDoubleValidator, QPainter, QColor, QPixmap
+from PyQt6.QtGui import QDoubleValidator, QPainter, QColor, QPixmap, QPalette
 from PyQt6.QtCore import pyqtSignal, Qt, QSize
 from typing import Optional, Dict, List
 from enum import Enum
@@ -34,7 +34,10 @@ class CollapsibleBox(QWidget):
         self.toggle_button.setText(title)
         self.toggle_button.setCheckable(True)
         self.toggle_button.setChecked(False)
-        self.toggle_button.setStyleSheet("QToolButton { border: none; font-weight: bold; }")
+        self.toggle_button.setAutoRaise(True)
+        font = self.toggle_button.font()
+        font.setBold(True)
+        self.toggle_button.setFont(font)
 
         self.status_label = QLabel(self)
         self.status_label.setFixedSize(12, 12)
@@ -166,7 +169,10 @@ class ValueSelector(QWidget):
         layout.addLayout(input_layout)
 
         self.error_label = QLabel()
-        self.error_label.setStyleSheet("color: #E57373; padding-left: 5px;")
+        palette = self.error_label.palette()
+        palette.setColor(QPalette.ColorRole.WindowText, QColor("#E57373"))
+        self.error_label.setPalette(palette)
+        self.error_label.setIndent(5)
         self.error_label.setVisible(False)
         self.error_label.setWordWrap(True)
         layout.addWidget(self.error_label)
@@ -260,7 +266,14 @@ class TagSelector(QWidget):
         self.main_tag_selector = ValueSelector()
         self.main_tag_selector.tagChanged.connect(self._on_main_tag_changed)
         self.main_tag_selector.inputChanged.connect(self.inputChanged.emit)
-        main_layout.addWidget(self.main_tag_selector)
+
+        self.main_tag_frame = QFrame()
+        self.main_tag_frame.setFrameShape(QFrame.Shape.StyledPanel)
+        self.main_tag_frame.setLineWidth(1)
+        frame_layout = QVBoxLayout(self.main_tag_frame)
+        frame_layout.setContentsMargins(2, 2, 2, 2)
+        frame_layout.addWidget(self.main_tag_selector)
+        main_layout.addWidget(self.main_tag_frame)
         
         self.index_widget = QWidget()
         self.index_layout = QFormLayout(self.index_widget)
@@ -272,16 +285,6 @@ class TagSelector(QWidget):
         main_layout.addStretch(1)
 
         self.setObjectName("TagSelector")
-        self.setStyleSheet("""
-            #TagSelector > ValueSelector {
-                border: 1px solid #454c5a;
-                border-radius: 4px;
-                padding: 2px;
-            }
-            #TagSelector > ValueSelector[error='true'] {
-                border: 1px solid #E57373;
-            }
-        """)
         
         self._update_index_fields(None)
         
