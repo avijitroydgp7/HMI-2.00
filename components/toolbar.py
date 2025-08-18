@@ -1,5 +1,5 @@
 # components/toolbar.py
-from PyQt6.QtWidgets import QToolBar, QComboBox, QWidget, QSizePolicy
+from PyQt6.QtWidgets import QToolBar
 
 from PyQt6.QtCore import Qt, QSize, pyqtSignal
 from PyQt6.QtGui import QAction, QActionGroup, QKeySequence
@@ -7,14 +7,10 @@ from utils.icon_manager import IconManager
 from utils import constants
 
 class QuickAccessToolBar(QToolBar):
-    """
-    A customizable toolbar for frequently used actions, typically at the top
-    of the window.
-    """
-    theme_changed = pyqtSignal(str)
+    """A customizable toolbar for frequently used actions, typically at the top
+    of the window."""
 
     def __init__(self, parent=None):
-
         super().__init__("Quick Access", parent)
         self.setObjectName("QuickAccessToolBar")
         self.setMovable(True)
@@ -30,15 +26,11 @@ class QuickAccessToolBar(QToolBar):
         self.save_action = QAction(IconManager.create_icon('fa5s.save', size=icon_sz), "Save", self)
         self.save_action.setShortcut(QKeySequence.StandardKey.Save)
         self.save_action.setToolTip(f"Save ({self.save_action.shortcut().toString()})")
-        
+
         self.addAction(self.new_action)
         self.addAction(self.open_action)
         self.addAction(self.save_action)
         self.addSeparator()
-
-    def populate_themes(self, themes, current_theme):
-        """Legacy method - themes are now handled elsewhere."""
-        pass
 
     def add_clipboard_actions(self, cut_action, copy_action, paste_action):
 
