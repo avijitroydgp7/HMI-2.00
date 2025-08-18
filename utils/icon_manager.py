@@ -1,5 +1,6 @@
-from typing import Optional
-from PyQt6.QtGui import QIcon, QPixmap
+from typing import List, Optional, Any
+from PyQt6.QtCore import QObject
+from PyQt6.QtGui import QIcon, QPixmap, QMovie
 import qtawesome as qta
 
 class IconManager:
@@ -93,3 +94,76 @@ class IconManager:
         except Exception as e:
             print(f"Error converting icon: {str(e)}")
             return QIcon()
+
+    @staticmethod
+    def create_animated_icon(path: str):
+        """Create an animated icon from a GIF or APNG file.
+
+        The returned :class:`AnimatedIcon` manages a :class:`QMovie` and
+        automatically updates assigned widgets or actions as the animation
+        progresses. If the environment lacks animation support or the file
+        cannot be loaded, a static icon is used instead.
+
+        Args:
+            path (str): Path to the GIF or APNG file.
+
+        Returns:
+            AnimatedIcon: Helper object that keeps the animation running and
+            updates any registered targets.
+
+        Example:
+            >>> spinner = IconManager.create_animated_icon("spinner.gif")
+            >>> spinner.add_target(my_button)
+
+        """
+        movie = QMovie(path)
+        if not movie.isValid():
+            # Fallback to a static icon when animation isn't supported
+            return AnimatedIcon(None, QIcon(path))
+
+        movie.jumpToFrame(0)
+        return AnimatedIcon(movie, QIcon(movie.currentPixmap()))
+
+
+class AnimatedIcon(QObject):
+    """Helper to apply animated icons to Qt widgets and actions.
+
+    Widgets or actions added via :meth:`add_target` will have their icon
+    updated each time the underlying ``QMovie`` advances. When no valid movie
+    is supplied the icon remains static, providing a graceful fallback on
+    platforms without animation support.
+    """
+
+    def __init__(self, movie: Optional[QMovie], icon: QIcon):
+        super().__init__()
+        self._movie = movie
+        self._icon = icon
+        self._targets: List[Any] = []
+
+        if self._movie:
+            self._movie.frameChanged.connect(self._on_frame_changed)
+            self._movie.start()
+
+    def _on_frame_changed(self, _frame: int):
+        if not self._movie:
+            return
+        self._icon = QIcon(self._movie.currentPixmap())
+        for target in self._targets:
+            if hasattr(target, "setIcon"):
+                target.setIcon(self._icon)
+
+    def add_target(self, target: Any):
+        """Attach the icon to a widget or action.
+
+        The target must provide a ``setIcon`` method. This works for
+        ``QAction``, ``QPushButton`` and any other Qt object exposing the same
+        API.
+        """
+        if hasattr(target, "setIcon"):
+            target.setIcon(self._icon)
+            self._targets.append(target)
+
+    @property
+    def icon(self) -> QIcon:
+        """Return the underlying ``QIcon`` instance."""
+        return self._icon
