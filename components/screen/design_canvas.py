@@ -1144,7 +1144,7 @@ class DesignCanvas(QGraphicsView):
         self._update_shadow_for_zoom()
         self.update_visible_items()
 
-    def update_theme_colors(self):
+    def apply_default_colors(self):
         """Apply a fixed palette to the canvas."""
         self.setBackgroundBrush(QColor("#1e1e1e"))
         if not self.screen_data.get('style', {}).get('transparent', False):
