@@ -16,6 +16,7 @@ from PyQt6.QtCore import QRectF, Qt, QPointF, QLineF
 import copy
 
 from services.screen_data_service import screen_service
+from services.tag_service import tag_service
 
 class BaseGraphicsItem(QGraphicsObject):
     """
@@ -106,7 +107,13 @@ class ButtonItem(BaseGraphicsItem):
         super().__init__(instance_data, parent)
         self.is_resizable = True
         self._conditional_style_manager = None
-        self._current_tag_values = {}
+        self._current_tag_values = tag_service.get_all_tag_values()
+        self._state = 'normal'
+        self._tooltip = ''
+
+        tag_service.tag_values_changed.connect(self.update_tag_values)
+        # Initialize tooltip based on current style
+        self._get_active_style_properties(self._state)
 
     def boundingRect(self) -> QRectF:
         props = self.instance_data.get('properties', {})
@@ -152,22 +159,37 @@ class ButtonItem(BaseGraphicsItem):
 
     def _get_current_tag_values(self):
         """Get current tag values for conditional style evaluation"""
-        # This would typically come from tag data service
-        # For now, return empty dict - will be populated by tag service
         return self._current_tag_values
 
-    def _get_active_style_properties(self):
-        """Get the active style properties based on conditional styles"""
+    def _get_active_style_properties(self, state: str = 'normal'):
+        """Get the active style properties based on conditional styles.
+
+        Parameters
+        ----------
+        state: str
+            One of ``'normal'``, ``'hover'``, or ``'click'``.
+        """
         manager = self._get_conditional_style_manager()
         tag_values = self._get_current_tag_values()
-        
-        # Get active style properties
-        active_props = manager.get_active_style(tag_values)
-        
-        # Merge with default properties
-        default_props = self.instance_data.get('properties', {})
+
+        default_props = dict(self.instance_data.get('properties', {}))
+        hover_default = default_props.pop('hover_properties', {})
+        click_default = default_props.pop('click_properties', {})
+
+        if state == 'hover':
+            default_props.update(hover_default)
+        elif state == 'click':
+            default_props.update(click_default)
+
+        active_props = manager.get_active_style(tag_values, state if state in ('hover', 'click') else None)
+
         final_props = {**default_props, **active_props}
-        
+
+        tooltip = final_props.get('tooltip', '')
+        if tooltip != self._tooltip:
+            self._tooltip = tooltip
+            self.setToolTip(tooltip)
+
         return final_props
 
     def paint(self, painter: QPainter, option, widget=None):
@@ -175,7 +197,7 @@ class ButtonItem(BaseGraphicsItem):
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
         
         # Get active style properties
-        props = self._get_active_style_properties()
+        props = self._get_active_style_properties(self._state)
         
         # Apply style properties
         bg_color = QColor(props.get('background_color', '#5a6270'))
@@ -229,8 +251,37 @@ class ButtonItem(BaseGraphicsItem):
     
     def update_tag_values(self, tag_values):
         """Update tag values and re-evaluate conditional styles"""
-        self._current_tag_values = tag_values
+        self._current_tag_values.update(tag_values)
+        # Update tooltip and appearance based on new tag values
+        self._get_active_style_properties(self._state)
         self.update()
+
+    def hoverEnterEvent(self, event):
+        self._state = 'hover'
+        self._get_active_style_properties(self._state)
+        self.update()
+        super().hoverEnterEvent(event)
+
+    def hoverLeaveEvent(self, event):
+        self._state = 'normal'
+        self._get_active_style_properties(self._state)
+        self.update()
+        super().hoverLeaveEvent(event)
+
+    def mousePressEvent(self, event):
+        self._state = 'click'
+        self._get_active_style_properties(self._state)
+        self.update()
+        super().mousePressEvent(event)
+
+    def mouseReleaseEvent(self, event):
+        if self.isUnderMouse():
+            self._state = 'hover'
+        else:
+            self._state = 'normal'
+        self._get_active_style_properties(self._state)
+        self.update()
+        super().mouseReleaseEvent(event)
 
 
 class TextItem(BaseGraphicsItem):
