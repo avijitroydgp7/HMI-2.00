@@ -43,6 +43,43 @@ class CommentDataService(QObject):
         self.comment_group_list_changed.emit()
         return group_id
 
+    def remove_group(self, group_id: str) -> Dict[str, Any] | None:
+        """Remove a comment group and return its data."""
+        if group_id in self._groups:
+            group_data = self._groups.pop(group_id)
+            number = group_data.get('number', '')
+            if number in self._number_index:
+                del self._number_index[number]
+            self.comment_group_list_changed.emit()
+            return group_data
+        return None
+
+    def rename_group(self, group_id: str, new_name: str, new_number: str) -> bool:
+        """Rename a comment group."""
+        if group_id in self._groups:
+            old_name = self._groups[group_id].get('name', '')
+            old_number = self._groups[group_id].get('number', '')
+            
+            # Check if new number is unique
+            if new_number != old_number and not self.is_group_number_unique(new_number):
+                return False
+                
+            self._groups[group_id]['name'] = new_name
+            self._groups[group_id]['number'] = new_number
+            
+            # Update number index
+            if old_number in self._number_index:
+                del self._number_index[old_number]
+            self._number_index[new_number] = group_id
+            
+            self.comment_group_list_changed.emit()
+            return True
+        return False
+
+    def is_group_number_unique(self, number: str) -> bool:
+        """Check if a group number is unique."""
+        return number not in self._number_index
+
     # --- Comment management -----------------------------------------------
     def update_comments(
         self, group_id: str, comments: List[List[str]], columns: List[str] | None = None

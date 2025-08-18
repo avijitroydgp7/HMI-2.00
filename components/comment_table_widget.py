@@ -150,20 +150,57 @@ class CommentTableView(QTableView):
     # Context menu ---------------------------------------------------
     def contextMenuEvent(self, event):  # noqa: N802 - Qt naming convention
         menu = QMenu(self)
+        
+        # Standard operations
+        cut_action = QAction("Cut", self)
+        cut_action.setShortcut(QKeySequence.StandardKey.Cut)
+        
+        copy_action = QAction("Copy", self)
+        copy_action.setShortcut(QKeySequence.StandardKey.Copy)
+        
+        paste_action = QAction("Paste", self)
+        paste_action.setShortcut(QKeySequence.StandardKey.Paste)
+        
+        delete_action = QAction("Delete", self)
+        delete_action.setShortcut(QKeySequence.StandardKey.Delete)
+        
+        rename_action = QAction("Rename", self)
+        rename_action.setShortcut(Qt.Key.Key_F2)
+        
+        # Table operations
         insert_row = QAction("Insert Row", self)
+        insert_row.setShortcut(QKeySequence("Ctrl+I"))
+        
         delete_row = QAction("Delete Row", self)
+        delete_row.setShortcut(QKeySequence("Ctrl+Shift+I"))
+        
         insert_col = QAction("Insert Column", self)
+        insert_col.setShortcut(QKeySequence("Ctrl+L"))
+        
         delete_col = QAction("Delete Column", self)
-        merge_cells = QAction("Merge Cells", self)
-        unmerge_cells = QAction("Unmerge Cells", self)
-        freeze = QAction("Freeze Panes", self)
-        menu.addActions([insert_row, delete_row, insert_col, delete_col, merge_cells, unmerge_cells, freeze])
+        delete_col.setShortcut(QKeySequence("Ctrl+Shift+L"))
+        
+        # Add actions to menu
+        menu.addActions([cut_action, copy_action, paste_action, delete_action, rename_action])
+        menu.addSeparator()
+        menu.addActions([insert_row, delete_row, insert_col, delete_col])
 
         action = menu.exec(event.globalPos())
         parent = self.parent()
         if not parent:
             return
-        if action == insert_row:
+            
+        if action == cut_action:
+            self._cut_selected()
+        elif action == copy_action:
+            self._copy_selected()
+        elif action == paste_action:
+            self._paste_selected()
+        elif action == delete_action:
+            self._delete_selected()
+        elif action == rename_action:
+            self._rename_selected()
+        elif action == insert_row:
             parent.add_comment()
         elif action == delete_row:
             parent.remove_selected_rows()
@@ -171,12 +208,6 @@ class CommentTableView(QTableView):
             parent.add_column()
         elif action == delete_col:
             parent.remove_column()
-        elif action == merge_cells:
-            self._merge_selected()
-        elif action == unmerge_cells:
-            self._unmerge_selected()
-        elif action == freeze:
-            setattr(parent, "_frozen", True)
 
     def _merge_selected(self):
         indexes = self.selectionModel().selectedIndexes()
@@ -192,6 +223,78 @@ class CommentTableView(QTableView):
         indexes = self.selectionModel().selectedIndexes()
         for index in indexes:
             self.setSpan(index.row(), index.column(), 1, 1)
+
+    def _cut_selected(self):
+        """Cut selected cells to clipboard."""
+        clipboard = QApplication.clipboard()
+        model = self.model()
+        selection_model = self.selectionModel()
+        indexes = sorted(selection_model.selectedIndexes(), key=lambda i: (i.row(), i.column()))
+        
+        if indexes:
+            rows = {}
+            for idx in indexes:
+                rows.setdefault(idx.row(), {})[idx.column()] = idx.data() or ""
+            lines = []
+            for row in sorted(rows.keys()):
+                cols = rows[row]
+                line = "\t".join(cols[col] for col in sorted(cols.keys()))
+                lines.append(line)
+            clipboard.setText("\n".join(lines))
+            for idx in indexes:
+                model.setData(idx, "")
+
+    def _copy_selected(self):
+        """Copy selected cells to clipboard."""
+        clipboard = QApplication.clipboard()
+        model = self.model()
+        selection_model = self.selectionModel()
+        indexes = sorted(selection_model.selectedIndexes(), key=lambda i: (i.row(), i.column()))
+        
+        if indexes:
+            rows = {}
+            for idx in indexes:
+                rows.setdefault(idx.row(), {})[idx.column()] = idx.data() or ""
+            lines = []
+            for row in sorted(rows.keys()):
+                cols = rows[row]
+                line = "\t".join(cols[col] for col in sorted(cols.keys()))
+                lines.append(line)
+            clipboard.setText("\n".join(lines))
+
+    def _paste_selected(self):
+        """Paste clipboard content to selected cells."""
+        clipboard = QApplication.clipboard()
+        model = self.model()
+        selection_model = self.selectionModel()
+        indexes = selection_model.selectedIndexes()
+        
+        text = clipboard.text()
+        if text and indexes:
+            start_row = indexes[0].row()
+            start_col = indexes[0].column()
+            lines = text.splitlines()
+            for r, line in enumerate(lines):
+                for c, cell in enumerate(line.split("\t")):
+                    row = start_row + r
+                    col = start_col + c
+                    if row < model.rowCount() and col < model.columnCount():
+                        model.setData(model.index(row, col), cell)
+
+    def _delete_selected(self):
+        """Delete content of selected cells."""
+        model = self.model()
+        selection_model = self.selectionModel()
+        indexes = selection_model.selectedIndexes()
+        
+        for idx in indexes:
+            model.setData(idx, "")
+
+    def _rename_selected(self):
+        """Rename selected cell (start editing)."""
+        index = self.currentIndex()
+        if index.isValid():
+            self.edit(index)
 
 
 class CommentTableWidget(QWidget):
