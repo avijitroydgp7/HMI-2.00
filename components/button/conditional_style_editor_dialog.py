@@ -3,9 +3,10 @@ from PyQt6.QtWidgets import (
     QDialog, QVBoxLayout, QFormLayout, QLineEdit, QSpinBox, QGroupBox,
     QPushButton, QHBoxLayout, QTableWidget, QTableWidgetItem, QHeaderView,
     QAbstractItemView, QDialogButtonBox, QComboBox, QGridLayout, QLabel,
-    QColorDialog, QSlider
+    QColorDialog, QSlider, QTabWidget, QWidget
 )
-from PyQt6.QtCore import Qt
+from PyQt6.QtCore import Qt, QRect, QRectF
+from PyQt6.QtGui import QPainter, QBrush, QPen, QColor
 from button_creator import IconButton
 from typing import Optional
 import copy
@@ -13,6 +14,98 @@ import copy
 from .conditional_style import ConditionalStyle, StyleCondition
 from dialogs.widgets import TagSelector
 from services.tag_data_service import tag_data_service
+
+
+class PreviewButton(IconButton):
+    """Simple button that paints itself using property dictionaries."""
+
+    def __init__(self, text: str = "", parent=None):
+        super().__init__(parent)
+        self.setText(text)
+        self.base_properties = {}
+        self.hover_properties = {}
+        self.click_properties = {}
+        self.setMouseTracking(True)
+
+    # ------------------------------------------------------------------
+    # Property setters
+    # ------------------------------------------------------------------
+    def set_base_properties(self, props: dict):
+        self.base_properties = props or {}
+        self.update()
+
+    def set_hover_properties(self, props: dict):
+        self.hover_properties = props or {}
+        self.update()
+
+    def set_click_properties(self, props: dict):
+        self.click_properties = props or {}
+        self.update()
+
+    # ------------------------------------------------------------------
+    # Event handling to update hover/press state
+    # ------------------------------------------------------------------
+    def enterEvent(self, e):
+        super().enterEvent(e)
+        self.update()
+
+    def leaveEvent(self, e):
+        super().leaveEvent(e)
+        self.update()
+
+    def mousePressEvent(self, e):
+        self._is_pressed = True
+        self.update()
+        super().mousePressEvent(e)
+
+    def mouseReleaseEvent(self, e):
+        self._is_pressed = False
+        self.update()
+        super().mouseReleaseEvent(e)
+
+    # ------------------------------------------------------------------
+    def _current_properties(self):
+        props = dict(self.base_properties)
+        if self._is_pressed:
+            props.update(self.click_properties)
+        elif self.underMouse():
+            props.update(self.hover_properties)
+        return props
+
+    def paintEvent(self, event):
+        props = self._current_properties()
+
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+
+        bg = QColor(props.get("background_color", "#dcdcdc"))
+        text_c = QColor(props.get("text_color", "#000000"))
+        border_c = QColor(props.get("border_color", "#000000"))
+        border_r = int(props.get("border_radius", 0))
+        border_w = int(props.get("border_width", 0))
+
+        rect = self.rect().adjusted(border_w // 2, border_w // 2,
+                                    -border_w // 2, -border_w // 2)
+        if border_w:
+            painter.setPen(QPen(border_c, border_w))
+        else:
+            painter.setPen(Qt.PenStyle.NoPen)
+        painter.setBrush(QBrush(bg))
+        painter.drawRoundedRect(rect, border_r, border_r)
+
+        font = self.font()
+        if "font_size" in props:
+            font.setPointSize(int(props["font_size"]))
+        painter.setFont(font)
+        painter.setPen(QPen(text_c))
+        painter.drawText(self.rect(), Qt.AlignmentFlag.AlignCenter, self.text())
+
+        renderer = (self.svg_renderer_clicked if self._is_pressed and
+                    self.svg_renderer_clicked else self.svg_renderer)
+        if renderer:
+            icon_rect = QRect(0, 0, self.icon_size.width(), self.icon_size.height())
+            icon_rect.moveCenter(self.rect().center())
+            renderer.render(painter, QRectF(icon_rect))
 
 
 class ConditionEditorDialog(QDialog):
@@ -103,9 +196,12 @@ class ConditionalStyleEditorDialog(QDialog):
         info_layout.addWidget(QLabel("Tooltip:"), 2, 0); info_layout.addWidget(self.tooltip_edit, 2, 1)
         controls_layout.addLayout(info_layout)
 
-        # Base style group
-        base_group = QGroupBox("Base Style")
-        base_layout = QGridLayout()
+        # Style tabs
+        style_tabs = QTabWidget()
+        controls_layout.addWidget(style_tabs)
+
+        # Base tab
+        base_tab = QWidget(); base_layout = QGridLayout(base_tab)
         self.bg_color_btn = self.create_color_button(self.style.properties.get("background_color", ""))
         self.text_color_btn = self.create_color_button(self.style.properties.get("text_color", ""))
         self.font_size_spin = QSpinBox(); self.font_size_spin.setRange(1, 1000)
@@ -127,12 +223,10 @@ class ConditionalStyleEditorDialog(QDialog):
         base_layout.addWidget(QLabel("Border Radius:"), 5, 0); base_layout.addWidget(self.border_radius_slider, 5, 1)
         base_layout.addWidget(QLabel("Border Width:"), 6, 0); base_layout.addWidget(self.border_width_slider, 6, 1)
         base_layout.addWidget(QLabel("Border Color:"), 7, 0); base_layout.addWidget(self.border_color_btn, 7, 1)
-        base_group.setLayout(base_layout)
-        controls_layout.addWidget(base_group)
+        style_tabs.addTab(base_tab, "Base")
 
-        # Hover style group
-        hover_group = QGroupBox("Hover Style")
-        hover_layout = QGridLayout()
+        # Hover tab
+        hover_tab = QWidget(); hover_layout = QGridLayout(hover_tab)
         self.hover_bg_btn = self.create_color_button(self.style.hover_properties.get("background_color", ""))
         self.hover_text_btn = self.create_color_button(self.style.hover_properties.get("text_color", ""))
         self.hover_border_radius_slider = QSlider(Qt.Orientation.Horizontal); self.hover_border_radius_slider.setRange(0, 1000)
@@ -145,12 +239,10 @@ class ConditionalStyleEditorDialog(QDialog):
         hover_layout.addWidget(QLabel("Border Radius:"), 2, 0); hover_layout.addWidget(self.hover_border_radius_slider, 2, 1)
         hover_layout.addWidget(QLabel("Border Width:"), 3, 0); hover_layout.addWidget(self.hover_border_width_slider, 3, 1)
         hover_layout.addWidget(QLabel("Border Color:"), 4, 0); hover_layout.addWidget(self.hover_border_color_btn, 4, 1)
-        hover_group.setLayout(hover_layout)
-        controls_layout.addWidget(hover_group)
+        style_tabs.addTab(hover_tab, "Hover")
 
-        # Click style group
-        click_group = QGroupBox("Click Style")
-        click_layout = QGridLayout()
+        # Click tab
+        click_tab = QWidget(); click_layout = QGridLayout(click_tab)
         self.click_bg_btn = self.create_color_button(self.style.click_properties.get("background_color", ""))
         self.click_text_btn = self.create_color_button(self.style.click_properties.get("text_color", ""))
         self.click_border_radius_slider = QSlider(Qt.Orientation.Horizontal); self.click_border_radius_slider.setRange(0, 1000)
@@ -163,8 +255,7 @@ class ConditionalStyleEditorDialog(QDialog):
         click_layout.addWidget(QLabel("Border Radius:"), 2, 0); click_layout.addWidget(self.click_border_radius_slider, 2, 1)
         click_layout.addWidget(QLabel("Border Width:"), 3, 0); click_layout.addWidget(self.click_border_width_slider, 3, 1)
         click_layout.addWidget(QLabel("Border Color:"), 4, 0); click_layout.addWidget(self.click_border_color_btn, 4, 1)
-        click_group.setLayout(click_layout)
-        controls_layout.addWidget(click_group)
+        style_tabs.addTab(click_tab, "Click")
 
         # Conditions group
         cond_group = QGroupBox("Conditions")
@@ -201,7 +292,8 @@ class ConditionalStyleEditorDialog(QDialog):
         preview_layout = QVBoxLayout()
         preview_group = QGroupBox("Preview")
         preview_group_layout = QVBoxLayout(); preview_group_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.preview_button = IconButton(); self.preview_button.setMinimumSize(200, 100)
+        self.preview_button = PreviewButton("Preview")
+        self.preview_button.setMinimumSize(200, 100)
         preview_group_layout.addWidget(self.preview_button)
         preview_group.setLayout(preview_group_layout)
         preview_layout.addStretch(1); preview_layout.addWidget(preview_group); preview_layout.addStretch(1)
@@ -243,62 +335,37 @@ class ConditionalStyleEditorDialog(QDialog):
         return btn.property("color") or ""
 
     def update_preview(self):
-        base_props = []
-        bg = self._button_color(self.bg_color_btn)
-        text = self._button_color(self.text_color_btn)
-        border_c = self._button_color(self.border_color_btn)
-        if bg:
-            base_props.append(f"background-color: {bg};")
-        if text:
-            base_props.append(f"color: {text};")
-        base_props.append(f"font-size: {self.font_size_spin.value()}px;")
-        base_props.append(f"border-radius: {self.border_radius_slider.value()}px;")
-        base_props.append(f"border-width: {self.border_width_slider.value()}px;")
-        base_props.append("border-style: solid;")
-        if border_c:
-            base_props.append(f"border-color: {border_c};")
+        base_props = {
+            "background_color": self._button_color(self.bg_color_btn),
+            "text_color": self._button_color(self.text_color_btn),
+            "font_size": self.font_size_spin.value(),
+            "border_radius": self.border_radius_slider.value(),
+            "border_width": self.border_width_slider.value(),
+            "border_color": self._button_color(self.border_color_btn),
+        }
 
-        hover_props = []
-        hbg = self._button_color(self.hover_bg_btn)
-        htext = self._button_color(self.hover_text_btn)
-        hborder_c = self._button_color(self.hover_border_color_btn)
-        if hbg:
-            hover_props.append(f"background-color: {hbg};")
-        if htext:
-            hover_props.append(f"color: {htext};")
-        hover_props.append(f"border-radius: {self.hover_border_radius_slider.value()}px;")
-        hover_props.append(f"border-width: {self.hover_border_width_slider.value()}px;")
-        hover_props.append("border-style: solid;")
-        if hborder_c:
-            hover_props.append(f"border-color: {hborder_c};")
+        hover_props = {
+            "background_color": self._button_color(self.hover_bg_btn),
+            "text_color": self._button_color(self.hover_text_btn),
+            "border_radius": self.hover_border_radius_slider.value(),
+            "border_width": self.hover_border_width_slider.value(),
+            "border_color": self._button_color(self.hover_border_color_btn),
+        }
 
-        click_props = []
-        cbg = self._button_color(self.click_bg_btn)
-        ctext = self._button_color(self.click_text_btn)
-        cborder_c = self._button_color(self.click_border_color_btn)
-        if cbg:
-            click_props.append(f"background-color: {cbg};")
-        if ctext:
-            click_props.append(f"color: {ctext};")
-        click_props.append(f"border-radius: {self.click_border_radius_slider.value()}px;")
-        click_props.append(f"border-width: {self.click_border_width_slider.value()}px;")
-        click_props.append("border-style: solid;")
-        if cborder_c:
-            click_props.append(f"border-color: {cborder_c};")
+        click_props = {
+            "background_color": self._button_color(self.click_bg_btn),
+            "text_color": self._button_color(self.click_text_btn),
+            "border_radius": self.click_border_radius_slider.value(),
+            "border_width": self.click_border_width_slider.value(),
+            "border_color": self._button_color(self.click_border_color_btn),
+        }
 
-        width = self.width_spin.value()
-        height = self.height_spin.value()
-        if width:
-            self.preview_button.setFixedWidth(width)
-        if height:
-            self.preview_button.setFixedHeight(height)
-
-        style = (
-            f"QPushButton {{ {' '.join(base_props)} }} "
-            f"QPushButton:hover {{ {' '.join(hover_props)} }} "
-            f"QPushButton:pressed {{ {' '.join(click_props)} }}"
-        )
-        self.preview_button.setStyleSheet(style)
+        width = self.width_spin.value() or 200
+        height = self.height_spin.value() or 100
+        self.preview_button.setFixedSize(width, height)
+        self.preview_button.set_base_properties(base_props)
+        self.preview_button.set_hover_properties(hover_props)
+        self.preview_button.set_click_properties(click_props)
 
     def _refresh_condition_table(self):
         self.condition_table.setRowCount(0)
