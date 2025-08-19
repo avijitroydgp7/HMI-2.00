@@ -1,5 +1,5 @@
-from typing import Dict, Any, List, Optional
-from dataclasses import dataclass, asdict
+from typing import Dict, Any, List, Optional, ClassVar
+from dataclasses import dataclass, asdict, field
 from PyQt6.QtCore import QObject, pyqtSignal
 from PyQt6.QtGui import QColor
 
@@ -40,25 +40,13 @@ class ConditionalStyle:
     """A style that can be conditionally applied based on tag values"""
     name: str = ""
     style_id: str = ""
-    conditions: List[StyleCondition] = None
-    properties: Dict[str, Any] = None
+    conditions: List[StyleCondition] = field(default_factory=list)
+    properties: Dict[str, Any] = field(default_factory=dict)
     tooltip: str = ""
-    hover_properties: Dict[str, Any] = None
-    click_properties: Dict[str, Any] = None
-    animation: AnimationProperties = None
+    hover_properties: Dict[str, Any] = field(default_factory=dict)
+    click_properties: Dict[str, Any] = field(default_factory=dict)
+    animation: AnimationProperties = field(default_factory=AnimationProperties)
     priority: int = 0  # Higher priority wins when multiple conditions match
-    
-    def __post_init__(self):
-        if self.conditions is None:
-            self.conditions = []
-        if self.properties is None:
-            self.properties = {}
-        if self.hover_properties is None:
-            self.hover_properties = {}
-        if self.click_properties is None:
-            self.click_properties = {}
-        if self.animation is None:
-            self.animation = AnimationProperties()
     
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -89,14 +77,16 @@ class ConditionalStyle:
             style.animation = AnimationProperties.from_dict(data['animation'])
         return style
 
+@dataclass
 class ConditionalStyleManager(QObject):
     """Manages conditional styles for buttons"""
-    styles_changed = pyqtSignal()
-    
-    def __init__(self, parent=None):
-        super().__init__(parent)
-        self.conditional_styles: List[ConditionalStyle] = []
-        self.default_style: Dict[str, Any] = {}
+    styles_changed: ClassVar[pyqtSignal] = pyqtSignal()
+    parent: Optional[QObject] = None
+    conditional_styles: List[ConditionalStyle] = field(default_factory=list)
+    default_style: Dict[str, Any] = field(default_factory=dict)
+
+    def __post_init__(self):
+        super().__init__(self.parent)
     
     def add_style(self, style: ConditionalStyle):
         """Add a new conditional style"""
