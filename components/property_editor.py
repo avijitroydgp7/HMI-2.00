@@ -174,7 +174,8 @@ class PropertyEditor(QStackedWidget):
 
     def _create_button_editor(self):
         """Creates a property editor widget specifically for buttons."""
-        from tools import button, button_styles
+        from tools import button
+        from components.button import conditional_style as button_styles
 
         editor_widget = QWidget()
         layout = QFormLayout(editor_widget)

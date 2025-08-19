@@ -2,9 +2,9 @@
 
 import copy
 
-from . import button_styles
+from components.button.conditional_style import get_style_by_id
 
-_default_style = button_styles.get_style_by_id("default_rounded")
+_default_style = get_style_by_id("default_rounded")
 DEFAULT_PROPERTIES = {
     "label": "Button",
     "size": {"width": 100, "height": 40},

@@ -4,6 +4,85 @@ from PyQt6.QtCore import QObject, pyqtSignal
 
 from services.tag_service import tag_service
 
+# ---------------------------------------------------------------------------
+# Built-in button styles
+# ---------------------------------------------------------------------------
+_DEFAULT_STYLES = [
+    {
+        "id": "default_rounded",
+        "name": "Default Rounded",
+        "properties": {
+            "background_color": "#5a6270",
+            "text_color": "#ffffff",
+            "border_radius": 20,
+        },
+    },
+    {
+        "id": "success_square",
+        "name": "Success Square",
+        "properties": {
+            "background_color": "#4CAF50",
+            "text_color": "#ffffff",
+            "border_radius": 5,
+        },
+    },
+    {
+        "id": "warning_pill",
+        "name": "Warning Pill",
+        "properties": {
+            "background_color": "#ff9800",
+            "text_color": "#000000",
+            "border_radius": 20,  # Height will make it a pill
+        },
+    },
+    {
+        "id": "danger_flat",
+        "name": "Danger Flat",
+        "properties": {
+            "background_color": "#f44336",
+            "text_color": "#ffffff",
+            "border_radius": 0,
+        },
+    },
+]
+
+
+def get_styles() -> List[Dict[str, Any]]:
+    """Return the list of built-in button style definitions."""
+    return _DEFAULT_STYLES
+
+
+def get_style_by_id(style_id: str) -> Dict[str, Any]:
+    """Return a style definition by its unique ID."""
+    for style in _DEFAULT_STYLES:
+        if style["id"] == style_id:
+            return style
+    return _DEFAULT_STYLES[0]
+
+
+@dataclass
+class AnimationProperties:
+    """Basic animation configuration for button styles."""
+    enabled: bool = False
+    type: str = "pulse"
+    intensity: float = 1.0
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "enabled": self.enabled,
+            "type": self.type,
+            "intensity": self.intensity,
+        }
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "AnimationProperties":
+        return cls(
+            enabled=data.get("enabled", False),
+            type=data.get("type", "pulse"),
+            intensity=data.get("intensity", 1.0),
+        )
+
+
 @dataclass
 class StyleCondition:
     """Defines when a style should be active based on tag values"""
@@ -11,12 +90,12 @@ class StyleCondition:
     operator: str = "=="  # ==, !=, >, <, >=, <=, between, outside
     value: Any = None
     value2: Any = None  # For range operators
-    
+
     def to_dict(self) -> Dict[str, Any]:
         return asdict(self)
-    
+
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> 'StyleCondition':
+    def from_dict(cls, data: Dict[str, Any]) -> "StyleCondition":
         return cls(**data)
 
 @dataclass
@@ -174,8 +253,9 @@ class ConditionalStyleManager(QObject):
         """Deserialize from dictionary"""
         manager = cls()
         manager.conditional_styles = [
-            ConditionalStyle.from_dict(style_data) 
+            ConditionalStyle.from_dict(style_data)
             for style_data in data.get('conditional_styles', [])
         ]
         manager.default_style = data.get('default_style', {})
         return manager
+
