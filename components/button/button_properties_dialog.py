@@ -19,6 +19,7 @@ from .conditional_style import (
     StyleCondition,
 )
 from .conditional_style_editor_dialog import ConditionalStyleEditorDialog
+from services.tag_data_service import tag_data_service
 
 
 class ButtonPropertiesDialog(QDialog):
@@ -443,8 +444,8 @@ class ButtonPropertiesDialog(QDialog):
         
         # Left panel: Style table
         self.style_table = QTableWidget()
-        self.style_table.setColumnCount(5)
-        self.style_table.setHorizontalHeaderLabels(["#", "Name", "Style ID", "Priority", "Conditions"])
+        self.style_table.setColumnCount(6)
+        self.style_table.setHorizontalHeaderLabels(["#", "Name", "Style ID", "Priority", "Conditions", "Preview"])
         self.style_table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         self.style_table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
         self.style_table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
@@ -454,7 +455,8 @@ class ButtonPropertiesDialog(QDialog):
         header.setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
         header.setSectionResizeMode(2, QHeaderView.ResizeMode.ResizeToContents)
         header.setSectionResizeMode(3, QHeaderView.ResizeMode.ResizeToContents)
-        header.setSectionResizeMode(4, QHeaderView.ResizeMode.Stretch)
+        header.setSectionResizeMode(4, QHeaderView.ResizeMode.ResizeToContents)
+        header.setSectionResizeMode(5, QHeaderView.ResizeMode.ResizeToContents)
         splitter.addWidget(self.style_table)
 
         # Right panel: Style properties (placeholder)
@@ -510,6 +512,35 @@ class ButtonPropertiesDialog(QDialog):
             parts.append(segment)
         return ", ".join(parts)
 
+    def _summarize_conditions(self, conditions):
+        bit = int_count = real = 0
+        for cond in conditions:
+            try:
+                db_part, tag_part = cond.tag_path.split("]::")
+                db_name = db_part.strip("[")
+                db_id = tag_data_service.find_db_id_by_name(db_name)
+                tag = tag_data_service.get_tag(db_id, tag_part) if db_id else None
+                dtype = (tag or {}).get("data_type", "").upper()
+                if dtype == "BOOL":
+                    bit += 1
+                elif dtype in ("INT", "DINT"):
+                    int_count += 1
+                elif dtype == "REAL":
+                    real += 1
+            except ValueError:
+                continue
+        parts = []
+        if bit:
+            parts.append(f"B:{bit}")
+        if int_count:
+            parts.append(f"I:{int_count}")
+        if real:
+            parts.append(f"R:{real}")
+        return ", ".join(parts) if parts else "None"
+
+    def _style_has_preview(self, style: ConditionalStyle) -> bool:
+        return bool(style.properties or style.hover_properties or style.click_properties)
+
     def _refresh_style_table(self):
         self.style_table.setRowCount(0)
         for i, style in enumerate(self.style_manager.conditional_styles):
@@ -518,8 +549,13 @@ class ButtonPropertiesDialog(QDialog):
             self.style_table.setItem(i, 1, QTableWidgetItem(style.name))
             self.style_table.setItem(i, 2, QTableWidgetItem(style.style_id))
             self.style_table.setItem(i, 3, QTableWidgetItem(str(style.priority)))
-            cond_str = self._format_conditions_for_display(style.conditions)
-            self.style_table.setItem(i, 4, QTableWidgetItem(cond_str))
+            summary = self._summarize_conditions(style.conditions)
+            details = self._format_conditions_for_display(style.conditions)
+            cond_item = QTableWidgetItem(summary)
+            cond_item.setToolTip(details)
+            self.style_table.setItem(i, 4, cond_item)
+            preview_item = QTableWidgetItem("Yes" if self._style_has_preview(style) else "No")
+            self.style_table.setItem(i, 5, preview_item)
 
     def _add_style(self):
         dialog = ConditionalStyleEditorDialog(self)
@@ -528,6 +564,7 @@ class ButtonPropertiesDialog(QDialog):
             if new_style:
                 self.style_manager.add_style(new_style)
                 self._refresh_style_table()
+                self._refresh_style_previews()
 
     def _edit_style(self):
         selected_rows = self.style_table.selectionModel().selectedRows()
@@ -544,6 +581,7 @@ class ButtonPropertiesDialog(QDialog):
                 # Use manager helper to ensure internal structures stay consistent
                 self.style_manager.update_style(row, updated_style)
                 self._refresh_style_table()
+                self._refresh_style_previews()
 
     def _remove_style(self):
         selected_rows = self.style_table.selectionModel().selectedRows()
@@ -610,15 +648,19 @@ class ButtonPropertiesDialog(QDialog):
     def _on_style_selected(self, style_id):
         pass
 
+    def _refresh_style_previews(self):
+        """Placeholder for preview refresh logic."""
+        pass
+
     def get_data(self) -> Dict[str, Any]:
         updated_props = self.properties.copy()
         updated_props["actions"] = self.properties.get('actions', [])
         # Save label and text color fallback
         updated_props["label"] = self.properties.get("label", "Button")
         updated_props["text_color"] = self.properties.get("text_color", "#ffffff")
-        # Serialize conditional styles, including separate hover/click properties
-        # and tooltip field handled by ``ConditionalStyle.to_dict``.
-        updated_props["conditional_styles"] = [
-            style.to_dict() for style in self.style_manager.conditional_styles
-        ]
+        # Serialize conditional styles, preserving any future fields
+        style_data = self.style_manager.to_dict()
+        updated_props["conditional_styles"] = style_data.get("conditional_styles", [])
+        if style_data.get("default_style"):
+            updated_props["default_style"] = style_data["default_style"]
         return updated_props
