@@ -444,19 +444,17 @@ class ButtonPropertiesDialog(QDialog):
         
         # Left panel: Style table
         self.style_table = QTableWidget()
-        self.style_table.setColumnCount(6)
-        self.style_table.setHorizontalHeaderLabels(["#", "Name", "Style ID", "Priority", "Conditions", "Preview"])
+        self.style_table.setColumnCount(4)
+        self.style_table.setHorizontalHeaderLabels(["#", "Style ID", "Conditions", "Preview"])
         self.style_table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         self.style_table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
         self.style_table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
         self.style_table.verticalHeader().setVisible(False)
         header = self.style_table.horizontalHeader()
         header.setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
-        header.setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
+        header.setSectionResizeMode(1, QHeaderView.ResizeMode.ResizeToContents)
         header.setSectionResizeMode(2, QHeaderView.ResizeMode.ResizeToContents)
         header.setSectionResizeMode(3, QHeaderView.ResizeMode.ResizeToContents)
-        header.setSectionResizeMode(4, QHeaderView.ResizeMode.ResizeToContents)
-        header.setSectionResizeMode(5, QHeaderView.ResizeMode.ResizeToContents)
         splitter.addWidget(self.style_table)
 
         # Right panel: Style properties (placeholder)
@@ -546,16 +544,14 @@ class ButtonPropertiesDialog(QDialog):
         for i, style in enumerate(self.style_manager.conditional_styles):
             self.style_table.insertRow(i)
             self.style_table.setItem(i, 0, QTableWidgetItem(str(i + 1)))
-            self.style_table.setItem(i, 1, QTableWidgetItem(style.name))
-            self.style_table.setItem(i, 2, QTableWidgetItem(style.style_id))
-            self.style_table.setItem(i, 3, QTableWidgetItem(str(style.priority)))
+            self.style_table.setItem(i, 1, QTableWidgetItem(style.style_id))
             summary = self._summarize_conditions(style.conditions)
             details = self._format_conditions_for_display(style.conditions)
             cond_item = QTableWidgetItem(summary)
             cond_item.setToolTip(details)
-            self.style_table.setItem(i, 4, cond_item)
+            self.style_table.setItem(i, 2, cond_item)
             preview_item = QTableWidgetItem("Yes" if self._style_has_preview(style) else "No")
-            self.style_table.setItem(i, 5, preview_item)
+            self.style_table.setItem(i, 3, preview_item)
 
     def _add_style(self):
         dialog = ConditionalStyleEditorDialog(self)

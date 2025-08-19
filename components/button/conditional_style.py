@@ -101,7 +101,6 @@ class StyleCondition:
 @dataclass
 class ConditionalStyle:
     """A style that can be conditionally applied based on tag values"""
-    name: str = ""
     style_id: str = ""
     conditions: List[StyleCondition] = field(default_factory=list)
     properties: Dict[str, Any] = field(default_factory=dict)
@@ -109,11 +108,9 @@ class ConditionalStyle:
     hover_properties: Dict[str, Any] = field(default_factory=dict)
     click_properties: Dict[str, Any] = field(default_factory=dict)
     animation: AnimationProperties = field(default_factory=AnimationProperties)
-    priority: int = 0  # Higher priority wins when multiple conditions match
     
     def to_dict(self) -> Dict[str, Any]:
         return {
-            'name': self.name,
             'style_id': self.style_id,
             'conditions': [cond.to_dict() for cond in self.conditions],
             'properties': self.properties,
@@ -121,20 +118,17 @@ class ConditionalStyle:
             'hover_properties': self.hover_properties,
             'click_properties': self.click_properties,
             'animation': self.animation.to_dict(),
-            'priority': self.priority
         }
     
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> 'ConditionalStyle':
         style = cls(
-            name=data.get('name', ''),
             style_id=data.get('style_id', ''),
             conditions=[StyleCondition.from_dict(cond) for cond in data.get('conditions', [])],
             properties=data.get('properties', {}),
             tooltip=data.get('tooltip', ''),
             hover_properties=data.get('hover_properties', {}),
             click_properties=data.get('click_properties', {}),
-            priority=data.get('priority', 0)
         )
         if 'animation' in data:
             style.animation = AnimationProperties.from_dict(data['animation'])
@@ -180,23 +174,17 @@ class ConditionalStyleManager(QObject):
             Supported states: ``"hover"`` and ``"click"``.
         """
         tag_values = tag_values or {}
-        matching_styles = []
 
         for style in self.conditional_styles:
             if self._evaluate_conditions(style.conditions, tag_values):
-                matching_styles.append(style)
-        
-        if matching_styles:
-            # Return the highest priority style
-            best_style = max(matching_styles, key=lambda s: s.priority)
-            props = dict(best_style.properties)
-            if state == 'hover':
-                props.update(best_style.hover_properties)
-            elif state == 'click':
-                props.update(best_style.click_properties)
-            if best_style.tooltip:
-                props['tooltip'] = best_style.tooltip
-            return props
+                props = dict(style.properties)
+                if state == 'hover':
+                    props.update(style.hover_properties)
+                elif state == 'click':
+                    props.update(style.click_properties)
+                if style.tooltip:
+                    props['tooltip'] = style.tooltip
+                return props
 
         return dict(self.default_style)
     

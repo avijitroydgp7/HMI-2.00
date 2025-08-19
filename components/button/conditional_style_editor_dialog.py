@@ -187,13 +187,9 @@ class ConditionalStyleEditorDialog(QDialog):
         controls_layout = QVBoxLayout()
 
         info_layout = QGridLayout()
-        self.name_edit = QLineEdit(self.style.name)
-        self.priority_spin = QSpinBox(); self.priority_spin.setRange(-100000, 100000)
-        self.priority_spin.setValue(self.style.priority)
         self.tooltip_edit = QLineEdit(self.style.tooltip)
-        info_layout.addWidget(QLabel("Name:"), 0, 0); info_layout.addWidget(self.name_edit, 0, 1)
-        info_layout.addWidget(QLabel("Priority:"), 1, 0); info_layout.addWidget(self.priority_spin, 1, 1)
-        info_layout.addWidget(QLabel("Tooltip:"), 2, 0); info_layout.addWidget(self.tooltip_edit, 2, 1)
+        info_layout.addWidget(QLabel("Tooltip:"), 0, 0)
+        info_layout.addWidget(self.tooltip_edit, 0, 1)
         controls_layout.addLayout(info_layout)
 
         # Style tabs
@@ -431,13 +427,11 @@ class ConditionalStyleEditorDialog(QDialog):
         }
 
         style = ConditionalStyle(
-            name=self.name_edit.text(),
             style_id=self.style.style_id,
             conditions=self.conditions,
             properties=properties,
             hover_properties=hover_properties,
             click_properties=click_properties,
             tooltip=self.tooltip_edit.text(),
-            priority=self.priority_spin.value(),
         )
         return style
