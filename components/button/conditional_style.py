@@ -3,10 +3,12 @@ from dataclasses import dataclass, asdict
 from PyQt6.QtCore import QObject, pyqtSignal
 from PyQt6.QtGui import QColor
 
+from services.tag_service import tag_service
+
 @dataclass
 class StyleCondition:
     """Defines when a style should be active based on tag values"""
-    tag_path: str = ""
+    tag_path: str = ""  # Full tag path in form "[db_name]::tag_name"
     operator: str = "=="  # ==, !=, >, <, >=, <=, between, outside
     value: Any = None
     value2: Any = None  # For range operators
@@ -113,19 +115,20 @@ class ConditionalStyleManager(QObject):
             self.conditional_styles[index] = style
             self.styles_changed.emit()
     
-    def get_active_style(self, tag_values: Dict[str, Any], state: Optional[str] = None) -> Dict[str, Any]:
+    def get_active_style(self, tag_values: Optional[Dict[str, Any]] = None, state: Optional[str] = None) -> Dict[str, Any]:
         """Determine which style should be active based on tag values.
 
         Parameters
         ----------
-        tag_values: Dict[str, Any]
-            Current tag values.
+        tag_values: Dict[str, Any], optional
+            Current tag values; if not provided, values will be resolved via ``tag_service``.
         state: Optional[str]
             Optional state for which to retrieve additional properties.
             Supported states: ``"hover"`` and ``"click"``.
         """
+        tag_values = tag_values or {}
         matching_styles = []
-        
+
         for style in self.conditional_styles:
             if self._evaluate_conditions(style.conditions, tag_values):
                 matching_styles.append(style)
@@ -158,6 +161,8 @@ class ConditionalStyleManager(QObject):
     def _evaluate_single_condition(self, condition: StyleCondition, tag_values: Dict[str, Any]) -> bool:
         """Evaluate a single condition"""
         tag_value = tag_values.get(condition.tag_path)
+        if tag_value is None:
+            tag_value = tag_service.get_tag_value(condition.tag_path)
         if tag_value is None:
             return False
         

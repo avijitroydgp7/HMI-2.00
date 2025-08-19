@@ -8,7 +8,8 @@ from typing import Optional
 import copy
 
 from .conditional_style import ConditionalStyle, StyleCondition
-from dialogs.tag_browser_dialog import TagBrowserDialog
+from dialogs.widgets import TagSelector
+from services.tag_data_service import tag_data_service
 
 
 class ConditionEditorDialog(QDialog):
@@ -18,13 +19,32 @@ class ConditionEditorDialog(QDialog):
         self.condition = copy.deepcopy(condition) if condition else StyleCondition()
 
         layout = QFormLayout(self)
-        tag_layout = QHBoxLayout()
-        self.tag_edit = QLineEdit(self.condition.tag_path)
-        browse_btn = QPushButton("...")
-        browse_btn.clicked.connect(self._browse_tag)
-        tag_layout.addWidget(self.tag_edit)
-        tag_layout.addWidget(browse_btn)
-        layout.addRow("Tag Path:", tag_layout)
+        self.tag_selector = TagSelector()
+        self.tag_selector.main_tag_selector.set_mode_fixed("Tag")
+
+        # Preload existing tag path if provided
+        if self.condition.tag_path:
+            try:
+                db_part, tag_part = self.condition.tag_path.split("]::")
+                db_name = db_part.strip("[")
+                tag_name = tag_part
+                db_id = tag_data_service.find_db_id_by_name(db_name)
+                if db_id:
+                    self.tag_selector.set_data({
+                        "main_tag": {
+                            "source": "tag",
+                            "value": {
+                                "db_id": db_id,
+                                "db_name": db_name,
+                                "tag_name": tag_name,
+                            },
+                        },
+                        "indices": [],
+                    })
+            except ValueError:
+                pass
+
+        layout.addRow("Tag Path:", self.tag_selector)
 
         self.operator_combo = QComboBox()
         self.operator_combo.addItems(["==", "!=", ">", "<", ">=", "<=", "between", "outside"])
@@ -41,17 +61,15 @@ class ConditionEditorDialog(QDialog):
         buttons.rejected.connect(self.reject)
         layout.addWidget(buttons)
 
-    def _browse_tag(self):
-        dlg = TagBrowserDialog(self)
-        if dlg.exec():
-            info = dlg.get_selected_tag_info()
-            if info:
-                db_id, db_name, tag_name = info
-                self.tag_edit.setText(f"[{db_name}]::{tag_name}")
-
     def get_condition(self) -> StyleCondition:
+        tag_data = self.tag_selector.get_data()
+        tag_path = ""
+        if tag_data and tag_data.get("main_tag", {}).get("source") == "tag":
+            value = tag_data["main_tag"]["value"]
+            tag_path = f"[{value.get('db_name')}]::{value.get('tag_name')}"
+
         cond = StyleCondition(
-            tag_path=self.tag_edit.text(),
+            tag_path=tag_path,
             operator=self.operator_combo.currentText(),
             value=self.value_edit.text() or None,
             value2=self.value2_edit.text() or None,

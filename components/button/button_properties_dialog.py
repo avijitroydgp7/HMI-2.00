@@ -489,6 +489,13 @@ class ButtonPropertiesDialog(QDialog):
         button_layout.addWidget(move_down_btn)
         layout.addLayout(button_layout)
 
+        add_btn.clicked.connect(self._add_style)
+        edit_btn.clicked.connect(self._edit_style)
+        remove_btn.clicked.connect(self._remove_style)
+        duplicate_btn.clicked.connect(self._duplicate_style)
+        move_up_btn.clicked.connect(self._move_style_up)
+        move_down_btn.clicked.connect(self._move_style_down)
+
         self.style_table.cellDoubleClicked.connect(self._on_style_double_click)
         self._refresh_style_table()
 
