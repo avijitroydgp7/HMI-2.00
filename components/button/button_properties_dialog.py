@@ -32,6 +32,8 @@ class ButtonPropertiesDialog(QDialog):
         self.style_manager = ConditionalStyleManager()
         for style_data in self.properties.get('conditional_styles', []):
             try:
+                # ConditionalStyle.from_dict already understands the separated
+                # base/hover/click property dictionaries and tooltip field.
                 self.style_manager.add_style(ConditionalStyle.from_dict(style_data))
             except Exception:
                 pass
@@ -539,7 +541,8 @@ class ButtonPropertiesDialog(QDialog):
         if dialog.exec():
             updated_style = dialog.get_style()
             if updated_style:
-                self.style_manager.conditional_styles[row] = updated_style
+                # Use manager helper to ensure internal structures stay consistent
+                self.style_manager.update_style(row, updated_style)
                 self._refresh_style_table()
 
     def _remove_style(self):
@@ -548,7 +551,7 @@ class ButtonPropertiesDialog(QDialog):
             return
         row = selected_rows[0].row()
         if 0 <= row < len(self.style_manager.conditional_styles):
-            del self.style_manager.conditional_styles[row]
+            self.style_manager.remove_style(row)
             self._refresh_style_table()
 
     def _duplicate_style(self):
@@ -613,6 +616,8 @@ class ButtonPropertiesDialog(QDialog):
         # Save label and text color fallback
         updated_props["label"] = self.properties.get("label", "Button")
         updated_props["text_color"] = self.properties.get("text_color", "#ffffff")
+        # Serialize conditional styles, including separate hover/click properties
+        # and tooltip field handled by ``ConditionalStyle.to_dict``.
         updated_props["conditional_styles"] = [
             style.to_dict() for style in self.style_manager.conditional_styles
         ]

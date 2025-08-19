@@ -92,7 +92,8 @@ class ConditionalStyleEditorDialog(QDialog):
         self.priority_spin = QSpinBox()
         self.priority_spin.setRange(-100000, 100000)
         self.priority_spin.setValue(self.style.priority)
-        self.tooltip_edit = QLineEdit(self.style.properties.get("tooltip", ""))
+        # Tooltip is now stored separately from properties
+        self.tooltip_edit = QLineEdit(self.style.tooltip)
         form.addRow("Name:", self.name_edit)
         form.addRow("Priority:", self.priority_spin)
         form.addRow("Tooltip:", self.tooltip_edit)
@@ -109,29 +110,54 @@ class ConditionalStyleEditorDialog(QDialog):
         self.width_spin.setValue(self.style.properties.get("width", 0))
         self.height_spin = QSpinBox(); self.height_spin.setRange(0, 10000)
         self.height_spin.setValue(self.style.properties.get("height", 0))
+        # Shape attributes
+        self.border_radius_spin = QSpinBox(); self.border_radius_spin.setRange(0, 1000)
+        self.border_radius_spin.setValue(self.style.properties.get("border_radius", 0))
+        self.border_width_spin = QSpinBox(); self.border_width_spin.setRange(0, 1000)
+        self.border_width_spin.setValue(self.style.properties.get("border_width", 0))
+        self.border_color_edit = QLineEdit(self.style.properties.get("border_color", ""))
         base_form.addRow("Background:", self.bg_color_edit)
         base_form.addRow("Text Color:", self.text_color_edit)
         base_form.addRow("Font Size:", self.font_size_spin)
         base_form.addRow("Width:", self.width_spin)
         base_form.addRow("Height:", self.height_spin)
+        base_form.addRow("Border Radius:", self.border_radius_spin)
+        base_form.addRow("Border Width:", self.border_width_spin)
+        base_form.addRow("Border Color:", self.border_color_edit)
         layout.addWidget(base_group)
 
         # Hover style group
         hover_group = QGroupBox("Hover Style")
         hover_form = QFormLayout(hover_group)
-        self.hover_bg_edit = QLineEdit(self.style.properties.get("hover_background_color", ""))
-        self.hover_text_edit = QLineEdit(self.style.properties.get("hover_text_color", ""))
+        self.hover_bg_edit = QLineEdit(self.style.hover_properties.get("background_color", ""))
+        self.hover_text_edit = QLineEdit(self.style.hover_properties.get("text_color", ""))
+        self.hover_border_radius_spin = QSpinBox(); self.hover_border_radius_spin.setRange(0, 1000)
+        self.hover_border_radius_spin.setValue(self.style.hover_properties.get("border_radius", 0))
+        self.hover_border_width_spin = QSpinBox(); self.hover_border_width_spin.setRange(0, 1000)
+        self.hover_border_width_spin.setValue(self.style.hover_properties.get("border_width", 0))
+        self.hover_border_color_edit = QLineEdit(self.style.hover_properties.get("border_color", ""))
         hover_form.addRow("Background:", self.hover_bg_edit)
         hover_form.addRow("Text Color:", self.hover_text_edit)
+        hover_form.addRow("Border Radius:", self.hover_border_radius_spin)
+        hover_form.addRow("Border Width:", self.hover_border_width_spin)
+        hover_form.addRow("Border Color:", self.hover_border_color_edit)
         layout.addWidget(hover_group)
 
         # Click style group
         click_group = QGroupBox("Click Style")
         click_form = QFormLayout(click_group)
-        self.click_bg_edit = QLineEdit(self.style.properties.get("click_background_color", ""))
-        self.click_text_edit = QLineEdit(self.style.properties.get("click_text_color", ""))
+        self.click_bg_edit = QLineEdit(self.style.click_properties.get("background_color", ""))
+        self.click_text_edit = QLineEdit(self.style.click_properties.get("text_color", ""))
+        self.click_border_radius_spin = QSpinBox(); self.click_border_radius_spin.setRange(0, 1000)
+        self.click_border_radius_spin.setValue(self.style.click_properties.get("border_radius", 0))
+        self.click_border_width_spin = QSpinBox(); self.click_border_width_spin.setRange(0, 1000)
+        self.click_border_width_spin.setValue(self.style.click_properties.get("border_width", 0))
+        self.click_border_color_edit = QLineEdit(self.style.click_properties.get("border_color", ""))
         click_form.addRow("Background:", self.click_bg_edit)
         click_form.addRow("Text Color:", self.click_text_edit)
+        click_form.addRow("Border Radius:", self.click_border_radius_spin)
+        click_form.addRow("Border Width:", self.click_border_width_spin)
+        click_form.addRow("Border Color:", self.click_border_color_edit)
         layout.addWidget(click_group)
 
         # Conditions group
@@ -208,23 +234,41 @@ class ConditionalStyleEditorDialog(QDialog):
             self._refresh_condition_table()
 
     def get_style(self) -> ConditionalStyle:
-        props = {
+        properties = {
             "background_color": self.bg_color_edit.text(),
             "text_color": self.text_color_edit.text(),
             "font_size": self.font_size_spin.value(),
             "width": self.width_spin.value(),
             "height": self.height_spin.value(),
-            "hover_background_color": self.hover_bg_edit.text(),
-            "hover_text_color": self.hover_text_edit.text(),
-            "click_background_color": self.click_bg_edit.text(),
-            "click_text_color": self.click_text_edit.text(),
-            "tooltip": self.tooltip_edit.text(),
+            "border_radius": self.border_radius_spin.value(),
+            "border_width": self.border_width_spin.value(),
+            "border_color": self.border_color_edit.text(),
         }
+
+        hover_properties = {
+            "background_color": self.hover_bg_edit.text(),
+            "text_color": self.hover_text_edit.text(),
+            "border_radius": self.hover_border_radius_spin.value(),
+            "border_width": self.hover_border_width_spin.value(),
+            "border_color": self.hover_border_color_edit.text(),
+        }
+
+        click_properties = {
+            "background_color": self.click_bg_edit.text(),
+            "text_color": self.click_text_edit.text(),
+            "border_radius": self.click_border_radius_spin.value(),
+            "border_width": self.click_border_width_spin.value(),
+            "border_color": self.click_border_color_edit.text(),
+        }
+
         style = ConditionalStyle(
             name=self.name_edit.text(),
             style_id=self.style.style_id,
             conditions=self.conditions,
-            properties=props,
+            properties=properties,
+            hover_properties=hover_properties,
+            click_properties=click_properties,
+            tooltip=self.tooltip_edit.text(),
             priority=self.priority_spin.value(),
         )
         return style
