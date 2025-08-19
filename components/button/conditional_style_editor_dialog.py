@@ -3,11 +3,11 @@ from PyQt6.QtWidgets import (
     QDialog, QVBoxLayout, QFormLayout, QLineEdit, QSpinBox, QGroupBox,
     QPushButton, QHBoxLayout, QTableWidget, QTableWidgetItem, QHeaderView,
     QAbstractItemView, QDialogButtonBox, QComboBox, QGridLayout, QLabel,
-    QColorDialog, QSlider, QTabWidget, QWidget
+    QColorDialog, QSlider, QTabWidget, QWidget, QStackedWidget
 )
-from PyQt6.QtCore import Qt, QRect, QRectF
-from PyQt6.QtGui import QPainter, QBrush, QPen, QColor
-from button_creator import IconButton
+from PyQt6.QtCore import Qt, QRect, QRectF, QSize
+from PyQt6.QtGui import QColor, QPixmap, QIcon, QPalette
+from button_creator import IconButton, SwitchButton
 from typing import Optional
 import copy
 
@@ -17,95 +17,11 @@ from services.tag_data_service import tag_data_service
 
 
 class PreviewButton(IconButton):
-    """Simple button that paints itself using property dictionaries."""
+    """Preview button that relies on style sheets for rendering."""
 
     def __init__(self, text: str = "", parent=None):
         super().__init__(parent)
         self.setText(text)
-        self.base_properties = {}
-        self.hover_properties = {}
-        self.click_properties = {}
-        self.setMouseTracking(True)
-
-    # ------------------------------------------------------------------
-    # Property setters
-    # ------------------------------------------------------------------
-    def set_base_properties(self, props: dict):
-        self.base_properties = props or {}
-        self.update()
-
-    def set_hover_properties(self, props: dict):
-        self.hover_properties = props or {}
-        self.update()
-
-    def set_click_properties(self, props: dict):
-        self.click_properties = props or {}
-        self.update()
-
-    # ------------------------------------------------------------------
-    # Event handling to update hover/press state
-    # ------------------------------------------------------------------
-    def enterEvent(self, e):
-        super().enterEvent(e)
-        self.update()
-
-    def leaveEvent(self, e):
-        super().leaveEvent(e)
-        self.update()
-
-    def mousePressEvent(self, e):
-        self._is_pressed = True
-        self.update()
-        super().mousePressEvent(e)
-
-    def mouseReleaseEvent(self, e):
-        self._is_pressed = False
-        self.update()
-        super().mouseReleaseEvent(e)
-
-    # ------------------------------------------------------------------
-    def _current_properties(self):
-        props = dict(self.base_properties)
-        if self._is_pressed:
-            props.update(self.click_properties)
-        elif self.underMouse():
-            props.update(self.hover_properties)
-        return props
-
-    def paintEvent(self, event):
-        props = self._current_properties()
-
-        painter = QPainter(self)
-        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
-
-        bg = QColor(props.get("background_color", "#dcdcdc"))
-        text_c = QColor(props.get("text_color", "#000000"))
-        border_c = QColor(props.get("border_color", "#000000"))
-        border_r = int(props.get("border_radius", 0))
-        border_w = int(props.get("border_width", 0))
-
-        rect = self.rect().adjusted(border_w // 2, border_w // 2,
-                                    -border_w // 2, -border_w // 2)
-        if border_w:
-            painter.setPen(QPen(border_c, border_w))
-        else:
-            painter.setPen(Qt.PenStyle.NoPen)
-        painter.setBrush(QBrush(bg))
-        painter.drawRoundedRect(rect, border_r, border_r)
-
-        font = self.font()
-        if "font_size" in props:
-            font.setPointSize(int(props["font_size"]))
-        painter.setFont(font)
-        painter.setPen(QPen(text_c))
-        painter.drawText(self.rect(), Qt.AlignmentFlag.AlignCenter, self.text())
-
-        renderer = (self.svg_renderer_clicked if self._is_pressed and
-                    self.svg_renderer_clicked else self.svg_renderer)
-        if renderer:
-            icon_rect = QRect(0, 0, self.icon_size.width(), self.icon_size.height())
-            icon_rect.moveCenter(self.rect().center())
-            renderer.render(painter, QRectF(icon_rect))
 
 
 class ConditionEditorDialog(QDialog):
@@ -192,6 +108,113 @@ class ConditionalStyleEditorDialog(QDialog):
         info_layout.addWidget(self.tooltip_edit, 0, 1)
         controls_layout.addLayout(info_layout)
 
+        self.init_colors()
+
+        style_group = QGroupBox("Component Style")
+        style_layout = QGridLayout()
+        style_layout.addWidget(QLabel("Component Type:"), 0, 0)
+        self.component_type_combo = QComboBox()
+        self.component_type_combo.addItems(["Standard Button", "Circle Button", "Square Button", "Toggle Switch"])
+        self.component_type_combo.setCurrentText(self.style.properties.get("component_type", "Standard Button"))
+        self.component_type_combo.currentTextChanged.connect(self.update_controls_state)
+        style_layout.addWidget(self.component_type_combo, 0, 1)
+
+        self.shape_style_label = QLabel("Shape Style:")
+        style_layout.addWidget(self.shape_style_label, 1, 0)
+        self.shape_style_combo = QComboBox()
+        self.shape_style_combo.addItems(["Flat", "3D", "Glass", "Neumorphic", "Outline"])
+        self.shape_style_combo.setCurrentText(self.style.properties.get("shape_style", "Flat"))
+        self.shape_style_combo.currentTextChanged.connect(self.update_preview)
+        style_layout.addWidget(self.shape_style_combo, 1, 1)
+
+        style_group.setLayout(style_layout)
+        controls_layout.addWidget(style_group)
+
+        self.background_group = QGroupBox("Background & Padding")
+        background_layout = QGridLayout()
+        background_layout.addWidget(QLabel("Background Type:"), 0, 0)
+        self.bg_type_combo = QComboBox()
+        self.bg_type_combo.addItems(["Solid", "Linear Gradient"])
+        self.bg_type_combo.setCurrentText(self.style.properties.get("background_type", "Solid"))
+        self.bg_type_combo.currentTextChanged.connect(self.update_controls_state)
+        background_layout.addWidget(self.bg_type_combo, 0, 1)
+
+        background_layout.addWidget(QLabel("Main Color:"), 1, 0)
+        self.bg_base_color_combo, self.bg_shade_combo = self.create_color_selection_widgets(self.on_bg_color_changed)
+        background_layout.addWidget(self.bg_base_color_combo, 1, 1)
+        background_layout.addWidget(self.bg_shade_combo, 2, 1)
+
+        self.gradient_coords_label = QLabel("Gradient Coords (x1,y1,x2,y2):")
+        background_layout.addWidget(self.gradient_coords_label, 3, 0, 1, 2)
+        coords_layout = QHBoxLayout()
+        self.x1_spin, self.y1_spin = self.create_coord_spinbox(), self.create_coord_spinbox()
+        self.x2_spin, self.y2_spin = self.create_coord_spinbox(0), self.create_coord_spinbox(1)
+        coords_layout.addWidget(self.x1_spin); coords_layout.addWidget(self.y1_spin)
+        coords_layout.addWidget(self.x2_spin); coords_layout.addWidget(self.y2_spin)
+        background_layout.addLayout(coords_layout, 4, 0, 1, 2)
+        self.gradient_spread_label = QLabel("Gradient Spread:")
+        background_layout.addWidget(self.gradient_spread_label, 5, 0)
+        self.spread_combo = QComboBox()
+        self.spread_combo.addItems(["pad", "reflect", "repeat"])
+        self.spread_combo.setCurrentText(self.style.properties.get("gradient_spread", "pad"))
+        self.spread_combo.currentTextChanged.connect(self.update_preview)
+        background_layout.addWidget(self.spread_combo, 5, 1)
+
+        self.padding_label = QLabel("Padding (px):")
+        background_layout.addWidget(self.padding_label, 6, 0)
+        self.padding_slider = QSlider(Qt.Orientation.Horizontal)
+        self.padding_slider.setRange(0, 50)
+        self.padding_slider.setValue(self.style.properties.get("padding", 15))
+        self.padding_slider.valueChanged.connect(self.update_preview)
+        background_layout.addWidget(self.padding_slider, 6, 1)
+        self.background_group.setLayout(background_layout)
+        controls_layout.addWidget(self.background_group)
+
+        self.border_group = QGroupBox("Border")
+        border_layout = QGridLayout()
+
+        self.tl_radius_label = QLabel("Top-Left Radius:")
+        border_layout.addWidget(self.tl_radius_label, 0, 0)
+        self.tl_radius_slider = self.create_radius_slider()
+        self.tl_radius_slider.setValue(self.style.properties.get("border_radius_tl", 0))
+        border_layout.addWidget(self.tl_radius_slider, 0, 1)
+
+        self.tr_radius_label = QLabel("Top-Right Radius:")
+        border_layout.addWidget(self.tr_radius_label, 1, 0)
+        self.tr_radius_slider = self.create_radius_slider()
+        self.tr_radius_slider.setValue(self.style.properties.get("border_radius_tr", 0))
+        border_layout.addWidget(self.tr_radius_slider, 1, 1)
+
+        self.br_radius_label = QLabel("Bottom-Right Radius:")
+        border_layout.addWidget(self.br_radius_label, 2, 0)
+        self.br_radius_slider = self.create_radius_slider()
+        self.br_radius_slider.setValue(self.style.properties.get("border_radius_br", 0))
+        border_layout.addWidget(self.br_radius_slider, 2, 1)
+
+        self.bl_radius_label = QLabel("Bottom-Left Radius:")
+        border_layout.addWidget(self.bl_radius_label, 3, 0)
+        self.bl_radius_slider = self.create_radius_slider()
+        self.bl_radius_slider.setValue(self.style.properties.get("border_radius_bl", 0))
+        border_layout.addWidget(self.bl_radius_slider, 3, 1)
+
+        border_layout.addWidget(QLabel("Border Width (px):"), 4, 0)
+        self.border_width_slider = QSlider(Qt.Orientation.Horizontal)
+        self.border_width_slider.setRange(0, 10)
+        self.border_width_slider.setValue(self.style.properties.get("border_width", 0))
+        self.border_width_slider.valueChanged.connect(self.update_preview)
+        border_layout.addWidget(self.border_width_slider, 4, 1)
+
+        self.border_style_label = QLabel("Border Style:")
+        border_layout.addWidget(self.border_style_label, 5, 0)
+        self.border_style_combo = QComboBox()
+        self.border_style_combo.addItems(["none", "solid", "dashed", "dotted", "double", "groove", "ridge"])
+        self.border_style_combo.setCurrentText(self.style.properties.get("border_style", "solid"))
+        self.border_style_combo.currentTextChanged.connect(self.update_preview)
+        border_layout.addWidget(self.border_style_combo, 5, 1)
+
+        self.border_group.setLayout(border_layout)
+        controls_layout.addWidget(self.border_group)
+
         # Style tabs
         style_tabs = QTabWidget()
         controls_layout.addWidget(style_tabs)
@@ -206,19 +229,13 @@ class ConditionalStyleEditorDialog(QDialog):
         self.width_spin.setValue(self.style.properties.get("width", 0))
         self.height_spin = QSpinBox(); self.height_spin.setRange(0, 10000)
         self.height_spin.setValue(self.style.properties.get("height", 0))
-        self.border_radius_slider = QSlider(Qt.Orientation.Horizontal); self.border_radius_slider.setRange(0, 1000)
-        self.border_radius_slider.setValue(self.style.properties.get("border_radius", 0))
-        self.border_width_slider = QSlider(Qt.Orientation.Horizontal); self.border_width_slider.setRange(0, 1000)
-        self.border_width_slider.setValue(self.style.properties.get("border_width", 0))
         self.border_color_btn = self.create_color_button(self.style.properties.get("border_color", ""))
         base_layout.addWidget(QLabel("Background:"), 0, 0); base_layout.addWidget(self.bg_color_btn, 0, 1)
         base_layout.addWidget(QLabel("Text Color:"), 1, 0); base_layout.addWidget(self.text_color_btn, 1, 1)
         base_layout.addWidget(QLabel("Font Size:"), 2, 0); base_layout.addWidget(self.font_size_spin, 2, 1)
         base_layout.addWidget(QLabel("Width:"), 3, 0); base_layout.addWidget(self.width_spin, 3, 1)
         base_layout.addWidget(QLabel("Height:"), 4, 0); base_layout.addWidget(self.height_spin, 4, 1)
-        base_layout.addWidget(QLabel("Border Radius:"), 5, 0); base_layout.addWidget(self.border_radius_slider, 5, 1)
-        base_layout.addWidget(QLabel("Border Width:"), 6, 0); base_layout.addWidget(self.border_width_slider, 6, 1)
-        base_layout.addWidget(QLabel("Border Color:"), 7, 0); base_layout.addWidget(self.border_color_btn, 7, 1)
+        base_layout.addWidget(QLabel("Border Color:"), 5, 0); base_layout.addWidget(self.border_color_btn, 5, 1)
         style_tabs.addTab(base_tab, "Base")
 
         # Hover tab
@@ -288,21 +305,32 @@ class ConditionalStyleEditorDialog(QDialog):
         preview_layout = QVBoxLayout()
         preview_group = QGroupBox("Preview")
         preview_group_layout = QVBoxLayout(); preview_group_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.preview_stack = QStackedWidget()
         self.preview_button = PreviewButton("Preview")
         self.preview_button.setMinimumSize(200, 100)
-        preview_group_layout.addWidget(self.preview_button)
+        self.preview_switch = SwitchButton()
+        self.preview_stack.addWidget(self.preview_button)
+        self.preview_stack.addWidget(self.preview_switch)
+        preview_group_layout.addWidget(self.preview_stack)
         preview_group.setLayout(preview_group_layout)
         preview_layout.addStretch(1); preview_layout.addWidget(preview_group); preview_layout.addStretch(1)
 
         main_layout.addLayout(controls_layout, 0, 0)
         main_layout.addLayout(preview_layout, 0, 1)
 
-        for w in [self.font_size_spin, self.width_spin, self.height_spin, self.border_radius_slider,
+        for w in [self.font_size_spin, self.width_spin, self.height_spin, self.tl_radius_slider,
+                  self.tr_radius_slider, self.br_radius_slider, self.bl_radius_slider,
                   self.border_width_slider, self.hover_border_radius_slider, self.hover_border_width_slider,
-                  self.click_border_radius_slider, self.click_border_width_slider]:
+                  self.click_border_radius_slider, self.click_border_width_slider, self.padding_slider,
+                  self.x1_spin, self.y1_spin, self.x2_spin, self.y2_spin]:
             w.valueChanged.connect(self.update_preview)
+        self.component_type_combo.currentTextChanged.connect(self.update_preview)
+        self.width_spin.valueChanged.connect(self.update_controls_state)
+        self.height_spin.valueChanged.connect(self.update_controls_state)
 
         self._refresh_condition_table()
+        self.set_initial_colors()
+        self.update_controls_state()
         self.update_preview()
 
     def create_color_button(self, initial):
@@ -325,43 +353,272 @@ class ConditionalStyleEditorDialog(QDialog):
             color_name = color.name()
             btn.setProperty("color", color_name)
             self._set_button_color(btn, color_name)
+            if btn is self.bg_color_btn:
+                self._bg_color = QColor(color_name)
+            elif btn is self.hover_bg_btn:
+                self._hover_bg_color = QColor(color_name)
+            elif btn in [self.border_color_btn, self.hover_border_color_btn, self.click_border_color_btn]:
+                self._border_color = QColor(color_name)
+            elif btn is self.click_bg_btn:
+                self._click_bg_color = QColor(color_name)
             self.update_preview()
 
     def _button_color(self, btn):
         return btn.property("color") or ""
 
-    def update_preview(self):
-        base_props = {
-            "background_color": self._button_color(self.bg_color_btn),
-            "text_color": self._button_color(self.text_color_btn),
-            "font_size": self.font_size_spin.value(),
-            "border_radius": self.border_radius_slider.value(),
-            "border_width": self.border_width_slider.value(),
-            "border_color": self._button_color(self.border_color_btn),
+    def init_colors(self):
+        self.color_schemes = {
+            "Blue": {"main": QColor("#3498db"), "hover": QColor("#5dade2"), "border": QColor("#2980b9"), "gradient2": QColor("#8e44ad")},
+            "Red": {"main": QColor("#e74c3c"), "hover": QColor("#ec7063"), "border": QColor("#c0392b"), "gradient2": QColor("#d35400")},
+            "Green": {"main": QColor("#2ecc71"), "hover": QColor("#58d68d"), "border": QColor("#27ae60"), "gradient2": QColor("#16a085")},
+            "Orange": {"main": QColor("#e67e22"), "hover": QColor("#eb984e"), "border": QColor("#d35400"), "gradient2": QColor("#f39c12")},
+            "Cyan": {"main": QColor("#1abc9c"), "hover": QColor("#48c9b0"), "border": QColor("#16a085"), "gradient2": QColor("#1abc9c")},
+            "Purple": {"main": QColor("#9b59b6"), "hover": QColor("#af7ac5"), "border": QColor("#8e44ad"), "gradient2": QColor("#3498db")},
+            "Pink": {"main": QColor("#fd79a8"), "hover": QColor("#fd9db4"), "border": QColor("#e75c90"), "gradient2": QColor("#9b59b6")},
+            "Teal": {"main": QColor("#008080"), "hover": QColor("#009688"), "border": QColor("#00695C"), "gradient2": QColor("#4DB6AC")},
+            "Indigo": {"main": QColor("#3F51B5"), "hover": QColor("#5C6BC0"), "border": QColor("#303F9F"), "gradient2": QColor("#7986CB")},
+            "Crimson": {"main": QColor("#DC143C"), "hover": QColor("#E53935"), "border": QColor("#C62828"), "gradient2": QColor("#EF5350")},
+            "Gray": {"main": QColor("#95a5a6"), "hover": QColor("#bdc3c7"), "border": QColor("#7f8c8d"), "gradient2": QColor("#bdc3c7")},
+            "Black": {"main": QColor("#34495e"), "hover": QColor("#4a6276"), "border": QColor("#2c3e50"), "gradient2": QColor("#2c3e50")},
+            "White": {"main": QColor("#ecf0f1"), "hover": QColor("#ffffff"), "border": QColor("#bdc3c7"), "gradient2": QColor("#bdc3c7")},
         }
+        self.base_colors = {name: scheme["main"] for name, scheme in self.color_schemes.items()}
 
-        hover_props = {
-            "background_color": self._button_color(self.hover_bg_btn),
-            "text_color": self._button_color(self.hover_text_btn),
-            "border_radius": self.hover_border_radius_slider.value(),
-            "border_width": self.hover_border_width_slider.value(),
-            "border_color": self._button_color(self.hover_border_color_btn),
-        }
+    def get_shades(self, color_name):
+        base_color = self.base_colors.get(color_name, QColor("#000000"))
+        shades = []
+        for i in range(16):
+            factor = 1.2 - (i / 15.0) * 0.6
+            shades.append(base_color.lighter(int(100 * factor)) if factor > 1.0 else base_color.darker(int(100 / factor)))
+        return shades
 
-        click_props = {
-            "background_color": self._button_color(self.click_bg_btn),
-            "text_color": self._button_color(self.click_text_btn),
-            "border_radius": self.click_border_radius_slider.value(),
-            "border_width": self.click_border_width_slider.value(),
-            "border_color": self._button_color(self.click_border_color_btn),
-        }
+    def create_color_selection_widgets(self, final_slot):
+        base_combo = QComboBox()
+        for color_name, color_value in self.base_colors.items():
+            pixmap = QPixmap(16, 16)
+            pixmap.fill(color_value)
+            base_combo.addItem(QIcon(pixmap), color_name)
 
+        shade_combo = QComboBox()
+
+        def update_shades(color_name):
+            shade_combo.blockSignals(True)
+            shade_combo.clear()
+            shades = self.get_shades(color_name)
+            for i, shade in enumerate(shades):
+                pixmap = QPixmap(16, 16)
+                pixmap.fill(shade)
+                shade_combo.addItem(QIcon(pixmap), f"Shade {i+1}")
+                shade_combo.setItemData(i, shade)
+            shade_combo.setCurrentIndex(7)
+            shade_combo.blockSignals(False)
+            final_slot(color_name, shade_combo.currentData())
+
+        base_combo.currentTextChanged.connect(update_shades)
+        shade_combo.currentIndexChanged.connect(lambda: final_slot(base_combo.currentText(), shade_combo.currentData()))
+
+        return base_combo, shade_combo
+
+    def on_bg_color_changed(self, color_name, color):
+        if not color:
+            return
+        scheme = self.color_schemes.get(color_name)
+        if scheme:
+            self._bg_color = color
+            self._hover_bg_color = scheme["hover"]
+            self._border_color = scheme["border"]
+            self._bg_color2 = scheme["gradient2"]
+            self._click_bg_color = self._bg_color.darker(120)
+            self._set_button_color(self.bg_color_btn, self._bg_color.name())
+            self.bg_color_btn.setProperty("color", self._bg_color.name())
+            self._set_button_color(self.hover_bg_btn, self._hover_bg_color.name())
+            self.hover_bg_btn.setProperty("color", self._hover_bg_color.name())
+            self._set_button_color(self.border_color_btn, self._border_color.name())
+            self.border_color_btn.setProperty("color", self._border_color.name())
+            self._set_button_color(self.hover_border_color_btn, self._border_color.name())
+            self.hover_border_color_btn.setProperty("color", self._border_color.name())
+            self._set_button_color(self.click_border_color_btn, self._border_color.name())
+            self.click_border_color_btn.setProperty("color", self._border_color.name())
+            self._set_button_color(self.click_bg_btn, self._click_bg_color.name())
+            self.click_bg_btn.setProperty("color", self._click_bg_color.name())
+        self.update_preview()
+
+    def set_initial_colors(self):
+        self.bg_base_color_combo.setCurrentText("Green")
+        scheme = self.color_schemes.get("Green")
+        if scheme:
+            self._bg_color = scheme["main"]
+            self._hover_bg_color = scheme["hover"]
+            self._border_color = scheme["border"]
+            self._bg_color2 = scheme["gradient2"]
+            self._click_bg_color = self._bg_color.darker(120)
+        else:
+            self._bg_color = QColor("#2ecc71")
+            self._hover_bg_color = QColor("#58d68d")
+            self._border_color = QColor("#27ae60")
+            self._bg_color2 = QColor("#16a085")
+            self._click_bg_color = self._bg_color.darker(120)
+        self.on_bg_color_changed("Green", self._bg_color)
+
+    def create_coord_spinbox(self, value=0):
+        spinbox = QSpinBox()
+        spinbox.setRange(0, 1)
+        spinbox.setSingleStep(1)
+        spinbox.setValue(value)
+        return spinbox
+
+    def create_radius_slider(self):
+        slider = QSlider(Qt.Orientation.Horizontal)
+        slider.setRange(0, 100)
+        slider.setValue(0)
+        return slider
+
+    def update_controls_state(self):
+        component_type = self.component_type_combo.currentText()
+        is_switch = component_type == "Toggle Switch"
+        if is_switch:
+            self.preview_stack.setCurrentWidget(self.preview_switch)
+        else:
+            self.preview_stack.setCurrentWidget(self.preview_button)
+
+        self.shape_style_label.setVisible(not is_switch)
+        self.shape_style_combo.setVisible(not is_switch)
+        self.padding_label.setVisible(not is_switch)
+        self.padding_slider.setVisible(not is_switch)
+        self.border_group.setVisible(not is_switch)
+
+        is_circle = component_type == "Circle Button"
+        for w in [self.tl_radius_label, self.tl_radius_slider, self.tr_radius_label, self.tr_radius_slider,
+                  self.bl_radius_label, self.bl_radius_slider, self.br_radius_label, self.br_radius_slider]:
+            w.setEnabled(not is_circle and not is_switch)
+
+        is_gradient = self.bg_type_combo.currentText() == "Linear Gradient"
+        for w in [self.gradient_coords_label, self.x1_spin, self.y1_spin, self.x2_spin, self.y2_spin,
+                  self.gradient_spread_label, self.spread_combo]:
+            w.setVisible(is_gradient)
+
+        self.update_dynamic_ranges()
+        self.update_preview()
+
+    def update_dynamic_ranges(self):
         width = self.width_spin.value() or 200
         height = self.height_spin.value() or 100
-        self.preview_button.setFixedSize(width, height)
-        self.preview_button.set_base_properties(base_props)
-        self.preview_button.set_hover_properties(hover_props)
-        self.preview_button.set_click_properties(click_props)
+        limit = min(width, height) // 2
+        for s in [self.tl_radius_slider, self.tr_radius_slider, self.br_radius_slider, self.bl_radius_slider,
+                  self.hover_border_radius_slider, self.click_border_radius_slider,
+                  self.padding_slider, self.border_width_slider,
+                  self.hover_border_width_slider, self.click_border_width_slider]:
+            s.setMaximum(limit)
+
+    def generate_qss(self, component_type):
+        shape_style = self.shape_style_combo.currentText()
+        bg_type = self.bg_type_combo.currentText()
+        padding = self.padding_slider.value()
+        tl_radius = self.tl_radius_slider.value()
+        tr_radius = self.tr_radius_slider.value()
+        br_radius = self.br_radius_slider.value()
+        bl_radius = self.bl_radius_slider.value()
+        border_width = self.border_width_slider.value()
+        border_style = self.border_style_combo.currentText()
+        bg_color = self._bg_color
+        hover_bg_color = self._hover_bg_color
+        click_bg_color = self._click_bg_color
+        border_color = self._border_color
+        text_color = self._button_color(self.text_color_btn) or self.palette().color(QPalette.ColorRole.ButtonText).name()
+        font_size = self.font_size_spin.value()
+        hover_border_color = QColor(self._button_color(self.hover_border_color_btn) or border_color.name())
+        click_border_color = QColor(self._button_color(self.click_border_color_btn) or border_color.name())
+
+        if component_type == "Circle Button":
+            size = max(self.width_spin.value() or 150, self.height_spin.value() or 150)
+            radius = size // 2
+            tl_radius = tr_radius = br_radius = bl_radius = radius
+            self.preview_button.setFixedSize(size, size)
+        elif component_type == "Square Button":
+            size = max(self.width_spin.value() or 150, self.height_spin.value() or 150)
+            self.preview_button.setFixedSize(size, size)
+        elif component_type == "Toggle Switch":
+            self.preview_switch.setFixedSize(self.width_spin.value() or 200, self.height_spin.value() or 100)
+        else:
+            self.preview_button.setFixedSize(self.width_spin.value() or 200, self.height_spin.value() or 100)
+
+        main_qss, hover_qss, pressed_qss = [], [], []
+        main_qss.extend([
+            f"padding: {padding}px;",
+            f"border-top-left-radius: {tl_radius}px;",
+            f"border-top-right-radius: {tr_radius}px;",
+            f"border-bottom-right-radius: {br_radius}px;",
+            f"border-bottom-left-radius: {bl_radius}px;",
+            f"color: {text_color};",
+            f"font-size: {font_size}pt;"
+        ])
+
+        if shape_style == "Glass":
+            light_color, dark_color = bg_color.lighter(150).name(), bg_color.name()
+            border_c = bg_color.darker(120).name()
+            main_qss.append(f"background-color: qlineargradient(spread:pad, x1:0, y1:0, x2:0, y2:1, stop:0 {light_color}, stop:1 {dark_color});")
+            main_qss.append(f"border: 1px solid {border_c};")
+            hover_qss.append(f"background-color: {bg_color.lighter(120).name()};")
+            pressed_qss.append(f"background-color: {bg_color.darker(120).name()};")
+        elif shape_style == "3D":
+            main_qss.extend([f"border-width: {border_width}px;", f"border-color: {border_color.name()};", "border-style: outset;"])
+            if bg_type == "Solid":
+                main_qss.append(f"background-color: {bg_color.name()};")
+            else:
+                spread = self.spread_combo.currentText()
+                x1, y1, x2, y2 = self.x1_spin.value(), self.y1_spin.value(), self.x2_spin.value(), self.y2_spin.value()
+                main_qss.append(f"background-color: qlineargradient(spread:{spread}, x1:{x1}, y1:{y1}, x2:{x2}, y2:{y2}, stop:0 {bg_color.name()}, stop:1 {self._bg_color2.name()});")
+            hover_qss.append(f"background-color: {hover_bg_color.name()};")
+            pressed_qss.extend(["border-style: inset;", f"background-color: {bg_color.darker(120).name()};"])
+        elif shape_style == "Neumorphic":
+            base_color = self.palette().color(QPalette.ColorRole.Window)
+            main_qss.extend([f"background-color: {base_color.name()};", f"border: 2px solid {base_color.name()};"])
+            pressed_qss.extend([f"border: 2px solid {base_color.darker(115).name()};",
+                                f"border-top-color: {base_color.lighter(115).name()};",
+                                f"border-left-color: {base_color.lighter(115).name()};"])
+        elif shape_style == "Outline":
+            main_qss.extend(["background-color: transparent;",
+                             f"border: {border_width}px solid {border_color.name()};",
+                             f"color: {border_color.name()};"])
+            hover_qss.extend([f"background-color: {border_color.name()};",
+                              f"color: {self.palette().color(QPalette.ColorRole.Window).name()};"])
+            pressed_qss.extend([f"background-color: {border_color.darker(120).name()};",
+                                f"color: {self.palette().color(QPalette.ColorRole.Window).name()};"])
+        else:
+            main_qss.extend([f"border-width: {border_width}px;",
+                             f"border-style: {border_style};",
+                             f"border-color: {border_color.name()};"])
+            if bg_type == "Solid":
+                main_qss.append(f"background-color: {bg_color.name()};")
+            else:
+                spread = self.spread_combo.currentText()
+                x1, y1, x2, y2 = self.x1_spin.value(), self.y1_spin.value(), self.x2_spin.value(), self.y2_spin.value()
+                main_qss.append(f"background-color: qlineargradient(spread:{spread}, x1:{x1}, y1:{y1}, x2:{x2}, y2:{y2}, stop:0 {bg_color.name()}, stop:1 {self._bg_color2.name()});")
+            hover_qss.append(f"background-color: {hover_bg_color.name()};")
+            pressed_qss.append(f"background-color: {click_bg_color.name()};")
+
+        if hover_border_color != border_color:
+            hover_qss.append(f"border-color: {hover_border_color.name()};")
+        if click_border_color != border_color:
+            pressed_qss.append(f"border-color: {click_border_color.name()};")
+
+        main_qss_str = "\n    ".join(main_qss)
+        hover_qss_str = "\n    ".join(hover_qss) if hover_qss else ""
+        pressed_qss_str = "\n    ".join(pressed_qss) if pressed_qss else ""
+        final_qss = f"QPushButton {{\n    {main_qss_str}\n}}\n"
+        if hover_qss_str:
+            final_qss += f"QPushButton:hover {{\n    {hover_qss_str}\n}}\n"
+        if pressed_qss_str:
+            final_qss += f"QPushButton:pressed {{\n    {pressed_qss_str}\n}}\n"
+        return final_qss
+
+    def update_preview(self):
+        component_type = self.component_type_combo.currentText()
+        qss = self.generate_qss(component_type)
+        if component_type == "Toggle Switch":
+            self.preview_switch.setStyleSheet(qss)
+        else:
+            self.preview_button.setStyleSheet(qss)
 
     def _refresh_condition_table(self):
         self.condition_table.setRowCount(0)
@@ -400,13 +657,27 @@ class ConditionalStyleEditorDialog(QDialog):
 
     def get_style(self) -> ConditionalStyle:
         properties = {
+            "component_type": self.component_type_combo.currentText(),
+            "shape_style": self.shape_style_combo.currentText(),
+            "background_type": self.bg_type_combo.currentText(),
             "background_color": self._button_color(self.bg_color_btn),
+            "background_color2": self._bg_color2.name(),
+            "gradient_x1": self.x1_spin.value(),
+            "gradient_y1": self.y1_spin.value(),
+            "gradient_x2": self.x2_spin.value(),
+            "gradient_y2": self.y2_spin.value(),
+            "gradient_spread": self.spread_combo.currentText(),
+            "padding": self.padding_slider.value(),
             "text_color": self._button_color(self.text_color_btn),
             "font_size": self.font_size_spin.value(),
             "width": self.width_spin.value(),
             "height": self.height_spin.value(),
-            "border_radius": self.border_radius_slider.value(),
+            "border_radius_tl": self.tl_radius_slider.value(),
+            "border_radius_tr": self.tr_radius_slider.value(),
+            "border_radius_br": self.br_radius_slider.value(),
+            "border_radius_bl": self.bl_radius_slider.value(),
             "border_width": self.border_width_slider.value(),
+            "border_style": self.border_style_combo.currentText(),
             "border_color": self._button_color(self.border_color_btn),
         }
 
