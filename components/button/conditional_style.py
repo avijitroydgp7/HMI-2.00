@@ -1,7 +1,6 @@
 from typing import Dict, Any, List, Optional, ClassVar
 from dataclasses import dataclass, asdict, field
 from PyQt6.QtCore import QObject, pyqtSignal
-from PyQt6.QtGui import QColor
 
 from services.tag_service import tag_service
 
@@ -18,21 +17,6 @@ class StyleCondition:
     
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> 'StyleCondition':
-        return cls(**data)
-
-@dataclass
-class AnimationProperties:
-    """Animation settings for button styles"""
-    enabled: bool = False
-    type: str = "pulse"  # pulse, color_shift, scale, glow
-    duration: int = 1000  # milliseconds
-    intensity: float = 1.0
-    
-    def to_dict(self) -> Dict[str, Any]:
-        return asdict(self)
-    
-    @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> 'AnimationProperties':
         return cls(**data)
 
 @dataclass
