@@ -27,7 +27,7 @@ from PyQt6.QtWidgets import (
     QWidget,
     QStackedWidget,
 )
-from PyQt6.QtGui import QColor, QPixmap, QIcon, QPalette
+from PyQt6.QtGui import QColor, QPixmap, QIcon, QPalette, QPainter, QLinearGradient
 
 from button_creator import IconButton, SwitchButton
 from services.tag_service import tag_service
@@ -44,6 +44,16 @@ _NUMERIC_OPERATORS = {
 _EQUALITY_OPERATORS = {
     "==": operator.eq,
     "!=": operator.ne,
+}
+
+# Predefined gradient orientations used for visual selection
+_GRADIENT_STYLES = {
+    "Top to Bottom": (0, 0, 0, 1),
+    "Bottom to Top": (0, 1, 0, 0),
+    "Left to Right": (0, 0, 1, 0),
+    "Right to Left": (1, 0, 0, 0),
+    "Diagonal TL-BR": (0, 0, 1, 1),
+    "Diagonal BL-TR": (0, 1, 1, 0),
 }
 
 # ---------------------------------------------------------------------------
@@ -413,29 +423,35 @@ class ConditionalStyleEditorDialog(QDialog):
         background_layout.addWidget(self.bg_base_color_combo, 1, 1)
         background_layout.addWidget(self.bg_shade_combo, 2, 1)
 
-        self.gradient_coords_label = QLabel("Gradient Coords (x1,y1,x2,y2):")
-        background_layout.addWidget(self.gradient_coords_label, 3, 0, 1, 2)
-        coords_layout = QHBoxLayout()
-        self.x1_spin, self.y1_spin = self.create_coord_spinbox(), self.create_coord_spinbox()
-        self.x2_spin, self.y2_spin = self.create_coord_spinbox(0), self.create_coord_spinbox(1)
-        coords_layout.addWidget(self.x1_spin); coords_layout.addWidget(self.y1_spin)
-        coords_layout.addWidget(self.x2_spin); coords_layout.addWidget(self.y2_spin)
-        background_layout.addLayout(coords_layout, 4, 0, 1, 2)
+        # Hidden coordinate spin boxes used internally to build the QSS gradient
+        self.x1_spin = self.create_coord_spinbox(self.style.properties.get("gradient_x1", 0))
+        self.y1_spin = self.create_coord_spinbox(self.style.properties.get("gradient_y1", 0))
+        self.x2_spin = self.create_coord_spinbox(self.style.properties.get("gradient_x2", 0))
+        self.y2_spin = self.create_coord_spinbox(self.style.properties.get("gradient_y2", 1))
+        for w in [self.x1_spin, self.y1_spin, self.x2_spin, self.y2_spin]:
+            w.setVisible(False)
+
+        self.gradient_dir_label = QLabel("Gradient Direction:")
+        background_layout.addWidget(self.gradient_dir_label, 3, 0)
+        self.gradient_type_combo = QComboBox()
+        self._init_gradient_type_combo()
+        background_layout.addWidget(self.gradient_type_combo, 3, 1)
+
         self.gradient_spread_label = QLabel("Gradient Spread:")
-        background_layout.addWidget(self.gradient_spread_label, 5, 0)
+        background_layout.addWidget(self.gradient_spread_label, 4, 0)
         self.spread_combo = QComboBox()
         self.spread_combo.addItems(["pad", "reflect", "repeat"])
         self.spread_combo.setCurrentText(self.style.properties.get("gradient_spread", "pad"))
         self.spread_combo.currentTextChanged.connect(self.update_preview)
-        background_layout.addWidget(self.spread_combo, 5, 1)
+        background_layout.addWidget(self.spread_combo, 4, 1)
 
         self.padding_label = QLabel("Padding (px):")
-        background_layout.addWidget(self.padding_label, 6, 0)
+        background_layout.addWidget(self.padding_label, 5, 0)
         self.padding_slider = QSlider(Qt.Orientation.Horizontal)
         self.padding_slider.setRange(0, 50)
         self.padding_slider.setValue(self.style.properties.get("padding", 15))
         self.padding_slider.valueChanged.connect(self.update_preview)
-        background_layout.addWidget(self.padding_slider, 6, 1)
+        background_layout.addWidget(self.padding_slider, 5, 1)
         self.background_group.setLayout(background_layout)
         controls_layout.addWidget(self.background_group)
 
@@ -742,6 +758,47 @@ class ConditionalStyleEditorDialog(QDialog):
         slider.setValue(0)
         return slider
 
+    def _create_gradient_icon(self, coords):
+        pixmap = QPixmap(40, 20)
+        gradient = QLinearGradient(coords[0] * 40, coords[1] * 20, coords[2] * 40, coords[3] * 20)
+        gradient.setColorAt(0, QColor("#000000"))
+        gradient.setColorAt(1, QColor("#ffffff"))
+        painter = QPainter(pixmap)
+        painter.fillRect(pixmap.rect(), gradient)
+        painter.end()
+        return QIcon(pixmap)
+
+    def _init_gradient_type_combo(self):
+        for name, coords in _GRADIENT_STYLES.items():
+            self.gradient_type_combo.addItem(self._create_gradient_icon(coords), name)
+        default_type = self.style.properties.get("gradient_type")
+        if default_type and default_type in _GRADIENT_STYLES:
+            self.gradient_type_combo.setCurrentText(default_type)
+            self._set_gradient_coords(_GRADIENT_STYLES[default_type])
+        else:
+            # Set from existing coordinates and detect matching type
+            current = (self.x1_spin.value(), self.y1_spin.value(),
+                       self.x2_spin.value(), self.y2_spin.value())
+            for name, coords in _GRADIENT_STYLES.items():
+                if coords == current:
+                    self.gradient_type_combo.setCurrentText(name)
+                    break
+            else:
+                self.gradient_type_combo.setCurrentText("Top to Bottom")
+                self._set_gradient_coords(_GRADIENT_STYLES["Top to Bottom"])
+        self.gradient_type_combo.currentTextChanged.connect(self._on_gradient_type_changed)
+
+    def _set_gradient_coords(self, coords):
+        self.x1_spin.setValue(coords[0])
+        self.y1_spin.setValue(coords[1])
+        self.x2_spin.setValue(coords[2])
+        self.y2_spin.setValue(coords[3])
+
+    def _on_gradient_type_changed(self, text):
+        if text in _GRADIENT_STYLES:
+            self._set_gradient_coords(_GRADIENT_STYLES[text])
+        self.update_preview()
+
     def update_controls_state(self):
         component_type = self.component_type_combo.currentText()
         is_switch = component_type == "Toggle Switch"
@@ -762,7 +819,7 @@ class ConditionalStyleEditorDialog(QDialog):
             w.setEnabled(not is_circle and not is_switch)
 
         is_gradient = self.bg_type_combo.currentText() == "Linear Gradient"
-        for w in [self.gradient_coords_label, self.x1_spin, self.y1_spin, self.x2_spin, self.y2_spin,
+        for w in [self.gradient_dir_label, self.gradient_type_combo,
                   self.gradient_spread_label, self.spread_combo]:
             w.setVisible(is_gradient)
 
@@ -931,6 +988,7 @@ class ConditionalStyleEditorDialog(QDialog):
             "background_type": self.bg_type_combo.currentText(),
             "background_color": self._button_color(self.bg_color_btn),
             "background_color2": self._bg_color2.name(),
+            "gradient_type": self.gradient_type_combo.currentText(),
             "gradient_x1": self.x1_spin.value(),
             "gradient_y1": self.y1_spin.value(),
             "gradient_x2": self.x2_spin.value(),
