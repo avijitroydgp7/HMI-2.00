@@ -483,11 +483,12 @@ class ConditionalStyleEditorDialog(QDialog):
         self.on_link_radius_toggled(self.link_radius_btn.isChecked())
 
         border_layout.addWidget(QLabel("Border Width (px):"), 4, 0)
-        self.border_width_slider = QSlider(Qt.Orientation.Horizontal)
-        self.border_width_slider.setRange(0, 10)
-        self.border_width_slider.setValue(self.style.properties.get("border_width", 0))
-        self.border_width_slider.valueChanged.connect(self.update_preview)
-        border_layout.addWidget(self.border_width_slider, 4, 1)
+        self.border_width_spin = QSpinBox()
+        # Allow border width up to 20px, final limit is adjusted dynamically
+        self.border_width_spin.setRange(0, 20)
+        self.border_width_spin.setValue(self.style.properties.get("border_width", 0))
+        self.border_width_spin.valueChanged.connect(self.update_preview)
+        border_layout.addWidget(self.border_width_spin, 4, 1)
 
         self.border_style_label = QLabel("Border Style:")
         border_layout.addWidget(self.border_style_label, 5, 0)
@@ -529,7 +530,7 @@ class ConditionalStyleEditorDialog(QDialog):
         self.hover_text_btn = self.create_color_button(self.style.hover_properties.get("text_color", ""))
         self.hover_border_radius_slider = QSlider(Qt.Orientation.Horizontal); self.hover_border_radius_slider.setRange(0, 1000)
         self.hover_border_radius_slider.setValue(self.style.hover_properties.get("border_radius", 0))
-        self.hover_border_width_slider = QSlider(Qt.Orientation.Horizontal); self.hover_border_width_slider.setRange(0, 1000)
+        self.hover_border_width_slider = QSlider(Qt.Orientation.Horizontal); self.hover_border_width_slider.setRange(0, 20)
         self.hover_border_width_slider.setValue(self.style.hover_properties.get("border_width", 0))
         self.hover_border_color_btn = self.create_color_button(self.style.hover_properties.get("border_color", ""))
         hover_layout.addWidget(QLabel("Background:"), 0, 0); hover_layout.addWidget(self.hover_bg_btn, 0, 1)
@@ -545,7 +546,7 @@ class ConditionalStyleEditorDialog(QDialog):
         self.click_text_btn = self.create_color_button(self.style.click_properties.get("text_color", ""))
         self.click_border_radius_slider = QSlider(Qt.Orientation.Horizontal); self.click_border_radius_slider.setRange(0, 1000)
         self.click_border_radius_slider.setValue(self.style.click_properties.get("border_radius", 0))
-        self.click_border_width_slider = QSlider(Qt.Orientation.Horizontal); self.click_border_width_slider.setRange(0, 1000)
+        self.click_border_width_slider = QSlider(Qt.Orientation.Horizontal); self.click_border_width_slider.setRange(0, 20)
         self.click_border_width_slider.setValue(self.style.click_properties.get("border_width", 0))
         self.click_border_color_btn = self.create_color_button(self.style.click_properties.get("border_color", ""))
         click_layout.addWidget(QLabel("Background:"), 0, 0); click_layout.addWidget(self.click_bg_btn, 0, 1)
@@ -604,7 +605,7 @@ class ConditionalStyleEditorDialog(QDialog):
         main_layout.addLayout(preview_layout, 0, 1)
 
         for w in [self.font_size_spin, self.width_spin, self.height_spin,
-                  self.border_width_slider, self.hover_border_radius_slider, self.hover_border_width_slider,
+                  self.border_width_spin, self.hover_border_radius_slider, self.hover_border_width_slider,
                   self.click_border_radius_slider, self.click_border_width_slider,
                   self.x1_spin, self.y1_spin, self.x2_spin, self.y2_spin]:
             w.valueChanged.connect(self.update_preview)
@@ -841,12 +842,15 @@ class ConditionalStyleEditorDialog(QDialog):
     def update_dynamic_ranges(self):
         width = self.width_spin.value() or 200
         height = self.height_spin.value() or 100
-        limit = min(width, height) // 2
+        # Corner radii can be up to half of the smaller dimension.
+        radius_limit = min(width, height) // 2
+        # Border widths are limited to 10% of the smaller dimension, capped at 20px.
+        border_limit = min(20, max(1, min(width, height) // 10))
         for s in [self.tl_radius_spin, self.tr_radius_spin, self.br_radius_spin, self.bl_radius_spin,
-                  self.hover_border_radius_slider, self.click_border_radius_slider,
-                  self.border_width_slider,
-                  self.hover_border_width_slider, self.click_border_width_slider]:
-            s.setMaximum(limit)
+                  self.hover_border_radius_slider, self.click_border_radius_slider]:
+            s.setMaximum(radius_limit)
+        for s in [self.border_width_spin, self.hover_border_width_slider, self.click_border_width_slider]:
+            s.setMaximum(border_limit)
 
     def generate_qss(self, component_type):
         shape_style = self.shape_style_combo.currentText()
@@ -858,7 +862,7 @@ class ConditionalStyleEditorDialog(QDialog):
         tr_radius = self.tr_radius_spin.value()
         br_radius = self.br_radius_spin.value()
         bl_radius = self.bl_radius_spin.value()
-        border_width = self.border_width_slider.value()
+        border_width = self.border_width_spin.value()
         border_style = self.border_style_combo.currentText()
         bg_color = self._bg_color
         hover_bg_color = self._hover_bg_color
@@ -1019,7 +1023,7 @@ class ConditionalStyleEditorDialog(QDialog):
             "border_radius_tr": self.tr_radius_spin.value(),
             "border_radius_br": self.br_radius_spin.value(),
             "border_radius_bl": self.bl_radius_spin.value(),
-            "border_width": self.border_width_slider.value(),
+            "border_width": self.border_width_spin.value(),
             "border_style": self.border_style_combo.currentText(),
             "border_color": self._button_color(self.border_color_btn),
         }
