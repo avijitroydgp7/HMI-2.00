@@ -17,8 +17,8 @@ from .conditional_style import (
     ConditionalStyleManager,
     ConditionalStyle,
     StyleCondition,
+    ConditionalStyleEditorDialog,
 )
-from .conditional_style_editor_dialog import ConditionalStyleEditorDialog
 from services.tag_data_service import tag_data_service
 
 
