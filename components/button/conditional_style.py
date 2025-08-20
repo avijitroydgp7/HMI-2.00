@@ -163,6 +163,20 @@ class ConditionalStyle:
     hover_properties: Dict[str, Any] = field(default_factory=dict)
     click_properties: Dict[str, Any] = field(default_factory=dict)
     animation: AnimationProperties = field(default_factory=AnimationProperties)
+    text_type: str = ""
+    comment_number: str = ""
+    comment_column: int = 0
+    comment_row: int = 0
+    simple_text: str = ""
+    font_family: str = ""
+    font_size: int = 0
+    font_bold: bool = False
+    font_italic: bool = False
+    font_underline: bool = False
+    align_h: str = ""
+    align_v: str = ""
+    text_background: str = ""
+    frame_offset: Dict[str, int] = field(default_factory=dict)
     
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -173,6 +187,20 @@ class ConditionalStyle:
             'hover_properties': self.hover_properties,
             'click_properties': self.click_properties,
             'animation': self.animation.to_dict(),
+            'text_type': self.text_type,
+            'comment_number': self.comment_number,
+            'comment_column': self.comment_column,
+            'comment_row': self.comment_row,
+            'simple_text': self.simple_text,
+            'font_family': self.font_family,
+            'font_size': self.font_size,
+            'font_bold': self.font_bold,
+            'font_italic': self.font_italic,
+            'font_underline': self.font_underline,
+            'align_h': self.align_h,
+            'align_v': self.align_v,
+            'text_background': self.text_background,
+            'frame_offset': self.frame_offset,
         }
     
     @classmethod
@@ -184,6 +212,20 @@ class ConditionalStyle:
             tooltip=data.get('tooltip', ''),
             hover_properties=data.get('hover_properties', {}),
             click_properties=data.get('click_properties', {}),
+            text_type=data.get('text_type', ''),
+            comment_number=data.get('comment_number', ''),
+            comment_column=data.get('comment_column', 0),
+            comment_row=data.get('comment_row', 0),
+            simple_text=data.get('simple_text', ''),
+            font_family=data.get('font_family', ''),
+            font_size=data.get('font_size', 0),
+            font_bold=data.get('font_bold', False),
+            font_italic=data.get('font_italic', False),
+            font_underline=data.get('font_underline', False),
+            align_h=data.get('align_h', ''),
+            align_v=data.get('align_v', ''),
+            text_background=data.get('text_background', ''),
+            frame_offset=data.get('frame_offset', {}),
         )
         if 'animation' in data:
             style.animation = AnimationProperties.from_dict(data['animation'])
