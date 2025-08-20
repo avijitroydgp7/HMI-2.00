@@ -33,6 +33,7 @@ from button_creator import IconButton, SwitchButton
 from services.tag_service import tag_service
 from dialogs.widgets import TagSelector
 from services.tag_data_service import tag_data_service
+from utils.icon_manager import IconManager
 
 _NUMERIC_OPERATORS = {
     ">": operator.gt,
@@ -466,7 +467,7 @@ class ConditionalStyleEditorDialog(QDialog):
         self.bl_radius_spin.setValue(self.style.properties.get("border_radius_bl", 0))
         border_layout.addWidget(self.bl_radius_spin, 3, 1)
 
-        self.link_radius_btn = QPushButton("Link")
+        self.link_radius_btn = QPushButton()
         self.link_radius_btn.setCheckable(True)
         border_layout.addWidget(self.link_radius_btn, 0, 2, 4, 1)
 
@@ -479,6 +480,7 @@ class ConditionalStyleEditorDialog(QDialog):
         for key, spin in self.corner_spins.items():
             spin.valueChanged.connect(lambda val, k=key: self.on_corner_radius_changed(k, val))
         self.link_radius_btn.toggled.connect(self.on_link_radius_toggled)
+        self.on_link_radius_toggled(self.link_radius_btn.isChecked())
 
         border_layout.addWidget(QLabel("Border Width (px):"), 4, 0)
         self.border_width_slider = QSlider(Qt.Orientation.Horizontal)
@@ -765,6 +767,8 @@ class ConditionalStyleEditorDialog(QDialog):
         self.update_preview()
 
     def on_link_radius_toggled(self, checked):
+        icon_name = "fa5s.link" if checked else "fa5s.unlink"
+        self.link_radius_btn.setIcon(IconManager.create_icon(icon_name))
         if checked:
             self.on_corner_radius_changed('tl', self.tl_radius_spin.value())
 
