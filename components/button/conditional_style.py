@@ -437,21 +437,13 @@ class ConditionalStyleEditorDialog(QDialog):
         self._init_gradient_type_combo()
         background_layout.addWidget(self.gradient_type_combo, 3, 1)
 
-        self.gradient_spread_label = QLabel("Gradient Spread:")
-        background_layout.addWidget(self.gradient_spread_label, 4, 0)
-        self.spread_combo = QComboBox()
-        self.spread_combo.addItems(["pad", "reflect", "repeat"])
-        self.spread_combo.setCurrentText(self.style.properties.get("gradient_spread", "pad"))
-        self.spread_combo.currentTextChanged.connect(self.update_preview)
-        background_layout.addWidget(self.spread_combo, 4, 1)
-
         self.padding_label = QLabel("Padding (px):")
-        background_layout.addWidget(self.padding_label, 5, 0)
+        background_layout.addWidget(self.padding_label, 4, 0)
         self.padding_slider = QSlider(Qt.Orientation.Horizontal)
         self.padding_slider.setRange(0, 50)
         self.padding_slider.setValue(self.style.properties.get("padding", 15))
         self.padding_slider.valueChanged.connect(self.update_preview)
-        background_layout.addWidget(self.padding_slider, 5, 1)
+        background_layout.addWidget(self.padding_slider, 4, 1)
         self.background_group.setLayout(background_layout)
         controls_layout.addWidget(self.background_group)
 
@@ -819,8 +811,7 @@ class ConditionalStyleEditorDialog(QDialog):
             w.setEnabled(not is_circle and not is_switch)
 
         is_gradient = self.bg_type_combo.currentText() == "Linear Gradient"
-        for w in [self.gradient_dir_label, self.gradient_type_combo,
-                  self.gradient_spread_label, self.spread_combo]:
+        for w in [self.gradient_dir_label, self.gradient_type_combo]:
             w.setVisible(is_gradient)
 
         self.update_dynamic_ranges()
@@ -882,7 +873,9 @@ class ConditionalStyleEditorDialog(QDialog):
         if shape_style == "Glass":
             light_color, dark_color = bg_color.lighter(150).name(), bg_color.name()
             border_c = bg_color.darker(120).name()
-            main_qss.append(f"background-color: qlineargradient(spread:pad, x1:0, y1:0, x2:0, y2:1, stop:0 {light_color}, stop:1 {dark_color});")
+            main_qss.append(
+                f"background-color: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 {light_color}, stop:1 {dark_color});"
+            )
             main_qss.append(f"border: 1px solid {border_c};")
             hover_qss.append(f"background-color: {bg_color.lighter(120).name()};")
             pressed_qss.append(f"background-color: {bg_color.darker(120).name()};")
@@ -891,9 +884,10 @@ class ConditionalStyleEditorDialog(QDialog):
             if bg_type == "Solid":
                 main_qss.append(f"background-color: {bg_color.name()};")
             else:
-                spread = self.spread_combo.currentText()
                 x1, y1, x2, y2 = self.x1_spin.value(), self.y1_spin.value(), self.x2_spin.value(), self.y2_spin.value()
-                main_qss.append(f"background-color: qlineargradient(spread:{spread}, x1:{x1}, y1:{y1}, x2:{x2}, y2:{y2}, stop:0 {bg_color.name()}, stop:1 {self._bg_color2.name()});")
+                main_qss.append(
+                    f"background-color: qlineargradient(x1:{x1}, y1:{y1}, x2:{x2}, y2:{y2}, stop:0 {bg_color.name()}, stop:1 {self._bg_color2.name()});"
+                )
             hover_qss.append(f"background-color: {hover_bg_color.name()};")
             pressed_qss.extend(["border-style: inset;", f"background-color: {bg_color.darker(120).name()};"])
         elif shape_style == "Neumorphic":
@@ -917,9 +911,10 @@ class ConditionalStyleEditorDialog(QDialog):
             if bg_type == "Solid":
                 main_qss.append(f"background-color: {bg_color.name()};")
             else:
-                spread = self.spread_combo.currentText()
                 x1, y1, x2, y2 = self.x1_spin.value(), self.y1_spin.value(), self.x2_spin.value(), self.y2_spin.value()
-                main_qss.append(f"background-color: qlineargradient(spread:{spread}, x1:{x1}, y1:{y1}, x2:{x2}, y2:{y2}, stop:0 {bg_color.name()}, stop:1 {self._bg_color2.name()});")
+                main_qss.append(
+                    f"background-color: qlineargradient(x1:{x1}, y1:{y1}, x2:{x2}, y2:{y2}, stop:0 {bg_color.name()}, stop:1 {self._bg_color2.name()});"
+                )
             hover_qss.append(f"background-color: {hover_bg_color.name()};")
             pressed_qss.append(f"background-color: {click_bg_color.name()};")
 
@@ -993,7 +988,6 @@ class ConditionalStyleEditorDialog(QDialog):
             "gradient_y1": self.y1_spin.value(),
             "gradient_x2": self.x2_spin.value(),
             "gradient_y2": self.y2_spin.value(),
-            "gradient_spread": self.spread_combo.currentText(),
             "padding": self.padding_slider.value(),
             "text_color": self._button_color(self.text_color_btn),
             "font_size": self.font_size_spin.value(),
