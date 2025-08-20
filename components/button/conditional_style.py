@@ -238,6 +238,23 @@ class ConditionalStyleManager(QObject):
     parent: Optional[QObject] = None
     conditional_styles: List[ConditionalStyle] = field(default_factory=list)
     default_style: Dict[str, Any] = field(default_factory=dict)
+    _TEXT_KEYS: ClassVar[List[str]] = [
+        "text_type",
+        "comment_number",
+        "comment_column",
+        "comment_row",
+        "simple_text",
+        "font_family",
+        "font_size",
+        "font_bold",
+        "font_italic",
+        "font_underline",
+        "h_align",
+        "v_align",
+        "text_bg_color",
+        "offset_x",
+        "offset_y",
+    ]
 
     def __post_init__(self):
         super().__init__(self.parent)
@@ -275,10 +292,29 @@ class ConditionalStyleManager(QObject):
         for style in self.conditional_styles:
             if self._evaluate_conditions(style.conditions, tag_values):
                 props = dict(style.properties)
+
+                # Merge dataclass text fields into base properties if they are
+                # stored as separate attributes (for backward compatibility).
+                for key in self._TEXT_KEYS:
+                    val = getattr(style, key, None)
+                    if val not in (None, "", {}):
+                        props.setdefault(key, val)
+
                 if state:
-                    props.update(getattr(style, f"{state}_properties", {}))
+                    state_props = getattr(style, f"{state}_properties", {})
+
+                    # If text locking is enabled, ensure state specific styles
+                    # inherit the base text properties when they are missing.
+                    if props.get("text_lock"):
+                        for key in self._TEXT_KEYS:
+                            if key not in state_props and key in props:
+                                state_props[key] = props[key]
+
+                    props.update(state_props)
+
                 if style.tooltip:
-                    props['tooltip'] = style.tooltip
+                    props["tooltip"] = style.tooltip
+
                 return props
 
         return dict(self.default_style)
@@ -916,6 +952,20 @@ class ConditionalStyleEditorDialog(QDialog):
             })
         return data
 
+    def _alignment_flags(self, h_align: str, v_align: str) -> str:
+        """Convert alignment options to Qt flag strings for QSS."""
+        h_map = {
+            'Left': 'AlignLeft',
+            'Center': 'AlignHCenter',
+            'Right': 'AlignRight'
+        }
+        v_map = {
+            'Top': 'AlignTop',
+            'Center': 'AlignVCenter',
+            'Bottom': 'AlignBottom'
+        }
+        return f"{h_map.get(h_align, 'AlignHCenter')} | {v_map.get(v_align, 'AlignVCenter')}"
+
     def init_colors(self):
         self.color_schemes = {
             "Blue": {"main": QColor("#3498db"), "hover": QColor("#5dade2"), "border": QColor("#2980b9"), "gradient2": QColor("#8e44ad")},
@@ -1133,14 +1183,15 @@ class ConditionalStyleEditorDialog(QDialog):
         hover_bg_color = self._hover_bg_color
         click_bg_color = self._click_bg_color
         border_color = self._border_color
+
+        base_text = self._collect_text_props(self.text_controls['base'])
+        hover_text = base_text if self.text_lock_checkbox.isChecked() else self._collect_text_props(self.text_controls['hover'])
+        click_text = base_text if self.text_lock_checkbox.isChecked() else self._collect_text_props(self.text_controls['click'])
+
         text_color = self._button_color(self.text_color_btn) or self.palette().color(QPalette.ColorRole.ButtonText).name()
-        font_size = self.font_size_spin.value()
-        base_text = self.text_controls['base']
-        font_family = base_text['font_combo'].currentFont().family()
-        bold = base_text['bold_check'].isChecked()
-        italic = base_text['italic_check'].isChecked()
-        underline = base_text['underline_check'].isChecked()
-        h_align = base_text['h_align_combo'].currentText().lower()
+        hover_text_color = self._button_color(self.hover_text_btn) or text_color
+        click_text_color = self._button_color(self.click_text_btn) or text_color
+
         hover_border_color = QColor(self._button_color(self.hover_border_color_btn) or border_color.name())
         click_border_color = QColor(self._button_color(self.click_border_color_btn) or border_color.name())
 
@@ -1157,6 +1208,20 @@ class ConditionalStyleEditorDialog(QDialog):
         else:
             self.preview_button.setFixedSize(self.width_spin.value() or 200, self.height_spin.value() or 100)
 
+        def _text_qss(text_props, color):
+            lines = [
+                f"color: {color};",
+                f"font-size: {text_props.get('font_size', 0)}pt;",
+                f"font-family: '{text_props.get('font_family', '')}';",
+                f"font-weight: {'bold' if text_props.get('font_bold') else 'normal'};",
+                f"font-style: {'italic' if text_props.get('font_italic') else 'normal'};",
+                f"text-align: {text_props.get('h_align', 'left').lower()};",
+                f"qproperty-alignment: {self._alignment_flags(text_props.get('h_align', 'Center'), text_props.get('v_align', 'Center'))};",
+            ]
+            if text_props.get('font_underline'):
+                lines.append("text-decoration: underline;")
+            return lines
+
         main_qss, hover_qss, pressed_qss = [], [], []
         main_qss.extend([
             f"padding: {padding}px;",
@@ -1164,15 +1229,11 @@ class ConditionalStyleEditorDialog(QDialog):
             f"border-top-right-radius: {tr_radius}px;",
             f"border-bottom-right-radius: {br_radius}px;",
             f"border-bottom-left-radius: {bl_radius}px;",
-            f"color: {text_color};",
-            f"font-size: {font_size}pt;",
-            f"font-family: '{font_family}';",
-            f"font-weight: {'bold' if bold else 'normal'};",
-            f"font-style: {'italic' if italic else 'normal'};",
-            f"text-align: {h_align};"
         ])
-        if underline:
-            main_qss.append("text-decoration: underline;")
+        main_qss.extend(_text_qss(base_text, text_color))
+
+        hover_qss.extend(_text_qss(hover_text, hover_text_color))
+        pressed_qss.extend(_text_qss(click_text, click_text_color))
 
         if shape_style == "Glass":
             light_color, dark_color = bg_color.lighter(150).name(), bg_color.name()
