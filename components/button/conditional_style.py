@@ -444,27 +444,41 @@ class ConditionalStyleEditorDialog(QDialog):
 
         self.tl_radius_label = QLabel("Top-Left Radius:")
         border_layout.addWidget(self.tl_radius_label, 0, 0)
-        self.tl_radius_slider = self.create_radius_slider()
-        self.tl_radius_slider.setValue(self.style.properties.get("border_radius_tl", 0))
-        border_layout.addWidget(self.tl_radius_slider, 0, 1)
+        self.tl_radius_spin = self.create_radius_spinbox()
+        self.tl_radius_spin.setValue(self.style.properties.get("border_radius_tl", 0))
+        border_layout.addWidget(self.tl_radius_spin, 0, 1)
 
         self.tr_radius_label = QLabel("Top-Right Radius:")
         border_layout.addWidget(self.tr_radius_label, 1, 0)
-        self.tr_radius_slider = self.create_radius_slider()
-        self.tr_radius_slider.setValue(self.style.properties.get("border_radius_tr", 0))
-        border_layout.addWidget(self.tr_radius_slider, 1, 1)
+        self.tr_radius_spin = self.create_radius_spinbox()
+        self.tr_radius_spin.setValue(self.style.properties.get("border_radius_tr", 0))
+        border_layout.addWidget(self.tr_radius_spin, 1, 1)
 
         self.br_radius_label = QLabel("Bottom-Right Radius:")
         border_layout.addWidget(self.br_radius_label, 2, 0)
-        self.br_radius_slider = self.create_radius_slider()
-        self.br_radius_slider.setValue(self.style.properties.get("border_radius_br", 0))
-        border_layout.addWidget(self.br_radius_slider, 2, 1)
+        self.br_radius_spin = self.create_radius_spinbox()
+        self.br_radius_spin.setValue(self.style.properties.get("border_radius_br", 0))
+        border_layout.addWidget(self.br_radius_spin, 2, 1)
 
         self.bl_radius_label = QLabel("Bottom-Left Radius:")
         border_layout.addWidget(self.bl_radius_label, 3, 0)
-        self.bl_radius_slider = self.create_radius_slider()
-        self.bl_radius_slider.setValue(self.style.properties.get("border_radius_bl", 0))
-        border_layout.addWidget(self.bl_radius_slider, 3, 1)
+        self.bl_radius_spin = self.create_radius_spinbox()
+        self.bl_radius_spin.setValue(self.style.properties.get("border_radius_bl", 0))
+        border_layout.addWidget(self.bl_radius_spin, 3, 1)
+
+        self.link_radius_btn = QPushButton("Link")
+        self.link_radius_btn.setCheckable(True)
+        border_layout.addWidget(self.link_radius_btn, 0, 2, 4, 1)
+
+        self.corner_spins = {
+            "tl": self.tl_radius_spin,
+            "tr": self.tr_radius_spin,
+            "br": self.br_radius_spin,
+            "bl": self.bl_radius_spin,
+        }
+        for key, spin in self.corner_spins.items():
+            spin.valueChanged.connect(lambda val, k=key: self.on_corner_radius_changed(k, val))
+        self.link_radius_btn.toggled.connect(self.on_link_radius_toggled)
 
         border_layout.addWidget(QLabel("Border Width (px):"), 4, 0)
         self.border_width_slider = QSlider(Qt.Orientation.Horizontal)
@@ -587,8 +601,7 @@ class ConditionalStyleEditorDialog(QDialog):
         main_layout.addLayout(controls_layout, 0, 0)
         main_layout.addLayout(preview_layout, 0, 1)
 
-        for w in [self.font_size_spin, self.width_spin, self.height_spin, self.tl_radius_slider,
-                  self.tr_radius_slider, self.br_radius_slider, self.bl_radius_slider,
+        for w in [self.font_size_spin, self.width_spin, self.height_spin,
                   self.border_width_slider, self.hover_border_radius_slider, self.hover_border_width_slider,
                   self.click_border_radius_slider, self.click_border_width_slider,
                   self.x1_spin, self.y1_spin, self.x2_spin, self.y2_spin]:
@@ -736,11 +749,24 @@ class ConditionalStyleEditorDialog(QDialog):
         spinbox.setValue(value)
         return spinbox
 
-    def create_radius_slider(self):
-        slider = QSlider(Qt.Orientation.Horizontal)
-        slider.setRange(0, 100)
-        slider.setValue(0)
-        return slider
+    def create_radius_spinbox(self):
+        spinbox = QSpinBox()
+        spinbox.setRange(0, 1000)
+        spinbox.setValue(0)
+        return spinbox
+
+    def on_corner_radius_changed(self, corner, value):
+        if self.link_radius_btn.isChecked():
+            for key, spin in self.corner_spins.items():
+                if key != corner:
+                    spin.blockSignals(True)
+                    spin.setValue(value)
+                    spin.blockSignals(False)
+        self.update_preview()
+
+    def on_link_radius_toggled(self, checked):
+        if checked:
+            self.on_corner_radius_changed('tl', self.tl_radius_spin.value())
 
     def _create_gradient_icon(self, coords):
         pixmap = QPixmap(40, 20)
@@ -796,8 +822,9 @@ class ConditionalStyleEditorDialog(QDialog):
         self.border_group.setVisible(not is_switch)
 
         is_circle = component_type == "Circle Button"
-        for w in [self.tl_radius_label, self.tl_radius_slider, self.tr_radius_label, self.tr_radius_slider,
-                  self.bl_radius_label, self.bl_radius_slider, self.br_radius_label, self.br_radius_slider]:
+        for w in [self.tl_radius_label, self.tl_radius_spin, self.tr_radius_label, self.tr_radius_spin,
+                  self.bl_radius_label, self.bl_radius_spin, self.br_radius_label, self.br_radius_spin,
+                  self.link_radius_btn]:
             w.setEnabled(not is_circle and not is_switch)
 
         is_gradient = self.bg_type_combo.currentText() == "Linear Gradient"
@@ -811,7 +838,7 @@ class ConditionalStyleEditorDialog(QDialog):
         width = self.width_spin.value() or 200
         height = self.height_spin.value() or 100
         limit = min(width, height) // 2
-        for s in [self.tl_radius_slider, self.tr_radius_slider, self.br_radius_slider, self.bl_radius_slider,
+        for s in [self.tl_radius_spin, self.tr_radius_spin, self.br_radius_spin, self.bl_radius_spin,
                   self.hover_border_radius_slider, self.click_border_radius_slider,
                   self.border_width_slider,
                   self.hover_border_width_slider, self.click_border_width_slider]:
@@ -823,10 +850,10 @@ class ConditionalStyleEditorDialog(QDialog):
         width = self.width_spin.value() or 200
         height = self.height_spin.value() or 100
         padding = min(width, height) // 10
-        tl_radius = self.tl_radius_slider.value()
-        tr_radius = self.tr_radius_slider.value()
-        br_radius = self.br_radius_slider.value()
-        bl_radius = self.bl_radius_slider.value()
+        tl_radius = self.tl_radius_spin.value()
+        tr_radius = self.tr_radius_spin.value()
+        br_radius = self.br_radius_spin.value()
+        bl_radius = self.bl_radius_spin.value()
         border_width = self.border_width_slider.value()
         border_style = self.border_style_combo.currentText()
         bg_color = self._bg_color
@@ -984,10 +1011,10 @@ class ConditionalStyleEditorDialog(QDialog):
             "font_size": self.font_size_spin.value(),
             "width": self.width_spin.value(),
             "height": self.height_spin.value(),
-            "border_radius_tl": self.tl_radius_slider.value(),
-            "border_radius_tr": self.tr_radius_slider.value(),
-            "border_radius_br": self.br_radius_slider.value(),
-            "border_radius_bl": self.bl_radius_slider.value(),
+            "border_radius_tl": self.tl_radius_spin.value(),
+            "border_radius_tr": self.tr_radius_spin.value(),
+            "border_radius_br": self.br_radius_spin.value(),
+            "border_radius_bl": self.bl_radius_spin.value(),
             "border_width": self.border_width_slider.value(),
             "border_style": self.border_style_combo.currentText(),
             "border_color": self._button_color(self.border_color_btn),
