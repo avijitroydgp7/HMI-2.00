@@ -409,7 +409,7 @@ class ConditionalStyleEditorDialog(QDialog):
         style_group.setLayout(style_layout)
         controls_layout.addWidget(style_group)
 
-        self.background_group = QGroupBox("Background & Padding")
+        self.background_group = QGroupBox("Background")
         background_layout = QGridLayout()
         background_layout.addWidget(QLabel("Background Type:"), 0, 0)
         self.bg_type_combo = QComboBox()
@@ -436,14 +436,6 @@ class ConditionalStyleEditorDialog(QDialog):
         self.gradient_type_combo = QComboBox()
         self._init_gradient_type_combo()
         background_layout.addWidget(self.gradient_type_combo, 3, 1)
-
-        self.padding_label = QLabel("Padding (px):")
-        background_layout.addWidget(self.padding_label, 4, 0)
-        self.padding_slider = QSlider(Qt.Orientation.Horizontal)
-        self.padding_slider.setRange(0, 50)
-        self.padding_slider.setValue(self.style.properties.get("padding", 15))
-        self.padding_slider.valueChanged.connect(self.update_preview)
-        background_layout.addWidget(self.padding_slider, 4, 1)
         self.background_group.setLayout(background_layout)
         controls_layout.addWidget(self.background_group)
 
@@ -598,7 +590,7 @@ class ConditionalStyleEditorDialog(QDialog):
         for w in [self.font_size_spin, self.width_spin, self.height_spin, self.tl_radius_slider,
                   self.tr_radius_slider, self.br_radius_slider, self.bl_radius_slider,
                   self.border_width_slider, self.hover_border_radius_slider, self.hover_border_width_slider,
-                  self.click_border_radius_slider, self.click_border_width_slider, self.padding_slider,
+                  self.click_border_radius_slider, self.click_border_width_slider,
                   self.x1_spin, self.y1_spin, self.x2_spin, self.y2_spin]:
             w.valueChanged.connect(self.update_preview)
         self.component_type_combo.currentTextChanged.connect(self.update_preview)
@@ -801,8 +793,6 @@ class ConditionalStyleEditorDialog(QDialog):
 
         self.shape_style_label.setVisible(not is_switch)
         self.shape_style_combo.setVisible(not is_switch)
-        self.padding_label.setVisible(not is_switch)
-        self.padding_slider.setVisible(not is_switch)
         self.border_group.setVisible(not is_switch)
 
         is_circle = component_type == "Circle Button"
@@ -823,14 +813,16 @@ class ConditionalStyleEditorDialog(QDialog):
         limit = min(width, height) // 2
         for s in [self.tl_radius_slider, self.tr_radius_slider, self.br_radius_slider, self.bl_radius_slider,
                   self.hover_border_radius_slider, self.click_border_radius_slider,
-                  self.padding_slider, self.border_width_slider,
+                  self.border_width_slider,
                   self.hover_border_width_slider, self.click_border_width_slider]:
             s.setMaximum(limit)
 
     def generate_qss(self, component_type):
         shape_style = self.shape_style_combo.currentText()
         bg_type = self.bg_type_combo.currentText()
-        padding = self.padding_slider.value()
+        width = self.width_spin.value() or 200
+        height = self.height_spin.value() or 100
+        padding = min(width, height) // 10
         tl_radius = self.tl_radius_slider.value()
         tr_radius = self.tr_radius_slider.value()
         br_radius = self.br_radius_slider.value()
@@ -988,7 +980,6 @@ class ConditionalStyleEditorDialog(QDialog):
             "gradient_y1": self.y1_spin.value(),
             "gradient_x2": self.x2_spin.value(),
             "gradient_y2": self.y2_spin.value(),
-            "padding": self.padding_slider.value(),
             "text_color": self._button_color(self.text_color_btn),
             "font_size": self.font_size_spin.value(),
             "width": self.width_spin.value(),
