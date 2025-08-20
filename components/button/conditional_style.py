@@ -1,6 +1,9 @@
 from typing import Dict, Any, List, Optional, ClassVar
 from dataclasses import dataclass, asdict, field
-from PyQt6.QtCore import QObject, pyqtSignal, Qt, QRect, QRectF, QSize
+import copy
+import operator
+
+from PyQt6.QtCore import QObject, pyqtSignal, Qt
 from PyQt6.QtWidgets import (
     QDialog,
     QVBoxLayout,
@@ -30,7 +33,18 @@ from button_creator import IconButton, SwitchButton
 from services.tag_service import tag_service
 from dialogs.widgets import TagSelector
 from services.tag_data_service import tag_data_service
-import copy
+
+_NUMERIC_OPERATORS = {
+    ">": operator.gt,
+    "<": operator.lt,
+    ">=": operator.ge,
+    "<=": operator.le,
+}
+
+_EQUALITY_OPERATORS = {
+    "==": operator.eq,
+    "!=": operator.ne,
+}
 
 # ---------------------------------------------------------------------------
 # Built-in button styles
@@ -206,10 +220,8 @@ class ConditionalStyleManager(QObject):
         for style in self.conditional_styles:
             if self._evaluate_conditions(style.conditions, tag_values):
                 props = dict(style.properties)
-                if state == 'hover':
-                    props.update(style.hover_properties)
-                elif state == 'click':
-                    props.update(style.click_properties)
+                if state:
+                    props.update(getattr(style, f"{state}_properties", {}))
                 if style.tooltip:
                     props['tooltip'] = style.tooltip
                 return props
@@ -234,27 +246,23 @@ class ConditionalStyleManager(QObject):
             tag_value = tag_service.get_tag_value(condition.tag_path)
         if tag_value is None:
             return False
-        
+
         try:
-            if condition.operator == "==":
-                return tag_value == condition.value
-            elif condition.operator == "!=":
-                return tag_value != condition.value
-            elif condition.operator == ">":
-                return float(tag_value) > float(condition.value)
-            elif condition.operator == "<":
-                return float(tag_value) < float(condition.value)
-            elif condition.operator == ">=":
-                return float(tag_value) >= float(condition.value)
-            elif condition.operator == "<=":
-                return float(tag_value) <= float(condition.value)
-            elif condition.operator == "between":
-                return float(condition.value) <= float(tag_value) <= float(condition.value2)
-            elif condition.operator == "outside":
-                return float(tag_value) < float(condition.value) or float(tag_value) > float(condition.value2)
+            if condition.operator in _EQUALITY_OPERATORS:
+                return _EQUALITY_OPERATORS[condition.operator](tag_value, condition.value)
+            if condition.operator in _NUMERIC_OPERATORS:
+                return _NUMERIC_OPERATORS[condition.operator](float(tag_value), float(condition.value))
+            if condition.operator == "between":
+                value = float(tag_value)
+                return float(condition.value) <= value <= float(condition.value2)
+            if condition.operator == "outside":
+                value = float(tag_value)
+                low = float(condition.value)
+                high = float(condition.value2)
+                return value < low or value > high
         except (ValueError, TypeError):
             return False
-        
+
         return False
     
     def to_dict(self) -> Dict[str, Any]:
