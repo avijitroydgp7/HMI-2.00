@@ -380,14 +380,13 @@ class ConditionalStyleEditorDialog(QDialog):
         main_layout = QGridLayout(self)
         main_layout.setColumnStretch(0, 1)
         main_layout.setColumnStretch(1, 1)
-
-        controls_layout = QVBoxLayout()
+        main_layout.setRowStretch(3, 1)
 
         info_layout = QGridLayout()
         self.tooltip_edit = QLineEdit(self.style.tooltip)
         info_layout.addWidget(QLabel("Tooltip:"), 0, 0)
         info_layout.addWidget(self.tooltip_edit, 0, 1)
-        controls_layout.addLayout(info_layout)
+        main_layout.addLayout(info_layout, 0, 0, 1, 2)
 
         self.init_colors()
 
@@ -435,7 +434,7 @@ class ConditionalStyleEditorDialog(QDialog):
         style_layout.addWidget(self.gradient_type_combo, 5, 1)
 
         style_group.setLayout(style_layout)
-        controls_layout.addWidget(style_group)
+        main_layout.addWidget(style_group, 1, 0)
 
         self.border_group = QGroupBox("Border")
         border_layout = QGridLayout()
@@ -522,11 +521,10 @@ class ConditionalStyleEditorDialog(QDialog):
         border_layout.addWidget(self.border_style_combo, 2, 1)
 
         self.border_group.setLayout(border_layout)
-        controls_layout.addWidget(self.border_group)
+        main_layout.addWidget(self.border_group, 2, 0)
 
         # Style tabs
         style_tabs = QTabWidget()
-        controls_layout.addWidget(style_tabs)
 
         # Base tab
         base_tab = QWidget(); base_layout = QGridLayout(base_tab)
@@ -602,16 +600,14 @@ class ConditionalStyleEditorDialog(QDialog):
         remove_cond_btn.clicked.connect(self._remove_condition)
         cond_buttons.addWidget(add_cond_btn); cond_buttons.addWidget(edit_cond_btn); cond_buttons.addWidget(remove_cond_btn)
         cond_buttons.addStretch(); cond_layout.addLayout(cond_buttons)
-        controls_layout.addWidget(cond_group)
-
-        controls_layout.addStretch(1)
+        main_layout.addWidget(cond_group, 2, 1)
 
         self.button_box = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
         self.button_box.accepted.connect(self.accept)
         self.button_box.rejected.connect(self.reject)
-        controls_layout.addWidget(self.button_box)
+        main_layout.addWidget(style_tabs, 3, 0, 1, 2)
+        main_layout.addWidget(self.button_box, 4, 0, 1, 2)
 
-        preview_layout = QVBoxLayout()
         preview_group = QGroupBox("Preview")
         preview_group_layout = QVBoxLayout(); preview_group_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.preview_stack = QStackedWidget()
@@ -622,11 +618,11 @@ class ConditionalStyleEditorDialog(QDialog):
         self.preview_stack.addWidget(self.preview_switch)
         preview_group_layout.addWidget(self.preview_stack)
         preview_group.setLayout(preview_group_layout)
-        preview_layout.addWidget(preview_group)
-        preview_layout.addStretch(1)
+        main_layout.addWidget(preview_group, 1, 1)
 
-        main_layout.addLayout(controls_layout, 0, 0)
-        main_layout.addLayout(preview_layout, 0, 1)
+        # Ensure group boxes line up neatly
+        preview_group.setMinimumHeight(style_group.sizeHint().height())
+        cond_group.setMinimumHeight(self.border_group.sizeHint().height())
 
         for w in [self.font_size_spin, self.width_spin, self.height_spin,
                   self.border_width_spin, self.hover_border_radius_slider, self.hover_border_width_slider,
