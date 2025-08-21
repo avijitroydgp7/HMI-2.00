@@ -26,10 +26,8 @@ from PyQt6.QtWidgets import (
     QTabWidget,
     QWidget,
     QStackedWidget,
-    QFontComboBox,
-    QCheckBox,
 )
-from PyQt6.QtGui import QColor, QPixmap, QIcon, QPalette, QPainter, QLinearGradient, QFont
+from PyQt6.QtGui import QColor, QPixmap, QIcon, QPalette, QPainter, QLinearGradient
 
 from button_creator import IconButton, SwitchButton
 from services.tag_service import tag_service
@@ -163,20 +161,6 @@ class ConditionalStyle:
     hover_properties: Dict[str, Any] = field(default_factory=dict)
     click_properties: Dict[str, Any] = field(default_factory=dict)
     animation: AnimationProperties = field(default_factory=AnimationProperties)
-    text_type: str = ""
-    comment_number: str = ""
-    comment_column: int = 0
-    comment_row: int = 0
-    simple_text: str = ""
-    font_family: str = ""
-    font_size: int = 0
-    font_bold: bool = False
-    font_italic: bool = False
-    font_underline: bool = False
-    align_h: str = ""
-    align_v: str = ""
-    text_background: str = ""
-    frame_offset: Dict[str, int] = field(default_factory=dict)
     
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -187,20 +171,6 @@ class ConditionalStyle:
             'hover_properties': self.hover_properties,
             'click_properties': self.click_properties,
             'animation': self.animation.to_dict(),
-            'text_type': self.text_type,
-            'comment_number': self.comment_number,
-            'comment_column': self.comment_column,
-            'comment_row': self.comment_row,
-            'simple_text': self.simple_text,
-            'font_family': self.font_family,
-            'font_size': self.font_size,
-            'font_bold': self.font_bold,
-            'font_italic': self.font_italic,
-            'font_underline': self.font_underline,
-            'align_h': self.align_h,
-            'align_v': self.align_v,
-            'text_background': self.text_background,
-            'frame_offset': self.frame_offset,
         }
     
     @classmethod
@@ -212,20 +182,6 @@ class ConditionalStyle:
             tooltip=data.get('tooltip', ''),
             hover_properties=data.get('hover_properties', {}),
             click_properties=data.get('click_properties', {}),
-            text_type=data.get('text_type', ''),
-            comment_number=data.get('comment_number', ''),
-            comment_column=data.get('comment_column', 0),
-            comment_row=data.get('comment_row', 0),
-            simple_text=data.get('simple_text', ''),
-            font_family=data.get('font_family', ''),
-            font_size=data.get('font_size', 0),
-            font_bold=data.get('font_bold', False),
-            font_italic=data.get('font_italic', False),
-            font_underline=data.get('font_underline', False),
-            align_h=data.get('align_h', ''),
-            align_v=data.get('align_v', ''),
-            text_background=data.get('text_background', ''),
-            frame_offset=data.get('frame_offset', {}),
         )
         if 'animation' in data:
             style.animation = AnimationProperties.from_dict(data['animation'])
@@ -238,23 +194,6 @@ class ConditionalStyleManager(QObject):
     parent: Optional[QObject] = None
     conditional_styles: List[ConditionalStyle] = field(default_factory=list)
     default_style: Dict[str, Any] = field(default_factory=dict)
-    _TEXT_KEYS: ClassVar[List[str]] = [
-        "text_type",
-        "comment_number",
-        "comment_column",
-        "comment_row",
-        "simple_text",
-        "font_family",
-        "font_size",
-        "font_bold",
-        "font_italic",
-        "font_underline",
-        "h_align",
-        "v_align",
-        "text_bg_color",
-        "offset_x",
-        "offset_y",
-    ]
 
     def __post_init__(self):
         super().__init__(self.parent)
@@ -292,29 +231,10 @@ class ConditionalStyleManager(QObject):
         for style in self.conditional_styles:
             if self._evaluate_conditions(style.conditions, tag_values):
                 props = dict(style.properties)
-
-                # Merge dataclass text fields into base properties if they are
-                # stored as separate attributes (for backward compatibility).
-                for key in self._TEXT_KEYS:
-                    val = getattr(style, key, None)
-                    if val not in (None, "", {}):
-                        props.setdefault(key, val)
-
                 if state:
-                    state_props = getattr(style, f"{state}_properties", {})
-
-                    # If text locking is enabled, ensure state specific styles
-                    # inherit the base text properties when they are missing.
-                    if props.get("text_lock"):
-                        for key in self._TEXT_KEYS:
-                            if key not in state_props and key in props:
-                                state_props[key] = props[key]
-
-                    props.update(state_props)
-
+                    props.update(getattr(style, f"{state}_properties", {}))
                 if style.tooltip:
-                    props["tooltip"] = style.tooltip
-
+                    props['tooltip'] = style.tooltip
                 return props
 
         return dict(self.default_style)
@@ -456,13 +376,6 @@ class ConditionalStyleEditorDialog(QDialog):
         self.style = copy.deepcopy(style) if style else ConditionalStyle()
         self.conditions = copy.deepcopy(self.style.conditions)
 
-        # Initialize color attributes to prevent AttributeError
-        self._bg_color = QColor("#2ecc71")
-        self._hover_bg_color = QColor("#58d68d")
-        self._border_color = QColor("#27ae60")
-        self._bg_color2 = QColor("#16a085")
-        self._click_bg_color = self._bg_color.darker(120)
-
         main_layout = QGridLayout(self)
         main_layout.setColumnStretch(0, 1)
         main_layout.setColumnStretch(1, 1)
@@ -477,14 +390,14 @@ class ConditionalStyleEditorDialog(QDialog):
 
         self.init_colors()
 
-        style_group = QGroupBox("Component Style & background")
+        style_group = QGroupBox("Component Style")
         style_layout = QGridLayout()
         style_layout.addWidget(QLabel("Component Type:"), 0, 0)
         self.component_type_combo = QComboBox()
         self.component_type_combo.addItems(["Standard Button", "Circle Button", "Square Button", "Toggle Switch"])
         self.component_type_combo.setCurrentText(self.style.properties.get("component_type", "Standard Button"))
         self.component_type_combo.currentTextChanged.connect(self.update_controls_state)
-        style_layout.addWidget(self.component_type_combo, 0, 1, 1, 2)
+        style_layout.addWidget(self.component_type_combo, 0, 1)
 
         self.shape_style_label = QLabel("Shape Style:")
         style_layout.addWidget(self.shape_style_label, 1, 0)
@@ -492,19 +405,24 @@ class ConditionalStyleEditorDialog(QDialog):
         self.shape_style_combo.addItems(["Flat", "3D", "Glass", "Neumorphic", "Outline"])
         self.shape_style_combo.setCurrentText(self.style.properties.get("shape_style", "Flat"))
         self.shape_style_combo.currentTextChanged.connect(self.update_preview)
-        style_layout.addWidget(self.shape_style_combo, 1, 1, 1, 2)
+        style_layout.addWidget(self.shape_style_combo, 1, 1)
 
-        style_layout.addWidget(QLabel("Background Type:"), 2, 0)
+        style_group.setLayout(style_layout)
+        controls_layout.addWidget(style_group)
+
+        self.background_group = QGroupBox("Background")
+        background_layout = QGridLayout()
+        background_layout.addWidget(QLabel("Background Type:"), 0, 0)
         self.bg_type_combo = QComboBox()
         self.bg_type_combo.addItems(["Solid", "Linear Gradient"])
         self.bg_type_combo.setCurrentText(self.style.properties.get("background_type", "Solid"))
         self.bg_type_combo.currentTextChanged.connect(self.update_controls_state)
-        style_layout.addWidget(self.bg_type_combo, 2, 1, 1, 2)
+        background_layout.addWidget(self.bg_type_combo, 0, 1)
 
-        style_layout.addWidget(QLabel("Main Color:"), 3, 0)
+        background_layout.addWidget(QLabel("Main Color:"), 1, 0)
         self.bg_base_color_combo, self.bg_shade_combo = self.create_color_selection_widgets(self.on_bg_color_changed)
-        style_layout.addWidget(self.bg_base_color_combo, 3, 1)
-        style_layout.addWidget(self.bg_shade_combo, 3, 2)
+        background_layout.addWidget(self.bg_base_color_combo, 1, 1)
+        background_layout.addWidget(self.bg_shade_combo, 2, 1)
 
         # Hidden coordinate spin boxes used internally to build the QSS gradient
         self.x1_spin = self.create_coord_spinbox(self.style.properties.get("gradient_x1", 0))
@@ -515,12 +433,12 @@ class ConditionalStyleEditorDialog(QDialog):
             w.setVisible(False)
 
         self.gradient_dir_label = QLabel("Gradient Direction:")
-        style_layout.addWidget(self.gradient_dir_label, 4, 0)
+        background_layout.addWidget(self.gradient_dir_label, 3, 0)
         self.gradient_type_combo = QComboBox()
         self._init_gradient_type_combo()
-        style_layout.addWidget(self.gradient_type_combo, 4, 1, 1, 2)
-        style_group.setLayout(style_layout)
-        controls_layout.addWidget(style_group)
+        background_layout.addWidget(self.gradient_type_combo, 3, 1)
+        self.background_group.setLayout(background_layout)
+        controls_layout.addWidget(self.background_group)
 
         self.border_group = QGroupBox("Border")
         border_layout = QGridLayout()
@@ -663,22 +581,6 @@ class ConditionalStyleEditorDialog(QDialog):
         cond_buttons.addStretch(); cond_layout.addLayout(cond_buttons)
         controls_layout.addWidget(cond_group)
 
-        # Text group
-        text_group = QGroupBox("Text")
-        text_layout = QVBoxLayout(text_group)
-        self.text_lock_checkbox = QCheckBox("Text base = Hover = Click")
-        self.text_lock_checkbox.setChecked(self.style.properties.get("text_lock", True))
-        text_layout.addWidget(self.text_lock_checkbox)
-        self.text_tabs = QTabWidget()
-        self.text_controls = {}
-        base_tab, self.text_controls['base'] = self._create_text_tab(self.style.properties)
-        hover_tab, self.text_controls['hover'] = self._create_text_tab(self.style.hover_properties)
-        click_tab, self.text_controls['click'] = self._create_text_tab(self.style.click_properties)
-        self.text_tabs.addTab(base_tab, "Base")
-        self.text_tabs.addTab(hover_tab, "Hover")
-        self.text_tabs.addTab(click_tab, "Click")
-        text_layout.addWidget(self.text_tabs)
-        controls_layout.addWidget(text_group)
         controls_layout.addStretch(1)
 
         self.button_box = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
@@ -695,13 +597,6 @@ class ConditionalStyleEditorDialog(QDialog):
         self.preview_switch = SwitchButton()
         self.preview_stack.addWidget(self.preview_button)
         self.preview_stack.addWidget(self.preview_switch)
-        self.text_lock_checkbox.toggled.connect(self._on_text_lock_toggled)
-        self._connect_base_text_signals()
-        # Ensure hover/click text changes refresh the preview when text locking
-        # is disabled by wiring their signals to the live preview slot.
-        self._connect_state_text_signals(self.text_controls['hover'])
-        self._connect_state_text_signals(self.text_controls['click'])
-        self._on_text_lock_toggled(self.text_lock_checkbox.isChecked())
         preview_group_layout.addWidget(self.preview_stack)
         preview_group.setLayout(preview_group_layout)
         preview_layout.addStretch(1); preview_layout.addWidget(preview_group); preview_layout.addStretch(1)
@@ -751,236 +646,10 @@ class ConditionalStyleEditorDialog(QDialog):
                 self._border_color = QColor(color_name)
             elif btn is self.click_bg_btn:
                 self._click_bg_color = QColor(color_name)
-            if hasattr(self, 'text_controls') and btn is self.text_controls.get('base', {}).get('bg_color_btn'):
-                self._sync_locked_text()
             self.update_preview()
 
     def _button_color(self, btn):
         return btn.property("color") or ""
-
-    # --- Text group helpers -------------------------------------------------
-
-    def _create_text_tab(self, data):
-        tab = QWidget()
-        layout = QGridLayout(tab)
-
-        text_type_combo = QComboBox()
-        text_type_combo.addItems(["Comment", "Simple text"])
-        text_type_combo.setCurrentText(data.get("text_type", "Simple text"))
-
-        comment_label = QLabel("Comment #:")
-        comment_edit = QLineEdit(data.get("comment_number", ""))
-        column_label = QLabel("Column:")
-        column_spin = QSpinBox(); column_spin.setRange(1, 1000)
-        column_spin.setValue(data.get("comment_column", 1))
-        row_label = QLabel("Row:")
-        row_spin = QSpinBox(); row_spin.setRange(1, 1000)
-        row_spin.setValue(data.get("comment_row", 1))
-
-        text_label = QLabel("Text:")
-        text_edit = QLineEdit(data.get("simple_text", ""))
-
-        font_label = QLabel("Font:")
-        font_combo = QFontComboBox();
-        font_combo.setCurrentFont(QFont(data.get("font_family", self.font().family())))
-        size_label = QLabel("Size:")
-        font_size_spin = QSpinBox(); font_size_spin.setRange(1, 1000)
-        font_size_spin.setValue(data.get("font_size", 10))
-        bold_check = QCheckBox("B"); bold_check.setChecked(data.get("font_bold", False))
-        italic_check = QCheckBox("I"); italic_check.setChecked(data.get("font_italic", False))
-        underline_check = QCheckBox("U"); underline_check.setChecked(data.get("font_underline", False))
-
-        h_align_label = QLabel("H Align:")
-        h_align_combo = QComboBox(); h_align_combo.addItems(["Left", "Center", "Right"])
-        h_align_combo.setCurrentText(data.get("h_align", "Center"))
-        v_align_label = QLabel("V Align:")
-        v_align_combo = QComboBox(); v_align_combo.addItems(["Top", "Center", "Bottom"])
-        v_align_combo.setCurrentText(data.get("v_align", "Center"))
-
-        bg_label = QLabel("Background:")
-        bg_btn = self.create_color_button(data.get("text_bg_color", ""))
-
-        offset_x_label = QLabel("Offset X:")
-        offset_x_spin = QSpinBox(); offset_x_spin.setRange(-1000, 1000)
-        offset_x_spin.setValue(data.get("offset_x", 0))
-        offset_y_label = QLabel("Offset Y:")
-        offset_y_spin = QSpinBox(); offset_y_spin.setRange(-1000, 1000)
-        offset_y_spin.setValue(data.get("offset_y", 0))
-
-        layout.addWidget(QLabel("Text Type:"), 0, 0)
-        layout.addWidget(text_type_combo, 0, 1, 1, 3)
-        layout.addWidget(comment_label, 1, 0); layout.addWidget(comment_edit, 1, 1)
-        layout.addWidget(column_label, 1, 2); layout.addWidget(column_spin, 1, 3)
-        layout.addWidget(row_label, 2, 0); layout.addWidget(row_spin, 2, 1)
-        layout.addWidget(text_label, 3, 0); layout.addWidget(text_edit, 3, 1, 1, 3)
-        layout.addWidget(font_label, 4, 0); layout.addWidget(font_combo, 4, 1, 1, 3)
-        layout.addWidget(size_label, 5, 0); layout.addWidget(font_size_spin, 5, 1)
-        style_layout = QHBoxLayout(); style_layout.addWidget(bold_check); style_layout.addWidget(italic_check); style_layout.addWidget(underline_check)
-        layout.addLayout(style_layout, 5, 2, 1, 2)
-        layout.addWidget(h_align_label, 6, 0); layout.addWidget(h_align_combo, 6, 1)
-        layout.addWidget(v_align_label, 6, 2); layout.addWidget(v_align_combo, 6, 3)
-        layout.addWidget(bg_label, 7, 0); layout.addWidget(bg_btn, 7, 1)
-        layout.addWidget(offset_x_label, 8, 0); layout.addWidget(offset_x_spin, 8, 1)
-        layout.addWidget(offset_y_label, 8, 2); layout.addWidget(offset_y_spin, 8, 3)
-
-        controls = {
-            'text_type_combo': text_type_combo,
-            'comment_label': comment_label,
-            'comment_edit': comment_edit,
-            'column_label': column_label,
-            'column_spin': column_spin,
-            'row_label': row_label,
-            'row_spin': row_spin,
-            'text_label': text_label,
-            'text_edit': text_edit,
-            'font_combo': font_combo,
-            'font_size_spin': font_size_spin,
-            'bold_check': bold_check,
-            'italic_check': italic_check,
-            'underline_check': underline_check,
-            'h_align_combo': h_align_combo,
-            'v_align_combo': v_align_combo,
-            'bg_color_btn': bg_btn,
-            'offset_x_spin': offset_x_spin,
-            'offset_y_spin': offset_y_spin,
-        }
-
-        text_type_combo.currentTextChanged.connect(lambda _: self._on_text_type_changed(controls))
-        self._on_text_type_changed(controls)
-
-        return tab, controls
-
-    def _on_text_type_changed(self, controls):
-        is_comment = controls['text_type_combo'].currentText() == "Comment"
-        for w in [controls['comment_label'], controls['comment_edit'], controls['column_label'], controls['column_spin'], controls['row_label'], controls['row_spin']]:
-            w.setVisible(is_comment)
-        for w in [controls['text_label'], controls['text_edit']]:
-            w.setVisible(not is_comment)
-
-    def _on_text_lock_toggled(self, checked):
-        self.text_tabs.setTabEnabled(1, not checked)
-        self.text_tabs.setTabEnabled(2, not checked)
-        self._sync_locked_text()
-        self.update_preview()
-
-    def _sync_locked_text(self):
-        if not getattr(self, 'text_controls', None):
-            return
-        if not self.text_lock_checkbox.isChecked():
-            return
-        base = self.text_controls['base']
-        for key in ['hover', 'click']:
-            ctrl = self.text_controls[key]
-            ctrl['text_type_combo'].setCurrentText(base['text_type_combo'].currentText())
-            ctrl['comment_edit'].setText(base['comment_edit'].text())
-            ctrl['column_spin'].setValue(base['column_spin'].value())
-            ctrl['row_spin'].setValue(base['row_spin'].value())
-            ctrl['text_edit'].setText(base['text_edit'].text())
-            ctrl['font_combo'].setCurrentFont(base['font_combo'].currentFont())
-            ctrl['font_size_spin'].setValue(base['font_size_spin'].value())
-            ctrl['bold_check'].setChecked(base['bold_check'].isChecked())
-            ctrl['italic_check'].setChecked(base['italic_check'].isChecked())
-            ctrl['underline_check'].setChecked(base['underline_check'].isChecked())
-            ctrl['h_align_combo'].setCurrentText(base['h_align_combo'].currentText())
-            ctrl['v_align_combo'].setCurrentText(base['v_align_combo'].currentText())
-            color = self._button_color(base['bg_color_btn'])
-            ctrl['bg_color_btn'].setProperty('color', color)
-            self._set_button_color(ctrl['bg_color_btn'], color)
-            ctrl['offset_x_spin'].setValue(base['offset_x_spin'].value())
-            ctrl['offset_y_spin'].setValue(base['offset_y_spin'].value())
-            self._on_text_type_changed(ctrl)
-
-    def _connect_base_text_signals(self):
-        base = self.text_controls['base']
-        base['text_type_combo'].currentTextChanged.connect(self.update_preview)
-        base['text_type_combo'].currentTextChanged.connect(self._sync_locked_text)
-        base['comment_edit'].textChanged.connect(self.update_preview)
-        base['comment_edit'].textChanged.connect(self._sync_locked_text)
-        base['column_spin'].valueChanged.connect(self.update_preview)
-        base['column_spin'].valueChanged.connect(self._sync_locked_text)
-        base['row_spin'].valueChanged.connect(self.update_preview)
-        base['row_spin'].valueChanged.connect(self._sync_locked_text)
-        base['text_edit'].textChanged.connect(self.update_preview)
-        base['text_edit'].textChanged.connect(self._sync_locked_text)
-        base['font_combo'].currentFontChanged.connect(self.update_preview)
-        base['font_combo'].currentFontChanged.connect(self._sync_locked_text)
-        base['font_size_spin'].valueChanged.connect(self.update_preview)
-        base['font_size_spin'].valueChanged.connect(self._sync_locked_text)
-        base['bold_check'].toggled.connect(self.update_preview)
-        base['bold_check'].toggled.connect(self._sync_locked_text)
-        base['italic_check'].toggled.connect(self.update_preview)
-        base['italic_check'].toggled.connect(self._sync_locked_text)
-        base['underline_check'].toggled.connect(self.update_preview)
-        base['underline_check'].toggled.connect(self._sync_locked_text)
-        base['h_align_combo'].currentTextChanged.connect(self.update_preview)
-        base['h_align_combo'].currentTextChanged.connect(self._sync_locked_text)
-        base['v_align_combo'].currentTextChanged.connect(self.update_preview)
-        base['v_align_combo'].currentTextChanged.connect(self._sync_locked_text)
-        base['offset_x_spin'].valueChanged.connect(self.update_preview)
-        base['offset_x_spin'].valueChanged.connect(self._sync_locked_text)
-        base['offset_y_spin'].valueChanged.connect(self.update_preview)
-        base['offset_y_spin'].valueChanged.connect(self._sync_locked_text)
-
-    def _connect_state_text_signals(self, controls):
-        """Connect text controls of a state (hover/click) to update preview."""
-        controls['text_type_combo'].currentTextChanged.connect(self.update_preview)
-        controls['comment_edit'].textChanged.connect(self.update_preview)
-        controls['column_spin'].valueChanged.connect(self.update_preview)
-        controls['row_spin'].valueChanged.connect(self.update_preview)
-        controls['text_edit'].textChanged.connect(self.update_preview)
-        controls['font_combo'].currentFontChanged.connect(self.update_preview)
-        controls['font_size_spin'].valueChanged.connect(self.update_preview)
-        controls['bold_check'].toggled.connect(self.update_preview)
-        controls['italic_check'].toggled.connect(self.update_preview)
-        controls['underline_check'].toggled.connect(self.update_preview)
-        controls['h_align_combo'].currentTextChanged.connect(self.update_preview)
-        controls['v_align_combo'].currentTextChanged.connect(self.update_preview)
-        controls['offset_x_spin'].valueChanged.connect(self.update_preview)
-        controls['offset_y_spin'].valueChanged.connect(self.update_preview)
-
-    def _collect_text_props(self, controls):
-        data = {
-            'text_type': controls['text_type_combo'].currentText(),
-            'font_family': controls['font_combo'].currentFont().family(),
-            'font_size': controls['font_size_spin'].value(),
-            'font_bold': controls['bold_check'].isChecked(),
-            'font_italic': controls['italic_check'].isChecked(),
-            'font_underline': controls['underline_check'].isChecked(),
-            'h_align': controls['h_align_combo'].currentText(),
-            'v_align': controls['v_align_combo'].currentText(),
-            'text_bg_color': self._button_color(controls['bg_color_btn']),
-            'offset_x': controls['offset_x_spin'].value(),
-            'offset_y': controls['offset_y_spin'].value(),
-        }
-        if data['text_type'] == 'Comment':
-            data.update({
-                'comment_number': controls['comment_edit'].text(),
-                'comment_column': controls['column_spin'].value(),
-                'comment_row': controls['row_spin'].value(),
-                'simple_text': '',
-            })
-        else:
-            data.update({
-                'simple_text': controls['text_edit'].text(),
-                'comment_number': '',
-                'comment_column': 0,
-                'comment_row': 0,
-            })
-        return data
-
-    def _alignment_flags(self, h_align: str, v_align: str) -> str:
-        """Convert alignment options to Qt flag strings for QSS."""
-        h_map = {
-            'Left': 'AlignLeft',
-            'Center': 'AlignHCenter',
-            'Right': 'AlignRight'
-        }
-        v_map = {
-            'Top': 'AlignTop',
-            'Center': 'AlignVCenter',
-            'Bottom': 'AlignBottom'
-        }
-        return f"{h_map.get(h_align, 'AlignHCenter')} | {v_map.get(v_align, 'AlignVCenter')}"
 
     def init_colors(self):
         self.color_schemes = {
@@ -1199,15 +868,8 @@ class ConditionalStyleEditorDialog(QDialog):
         hover_bg_color = self._hover_bg_color
         click_bg_color = self._click_bg_color
         border_color = self._border_color
-
-        base_text = self._collect_text_props(self.text_controls['base'])
-        hover_text = base_text if self.text_lock_checkbox.isChecked() else self._collect_text_props(self.text_controls['hover'])
-        click_text = base_text if self.text_lock_checkbox.isChecked() else self._collect_text_props(self.text_controls['click'])
-
         text_color = self._button_color(self.text_color_btn) or self.palette().color(QPalette.ColorRole.ButtonText).name()
-        hover_text_color = self._button_color(self.hover_text_btn) or text_color
-        click_text_color = self._button_color(self.click_text_btn) or text_color
-
+        font_size = self.font_size_spin.value()
         hover_border_color = QColor(self._button_color(self.hover_border_color_btn) or border_color.name())
         click_border_color = QColor(self._button_color(self.click_border_color_btn) or border_color.name())
 
@@ -1224,20 +886,6 @@ class ConditionalStyleEditorDialog(QDialog):
         else:
             self.preview_button.setFixedSize(self.width_spin.value() or 200, self.height_spin.value() or 100)
 
-        def _text_qss(text_props, color):
-            lines = [
-                f"color: {color};",
-                f"font-size: {text_props.get('font_size', 0)}pt;",
-                f"font-family: '{text_props.get('font_family', '')}';",
-                f"font-weight: {'bold' if text_props.get('font_bold') else 'normal'};",
-                f"font-style: {'italic' if text_props.get('font_italic') else 'normal'};",
-                f"text-align: {text_props.get('h_align', 'left').lower()};",
-                f"qproperty-alignment: {self._alignment_flags(text_props.get('h_align', 'Center'), text_props.get('v_align', 'Center'))};",
-            ]
-            if text_props.get('font_underline'):
-                lines.append("text-decoration: underline;")
-            return lines
-
         main_qss, hover_qss, pressed_qss = [], [], []
         main_qss.extend([
             f"padding: {padding}px;",
@@ -1245,11 +893,9 @@ class ConditionalStyleEditorDialog(QDialog):
             f"border-top-right-radius: {tr_radius}px;",
             f"border-bottom-right-radius: {br_radius}px;",
             f"border-bottom-left-radius: {bl_radius}px;",
+            f"color: {text_color};",
+            f"font-size: {font_size}pt;"
         ])
-        main_qss.extend(_text_qss(base_text, text_color))
-
-        hover_qss.extend(_text_qss(hover_text, hover_text_color))
-        pressed_qss.extend(_text_qss(click_text, click_text_color))
 
         if shape_style == "Glass":
             light_color, dark_color = bg_color.lighter(150).name(), bg_color.name()
@@ -1316,19 +962,6 @@ class ConditionalStyleEditorDialog(QDialog):
 
     def update_preview(self):
         component_type = self.component_type_combo.currentText()
-        base = self.text_controls['base'] if hasattr(self, 'text_controls') else None
-        if base:
-            if base['text_type_combo'].currentText() == "Simple text":
-                text = base['text_edit'].text()
-            else:
-                text = f"{base['comment_edit'].text()}[{base['row_spin'].value()},{base['column_spin'].value()}]"
-            self.preview_button.setText(text)
-            font = base['font_combo'].currentFont()
-            font.setPointSize(base['font_size_spin'].value())
-            font.setBold(base['bold_check'].isChecked())
-            font.setItalic(base['italic_check'].isChecked())
-            font.setUnderline(base['underline_check'].isChecked())
-            self.preview_button.setFont(font)
         qss = self.generate_qss(component_type)
         if component_type == "Toggle Switch":
             self.preview_switch.setStyleSheet(qss)
@@ -1395,10 +1028,6 @@ class ConditionalStyleEditorDialog(QDialog):
             "border_color": self._button_color(self.border_color_btn),
         }
 
-        base_text = self._collect_text_props(self.text_controls['base'])
-        properties.update(base_text)
-        properties["text_lock"] = self.text_lock_checkbox.isChecked()
-
         hover_properties = {
             "background_color": self._button_color(self.hover_bg_btn),
             "text_color": self._button_color(self.hover_text_btn),
@@ -1414,13 +1043,6 @@ class ConditionalStyleEditorDialog(QDialog):
             "border_width": self.click_border_width_slider.value(),
             "border_color": self._button_color(self.click_border_color_btn),
         }
-
-        if self.text_lock_checkbox.isChecked():
-            hover_properties.update(base_text)
-            click_properties.update(base_text)
-        else:
-            hover_properties.update(self._collect_text_props(self.text_controls['hover']))
-            click_properties.update(self._collect_text_props(self.text_controls['click']))
 
         style = ConditionalStyle(
             style_id=self.style.style_id,
