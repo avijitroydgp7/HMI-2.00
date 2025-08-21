@@ -3,7 +3,7 @@ from dataclasses import dataclass, asdict, field
 import copy
 import operator
 
-from PyQt6.QtCore import QObject, pyqtSignal, Qt
+from PyQt6.QtCore import QObject, pyqtSignal, Qt, QSize
 from PyQt6.QtWidgets import (
     QDialog,
     QVBoxLayout,
@@ -26,8 +26,9 @@ from PyQt6.QtWidgets import (
     QTabWidget,
     QWidget,
     QStackedWidget,
+    QFrame,
 )
-from PyQt6.QtGui import QColor, QPixmap, QIcon, QPalette, QPainter, QLinearGradient
+from PyQt6.QtGui import QColor, QPixmap, QIcon, QPalette, QPainter, QLinearGradient, QPen
 
 from button_creator import IconButton, SwitchButton
 from services.tag_service import tag_service
@@ -439,33 +440,51 @@ class ConditionalStyleEditorDialog(QDialog):
         self.border_group = QGroupBox("Border")
         border_layout = QGridLayout()
 
-        self.tl_radius_label = QLabel("Top-Left Radius:")
-        border_layout.addWidget(self.tl_radius_label, 0, 0)
-        self.tl_radius_spin = self.create_radius_spinbox()
-        self.tl_radius_spin.setValue(self.style.properties.get("border_radius_tl", 0))
-        border_layout.addWidget(self.tl_radius_spin, 0, 1)
+        # Corner radius table
+        self.corner_frame = QFrame()
+        self.corner_frame.setStyleSheet("QFrame { border: 1px solid #666; }")
+        corner_layout = QGridLayout(self.corner_frame)
+        corner_layout.setContentsMargins(0, 0, 0, 0)
+        corner_layout.setSpacing(0)
 
-        self.tr_radius_label = QLabel("Top-Right Radius:")
-        border_layout.addWidget(self.tr_radius_label, 1, 0)
-        self.tr_radius_spin = self.create_radius_spinbox()
-        self.tr_radius_spin.setValue(self.style.properties.get("border_radius_tr", 0))
-        border_layout.addWidget(self.tr_radius_spin, 1, 1)
-
-        self.br_radius_label = QLabel("Bottom-Right Radius:")
-        border_layout.addWidget(self.br_radius_label, 2, 0)
-        self.br_radius_spin = self.create_radius_spinbox()
-        self.br_radius_spin.setValue(self.style.properties.get("border_radius_br", 0))
-        border_layout.addWidget(self.br_radius_spin, 2, 1)
-
-        self.bl_radius_label = QLabel("Bottom-Left Radius:")
-        border_layout.addWidget(self.bl_radius_label, 3, 0)
-        self.bl_radius_spin = self.create_radius_spinbox()
-        self.bl_radius_spin.setValue(self.style.properties.get("border_radius_bl", 0))
-        border_layout.addWidget(self.bl_radius_spin, 3, 1)
+        header = QLabel("Corner radius")
+        header.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        corner_layout.addWidget(header, 0, 0, 1, 3)
 
         self.link_radius_btn = QPushButton()
         self.link_radius_btn.setCheckable(True)
-        border_layout.addWidget(self.link_radius_btn, 0, 2, 4, 1)
+        corner_layout.addWidget(self.link_radius_btn, 1, 0)
+
+        left_label = QLabel("Left")
+        left_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        corner_layout.addWidget(left_label, 1, 1)
+        right_label = QLabel("Right")
+        right_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        corner_layout.addWidget(right_label, 1, 2)
+
+        top_label = QLabel("Top")
+        top_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        corner_layout.addWidget(top_label, 2, 0)
+        bottom_label = QLabel("Bottom")
+        bottom_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        corner_layout.addWidget(bottom_label, 3, 0)
+
+        self.tl_radius_spin = self.create_radius_spinbox()
+        self.tl_radius_spin.setValue(self.style.properties.get("border_radius_tl", 0))
+        corner_layout.addWidget(self.tl_radius_spin, 2, 1)
+        self.tr_radius_spin = self.create_radius_spinbox()
+        self.tr_radius_spin.setValue(self.style.properties.get("border_radius_tr", 0))
+        corner_layout.addWidget(self.tr_radius_spin, 2, 2)
+        self.bl_radius_spin = self.create_radius_spinbox()
+        self.bl_radius_spin.setValue(self.style.properties.get("border_radius_bl", 0))
+        corner_layout.addWidget(self.bl_radius_spin, 3, 1)
+        self.br_radius_spin = self.create_radius_spinbox()
+        self.br_radius_spin.setValue(self.style.properties.get("border_radius_br", 0))
+        corner_layout.addWidget(self.br_radius_spin, 3, 2)
+
+        for w in [header, self.link_radius_btn, left_label, right_label, top_label, bottom_label,
+                   self.tl_radius_spin, self.tr_radius_spin, self.bl_radius_spin, self.br_radius_spin]:
+            w.setStyleSheet("border: 1px solid #666;")
 
         self.corner_spins = {
             "tl": self.tl_radius_spin,
@@ -478,21 +497,30 @@ class ConditionalStyleEditorDialog(QDialog):
         self.link_radius_btn.toggled.connect(self.on_link_radius_toggled)
         self.on_link_radius_toggled(self.link_radius_btn.isChecked())
 
-        border_layout.addWidget(QLabel("Border Width (px):"), 4, 0)
+        border_layout.addWidget(self.corner_frame, 0, 0, 1, 2)
+
+        border_layout.addWidget(QLabel("Border Width (px):"), 1, 0)
         self.border_width_spin = QSpinBox()
         # Allow border width up to 20px, final limit is adjusted dynamically
         self.border_width_spin.setRange(0, 20)
         self.border_width_spin.setValue(self.style.properties.get("border_width", 0))
         self.border_width_spin.valueChanged.connect(self.update_preview)
-        border_layout.addWidget(self.border_width_spin, 4, 1)
+        border_layout.addWidget(self.border_width_spin, 1, 1)
 
         self.border_style_label = QLabel("Border Style:")
-        border_layout.addWidget(self.border_style_label, 5, 0)
+        border_layout.addWidget(self.border_style_label, 2, 0)
         self.border_style_combo = QComboBox()
-        self.border_style_combo.addItems(["none", "solid", "dashed", "dotted", "double", "groove", "ridge"])
-        self.border_style_combo.setCurrentText(self.style.properties.get("border_style", "solid"))
-        self.border_style_combo.currentTextChanged.connect(self.update_preview)
-        border_layout.addWidget(self.border_style_combo, 5, 1)
+        self.border_style_combo.setIconSize(QSize(60, 12))
+        _styles = ["none", "solid", "dashed", "dotted", "double", "groove", "ridge"]
+        for s in _styles:
+            self.border_style_combo.addItem(self._create_border_style_icon(s), "")
+            index = self.border_style_combo.count() - 1
+            self.border_style_combo.setItemData(index, s)
+        current_style = self.style.properties.get("border_style", "solid")
+        if current_style in _styles:
+            self.border_style_combo.setCurrentIndex(_styles.index(current_style))
+        self.border_style_combo.currentIndexChanged.connect(self.update_preview)
+        border_layout.addWidget(self.border_style_combo, 2, 1)
 
         self.border_group.setLayout(border_layout)
         controls_layout.addWidget(self.border_group)
@@ -780,6 +808,38 @@ class ConditionalStyleEditorDialog(QDialog):
         painter.end()
         return QIcon(pixmap)
 
+    def _create_border_style_icon(self, style_name: str) -> QIcon:
+        pixmap = QPixmap(60, 12)
+        pixmap.fill(Qt.GlobalColor.transparent)
+        painter = QPainter(pixmap)
+        pen = QPen(QColor("#ffffff"), 2)
+        if style_name == "double":
+            painter.setPen(pen)
+            painter.drawLine(0, 4, 60, 4)
+            painter.drawLine(0, 8, 60, 8)
+        elif style_name == "groove":
+            painter.setPen(pen)
+            painter.drawLine(0, 4, 60, 4)
+            pen.setColor(QColor("#888888"))
+            painter.setPen(pen)
+            painter.drawLine(0, 8, 60, 8)
+        elif style_name == "ridge":
+            painter.setPen(QPen(QColor("#888888"), 2))
+            painter.drawLine(0, 4, 60, 4)
+            painter.setPen(QPen(QColor("#ffffff"), 2))
+            painter.drawLine(0, 8, 60, 8)
+        elif style_name != "none":
+            if style_name == "dashed":
+                pen.setStyle(Qt.PenStyle.DashLine)
+            elif style_name == "dotted":
+                pen.setStyle(Qt.PenStyle.DotLine)
+            else:
+                pen.setStyle(Qt.PenStyle.SolidLine)
+            painter.setPen(pen)
+            painter.drawLine(0, 6, 60, 6)
+        painter.end()
+        return QIcon(pixmap)
+
     def _init_gradient_type_combo(self):
         for name, coords in _GRADIENT_STYLES.items():
             self.gradient_type_combo.addItem(self._create_gradient_icon(coords), name)
@@ -824,10 +884,7 @@ class ConditionalStyleEditorDialog(QDialog):
         self.border_group.setVisible(not is_switch)
 
         is_circle = component_type == "Circle Button"
-        for w in [self.tl_radius_label, self.tl_radius_spin, self.tr_radius_label, self.tr_radius_spin,
-                  self.bl_radius_label, self.bl_radius_spin, self.br_radius_label, self.br_radius_spin,
-                  self.link_radius_btn]:
-            w.setEnabled(not is_circle and not is_switch)
+        self.corner_frame.setEnabled(not is_circle and not is_switch)
 
         is_gradient = self.bg_type_combo.currentText() == "Linear Gradient"
         for w in [self.gradient_dir_label, self.gradient_type_combo]:
@@ -860,7 +917,7 @@ class ConditionalStyleEditorDialog(QDialog):
         br_radius = self.br_radius_spin.value()
         bl_radius = self.bl_radius_spin.value()
         border_width = self.border_width_spin.value()
-        border_style = self.border_style_combo.currentText()
+        border_style = self.border_style_combo.currentData()
         bg_color = self._bg_color
         hover_bg_color = self._hover_bg_color
         click_bg_color = self._click_bg_color
@@ -1021,7 +1078,7 @@ class ConditionalStyleEditorDialog(QDialog):
             "border_radius_br": self.br_radius_spin.value(),
             "border_radius_bl": self.bl_radius_spin.value(),
             "border_width": self.border_width_spin.value(),
-            "border_style": self.border_style_combo.currentText(),
+            "border_style": self.border_style_combo.currentData(),
             "border_color": self._button_color(self.border_color_btn),
         }
 
