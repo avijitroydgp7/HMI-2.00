@@ -655,7 +655,7 @@ class ConditionalStyleEditorDialog(QDialog):
         layout.addWidget(QLabel("Font:"), 2, 0)
         font_combo = QComboBox()
         font_combo.setEditable(True)
-        font_combo.addItems(QFontDatabase().families())
+        font_combo.addItems(QFontDatabase.families())
         if props.get("font_family"):
             font_combo.setCurrentText(props.get("font_family"))
         layout.addWidget(font_combo, 2, 1)
