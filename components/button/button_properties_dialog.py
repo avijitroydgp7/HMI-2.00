@@ -16,10 +16,8 @@ from dialogs.actions.word_action_dialog import WordActionDialog
 from .conditional_style import (
     ConditionalStyleManager,
     ConditionalStyle,
-    StyleCondition,
     ConditionalStyleEditorDialog,
 )
-from services.tag_data_service import tag_data_service
 
 
 class ButtonPropertiesDialog(QDialog):
@@ -445,7 +443,7 @@ class ButtonPropertiesDialog(QDialog):
         # Left panel: Style table
         self.style_table = QTableWidget()
         self.style_table.setColumnCount(3)
-        self.style_table.setHorizontalHeaderLabels(["#", "Style ID", "Condition Summary"])
+        self.style_table.setHorizontalHeaderLabels(["#", "Style ID"])
         self.style_table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         self.style_table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
         self.style_table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
@@ -453,7 +451,6 @@ class ButtonPropertiesDialog(QDialog):
         header = self.style_table.horizontalHeader()
         header.setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
         header.setSectionResizeMode(1, QHeaderView.ResizeMode.ResizeToContents)
-        header.setSectionResizeMode(2, QHeaderView.ResizeMode.Stretch)
         splitter.addWidget(self.style_table)
 
         # Right panel: Style properties (placeholder)
@@ -500,52 +497,12 @@ class ButtonPropertiesDialog(QDialog):
         self.style_table.cellDoubleClicked.connect(self._on_style_double_click)
         self._refresh_style_table()
 
-    def _format_conditions_for_display(self, conditions):
-        parts = []
-        for cond in conditions:
-            segment = f"{cond.tag_path} {cond.operator} {cond.value}"
-            if cond.operator in ("between", "outside") and cond.value2 not in (None, ""):
-                segment += f" {cond.value2}"
-            parts.append(segment)
-        return ", ".join(parts)
-
-    def _summarize_conditions(self, conditions):
-        bit = int_count = real = 0
-        for cond in conditions:
-            try:
-                db_part, tag_part = cond.tag_path.split("]::")
-                db_name = db_part.strip("[")
-                db_id = tag_data_service.find_db_id_by_name(db_name)
-                tag = tag_data_service.get_tag(db_id, tag_part) if db_id else None
-                dtype = (tag or {}).get("data_type", "").upper()
-                if dtype == "BOOL":
-                    bit += 1
-                elif dtype in ("INT", "DINT"):
-                    int_count += 1
-                elif dtype == "REAL":
-                    real += 1
-            except ValueError:
-                continue
-        parts = []
-        if bit:
-            parts.append(f"B:{bit}")
-        if int_count:
-            parts.append(f"I:{int_count}")
-        if real:
-            parts.append(f"R:{real}")
-        return ", ".join(parts) if parts else "None"
-
     def _refresh_style_table(self):
         self.style_table.setRowCount(0)
         for i, style in enumerate(self.style_manager.conditional_styles):
             self.style_table.insertRow(i)
             self.style_table.setItem(i, 0, QTableWidgetItem(str(i + 1)))
             self.style_table.setItem(i, 1, QTableWidgetItem(style.style_id))
-            summary = self._summarize_conditions(style.conditions)
-            details = self._format_conditions_for_display(style.conditions)
-            cond_item = QTableWidgetItem(summary)
-            cond_item.setToolTip(details)
-            self.style_table.setItem(i, 2, cond_item)
 
     def _add_style(self):
         dialog = ConditionalStyleEditorDialog(self)

@@ -1,22 +1,15 @@
 from typing import Dict, Any, List, Optional, ClassVar
-from dataclasses import dataclass, asdict, field
+from dataclasses import dataclass, field
 import copy
-import operator
 
 from PyQt6.QtCore import QObject, pyqtSignal, Qt, QSize
 from PyQt6.QtWidgets import (
     QDialog,
     QVBoxLayout,
-    QFormLayout,
     QLineEdit,
     QSpinBox,
     QGroupBox,
     QPushButton,
-    QHBoxLayout,
-    QTableWidget,
-    QTableWidgetItem,
-    QHeaderView,
-    QAbstractItemView,
     QDialogButtonBox,
     QComboBox,
     QGridLayout,
@@ -31,22 +24,7 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtGui import QColor, QPixmap, QIcon, QPalette, QPainter, QLinearGradient, QPen
 
 from button_creator import IconButton, SwitchButton
-from services.tag_service import tag_service
-from dialogs.widgets import TagSelector
-from services.tag_data_service import tag_data_service
 from utils.icon_manager import IconManager
-
-_NUMERIC_OPERATORS = {
-    ">": operator.gt,
-    "<": operator.lt,
-    ">=": operator.ge,
-    "<=": operator.le,
-}
-
-_EQUALITY_OPERATORS = {
-    "==": operator.eq,
-    "!=": operator.ne,
-}
 
 # Predefined gradient orientations used for visual selection
 _GRADIENT_STYLES = {
@@ -138,25 +116,9 @@ class AnimationProperties:
 
 
 @dataclass
-class StyleCondition:
-    """Defines when a style should be active based on tag values"""
-    tag_path: str = ""  # Full tag path in form "[db_name]::tag_name"
-    operator: str = "=="  # ==, !=, >, <, >=, <=, between, outside
-    value: Any = None
-    value2: Any = None  # For range operators
-
-    def to_dict(self) -> Dict[str, Any]:
-        return asdict(self)
-
-    @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "StyleCondition":
-        return cls(**data)
-
-@dataclass
 class ConditionalStyle:
-    """A style that can be conditionally applied based on tag values"""
+    """A style that can be applied to a button"""
     style_id: str = ""
-    conditions: List[StyleCondition] = field(default_factory=list)
     properties: Dict[str, Any] = field(default_factory=dict)
     tooltip: str = ""
     hover_properties: Dict[str, Any] = field(default_factory=dict)
@@ -166,7 +128,6 @@ class ConditionalStyle:
     def to_dict(self) -> Dict[str, Any]:
         return {
             'style_id': self.style_id,
-            'conditions': [cond.to_dict() for cond in self.conditions],
             'properties': self.properties,
             'tooltip': self.tooltip,
             'hover_properties': self.hover_properties,
@@ -178,7 +139,6 @@ class ConditionalStyle:
     def from_dict(cls, data: Dict[str, Any]) -> 'ConditionalStyle':
         style = cls(
             style_id=data.get('style_id', ''),
-            conditions=[StyleCondition.from_dict(cond) for cond in data.get('conditions', [])],
             properties=data.get('properties', {}),
             tooltip=data.get('tooltip', ''),
             hover_properties=data.get('hover_properties', {}),
@@ -222,60 +182,23 @@ class ConditionalStyleManager(QObject):
         Parameters
         ----------
         tag_values: Dict[str, Any], optional
-            Current tag values; if not provided, values will be resolved via ``tag_service``.
+            Current tag values (reserved for future use).
         state: Optional[str]
             Optional state for which to retrieve additional properties.
             Supported states: ``"hover"`` and ``"click"``.
         """
         tag_values = tag_values or {}
 
-        for style in self.conditional_styles:
-            if self._evaluate_conditions(style.conditions, tag_values):
-                props = dict(style.properties)
-                if state:
-                    props.update(getattr(style, f"{state}_properties", {}))
-                if style.tooltip:
-                    props['tooltip'] = style.tooltip
-                return props
+        if self.conditional_styles:
+            style = self.conditional_styles[0]
+            props = dict(style.properties)
+            if state:
+                props.update(getattr(style, f"{state}_properties", {}))
+            if style.tooltip:
+                props['tooltip'] = style.tooltip
+            return props
 
         return dict(self.default_style)
-    
-    def _evaluate_conditions(self, conditions: List[StyleCondition], tag_values: Dict[str, Any]) -> bool:
-        """Evaluate if all conditions are met"""
-        if not conditions:
-            return True
-        
-        for condition in conditions:
-            if not self._evaluate_single_condition(condition, tag_values):
-                return False
-        
-        return True
-    
-    def _evaluate_single_condition(self, condition: StyleCondition, tag_values: Dict[str, Any]) -> bool:
-        """Evaluate a single condition"""
-        tag_value = tag_values.get(condition.tag_path)
-        if tag_value is None:
-            tag_value = tag_service.get_tag_value(condition.tag_path)
-        if tag_value is None:
-            return False
-
-        try:
-            if condition.operator in _EQUALITY_OPERATORS:
-                return _EQUALITY_OPERATORS[condition.operator](tag_value, condition.value)
-            if condition.operator in _NUMERIC_OPERATORS:
-                return _NUMERIC_OPERATORS[condition.operator](float(tag_value), float(condition.value))
-            if condition.operator == "between":
-                value = float(tag_value)
-                return float(condition.value) <= value <= float(condition.value2)
-            if condition.operator == "outside":
-                value = float(tag_value)
-                low = float(condition.value)
-                high = float(condition.value2)
-                return value < low or value > high
-        except (ValueError, TypeError):
-            return False
-
-        return False
     
     def to_dict(self) -> Dict[str, Any]:
         """Serialize to dictionary"""
@@ -305,77 +228,11 @@ class PreviewButton(IconButton):
         self.setText(text)
 
 
-class ConditionEditorDialog(QDialog):
-    def __init__(self, parent=None, condition: Optional[StyleCondition] = None):
-        super().__init__(parent)
-        self.setWindowTitle("Edit Condition")
-        self.condition = copy.deepcopy(condition) if condition else StyleCondition()
-
-        layout = QFormLayout(self)
-        self.tag_selector = TagSelector()
-        self.tag_selector.main_tag_selector.set_mode_fixed("Tag")
-
-        # Preload existing tag path if provided
-        if self.condition.tag_path:
-            try:
-                db_part, tag_part = self.condition.tag_path.split("]::")
-                db_name = db_part.strip("[")
-                tag_name = tag_part
-                db_id = tag_data_service.find_db_id_by_name(db_name)
-                if db_id:
-                    self.tag_selector.set_data({
-                        "main_tag": {
-                            "source": "tag",
-                            "value": {
-                                "db_id": db_id,
-                                "db_name": db_name,
-                                "tag_name": tag_name,
-                            },
-                        },
-                        "indices": [],
-                    })
-            except ValueError:
-                pass
-
-        layout.addRow("Tag Path:", self.tag_selector)
-
-        self.operator_combo = QComboBox()
-        self.operator_combo.addItems(["==", "!=", ">", "<", ">=", "<=", "between", "outside"])
-        self.operator_combo.setCurrentText(self.condition.operator)
-        layout.addRow("Operator:", self.operator_combo)
-
-        self.value_edit = QLineEdit(str(self.condition.value) if self.condition.value is not None else "")
-        self.value2_edit = QLineEdit(str(self.condition.value2) if self.condition.value2 is not None else "")
-        layout.addRow("Value:", self.value_edit)
-        layout.addRow("Value2:", self.value2_edit)
-
-        buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
-        buttons.accepted.connect(self.accept)
-        buttons.rejected.connect(self.reject)
-        layout.addWidget(buttons)
-
-    def get_condition(self) -> StyleCondition:
-        tag_data = self.tag_selector.get_data()
-        tag_path = ""
-        if tag_data and tag_data.get("main_tag", {}).get("source") == "tag":
-            value = tag_data["main_tag"]["value"]
-            tag_path = f"[{value.get('db_name')}]::{value.get('tag_name')}"
-
-        cond = StyleCondition(
-            tag_path=tag_path,
-            operator=self.operator_combo.currentText(),
-            value=self.value_edit.text() or None,
-            value2=self.value2_edit.text() or None,
-        )
-        return cond
-
-
 class ConditionalStyleEditorDialog(QDialog):
     def __init__(self, parent=None, style: Optional[ConditionalStyle] = None):
         super().__init__(parent)
         self.setWindowTitle("Conditional Style")
         self.style = copy.deepcopy(style) if style else ConditionalStyle()
-        self.conditions = copy.deepcopy(self.style.conditions)
 
         main_layout = QGridLayout(self)
         main_layout.setColumnStretch(0, 1)
@@ -577,29 +434,9 @@ class ConditionalStyleEditorDialog(QDialog):
         click_layout.addWidget(QLabel("Border Color:"), 4, 0); click_layout.addWidget(self.click_border_color_btn, 4, 1)
         style_tabs.addTab(click_tab, "Click")
 
-        # Conditions group
+        # Conditions group - left empty for future use
         cond_group = QGroupBox("Conditions")
-        cond_layout = QVBoxLayout(cond_group)
-        self.condition_table = QTableWidget(); self.condition_table.setColumnCount(4)
-        self.condition_table.setHorizontalHeaderLabels(["Tag Path", "Operator", "Value", "Value2"])
-        self.condition_table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
-        self.condition_table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
-        self.condition_table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
-        self.condition_table.verticalHeader().setVisible(False)
-        header = self.condition_table.horizontalHeader()
-        header.setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
-        header.setSectionResizeMode(1, QHeaderView.ResizeMode.ResizeToContents)
-        header.setSectionResizeMode(2, QHeaderView.ResizeMode.Stretch)
-        header.setSectionResizeMode(3, QHeaderView.ResizeMode.Stretch)
-        cond_layout.addWidget(self.condition_table)
-
-        cond_buttons = QHBoxLayout()
-        add_cond_btn = QPushButton("Add"); edit_cond_btn = QPushButton("Edit"); remove_cond_btn = QPushButton("Remove")
-        add_cond_btn.clicked.connect(self._add_condition)
-        edit_cond_btn.clicked.connect(self._edit_condition)
-        remove_cond_btn.clicked.connect(self._remove_condition)
-        cond_buttons.addWidget(add_cond_btn); cond_buttons.addWidget(edit_cond_btn); cond_buttons.addWidget(remove_cond_btn)
-        cond_buttons.addStretch(); cond_layout.addLayout(cond_buttons)
+        QVBoxLayout(cond_group)
         main_layout.addWidget(cond_group, 2, 1)
 
         self.button_box = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
@@ -633,7 +470,6 @@ class ConditionalStyleEditorDialog(QDialog):
         self.width_spin.valueChanged.connect(self.update_controls_state)
         self.height_spin.valueChanged.connect(self.update_controls_state)
 
-        self._refresh_condition_table()
         self.set_initial_colors()
         self.update_controls_state()
         self.update_preview()
@@ -1017,40 +853,6 @@ class ConditionalStyleEditorDialog(QDialog):
         else:
             self.preview_button.setStyleSheet(qss)
 
-    def _refresh_condition_table(self):
-        self.condition_table.setRowCount(0)
-        for i, cond in enumerate(self.conditions):
-            self.condition_table.insertRow(i)
-            self.condition_table.setItem(i, 0, QTableWidgetItem(cond.tag_path))
-            self.condition_table.setItem(i, 1, QTableWidgetItem(cond.operator))
-            self.condition_table.setItem(i, 2, QTableWidgetItem(str(cond.value)))
-            self.condition_table.setItem(i, 3, QTableWidgetItem(str(cond.value2) if cond.value2 is not None else ""))
-
-    def _add_condition(self):
-        dlg = ConditionEditorDialog(self)
-        if dlg.exec():
-            self.conditions.append(dlg.get_condition())
-            self._refresh_condition_table()
-
-    def _edit_condition(self):
-        rows = self.condition_table.selectionModel().selectedRows()
-        if not rows:
-            return
-        row = rows[0].row()
-        cond = self.conditions[row]
-        dlg = ConditionEditorDialog(self, cond)
-        if dlg.exec():
-            self.conditions[row] = dlg.get_condition()
-            self._refresh_condition_table()
-
-    def _remove_condition(self):
-        rows = self.condition_table.selectionModel().selectedRows()
-        if not rows:
-            return
-        row = rows[0].row()
-        if 0 <= row < len(self.conditions):
-            del self.conditions[row]
-            self._refresh_condition_table()
 
     def get_style(self) -> ConditionalStyle:
         properties = {
@@ -1095,7 +897,6 @@ class ConditionalStyleEditorDialog(QDialog):
 
         style = ConditionalStyle(
             style_id=self.style.style_id,
-            conditions=self.conditions,
             properties=properties,
             hover_properties=hover_properties,
             click_properties=click_properties,
