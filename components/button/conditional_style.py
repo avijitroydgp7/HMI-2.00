@@ -878,16 +878,16 @@ class ConditionalStyleEditorDialog(QDialog):
         else:
             self.preview_stack.setCurrentWidget(self.preview_button)
 
-        self.shape_style_label.setVisible(not is_switch)
-        self.shape_style_combo.setVisible(not is_switch)
-        self.border_group.setVisible(not is_switch)
+        self.shape_style_label.setEnabled(not is_switch)
+        self.shape_style_combo.setEnabled(not is_switch)
+        self.border_group.setEnabled(not is_switch)
 
         is_circle = component_type == "Circle Button"
         self.corner_frame.setEnabled(not is_circle and not is_switch)
 
         is_gradient = self.bg_type_combo.currentText() == "Linear Gradient"
         for w in [self.gradient_dir_label, self.gradient_type_combo]:
-            w.setVisible(is_gradient)
+            w.setEnabled(is_gradient)
 
         self.update_dynamic_ranges()
         self.update_preview()
