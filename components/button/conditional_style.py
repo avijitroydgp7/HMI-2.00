@@ -697,6 +697,10 @@ class ConditionalStyleEditorDialog(QDialog):
         self.preview_stack.addWidget(self.preview_switch)
         self.text_lock_checkbox.toggled.connect(self._on_text_lock_toggled)
         self._connect_base_text_signals()
+        # Ensure hover/click text changes refresh the preview when text locking
+        # is disabled by wiring their signals to the live preview slot.
+        self._connect_state_text_signals(self.text_controls['hover'])
+        self._connect_state_text_signals(self.text_controls['click'])
         self._on_text_lock_toggled(self.text_lock_checkbox.isChecked())
         preview_group_layout.addWidget(self.preview_stack)
         preview_group.setLayout(preview_group_layout)
@@ -916,6 +920,23 @@ class ConditionalStyleEditorDialog(QDialog):
         base['offset_x_spin'].valueChanged.connect(self._sync_locked_text)
         base['offset_y_spin'].valueChanged.connect(self.update_preview)
         base['offset_y_spin'].valueChanged.connect(self._sync_locked_text)
+
+    def _connect_state_text_signals(self, controls):
+        """Connect text controls of a state (hover/click) to update preview."""
+        controls['text_type_combo'].currentTextChanged.connect(self.update_preview)
+        controls['comment_edit'].textChanged.connect(self.update_preview)
+        controls['column_spin'].valueChanged.connect(self.update_preview)
+        controls['row_spin'].valueChanged.connect(self.update_preview)
+        controls['text_edit'].textChanged.connect(self.update_preview)
+        controls['font_combo'].currentFontChanged.connect(self.update_preview)
+        controls['font_size_spin'].valueChanged.connect(self.update_preview)
+        controls['bold_check'].toggled.connect(self.update_preview)
+        controls['italic_check'].toggled.connect(self.update_preview)
+        controls['underline_check'].toggled.connect(self.update_preview)
+        controls['h_align_combo'].currentTextChanged.connect(self.update_preview)
+        controls['v_align_combo'].currentTextChanged.connect(self.update_preview)
+        controls['offset_x_spin'].valueChanged.connect(self.update_preview)
+        controls['offset_y_spin'].valueChanged.connect(self.update_preview)
 
     def _collect_text_props(self, controls):
         data = {
