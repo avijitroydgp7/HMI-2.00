@@ -144,6 +144,55 @@ class ConditionalStyle:
     hover_properties: Dict[str, Any] = field(default_factory=dict)
     click_properties: Dict[str, Any] = field(default_factory=dict)
     animation: AnimationProperties = field(default_factory=AnimationProperties)
+
+    @staticmethod
+    def _normalize_state(props: Dict[str, Any]) -> Dict[str, Any]:
+        """Return a state dictionary containing the expected keys.
+
+        Older dictionaries may use legacy key names (e.g. ``vertical_align``)
+        or include text/comment fields without the new ``text_value`` /
+        ``comment_ref`` structure.  This helper converts such dictionaries into
+        the unified format used by :class:`ConditionalStyle`.
+        """
+        defaults = {
+            "text_type": "Text",
+            "text_value": "",
+            "comment_ref": {},
+            "font_family": "",
+            "font_size": 0,
+            "bold": False,
+            "italic": False,
+            "underline": False,
+            "background_color": "",
+            "text_color": "",
+            "h_align": "center",
+            "v_align": "middle",
+            "offset": 0,
+        }
+        if not props:
+            return defaults.copy()
+
+        data = dict(props)
+        # Map legacy keys to new ones
+        if "text" in data and "text_value" not in data:
+            data["text_value"] = data.get("text", "")
+        if data.get("text_type") == "Comment" and "comment_ref" not in data:
+            data["comment_ref"] = {
+                "number": data.get("comment_number", 0),
+                "column": data.get("comment_column", 0),
+                "row": data.get("comment_row", 0),
+            }
+        if "horizontal_align" in data and "h_align" not in data:
+            data["h_align"] = data.get("horizontal_align")
+        if "vertical_align" in data and "v_align" not in data:
+            data["v_align"] = data.get("vertical_align")
+        if "offset_to_frame" in data and "offset" not in data:
+            data["offset"] = data.get("offset_to_frame")
+
+        normalized = defaults.copy()
+        for key in normalized.keys():
+            normalized[key] = data.get(key, normalized[key])
+        return normalized
     
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -163,14 +212,16 @@ class ConditionalStyle:
             'v_align': self.v_align,
             'offset': self.offset,
             'properties': self.properties,
-            'hover_properties': self.hover_properties,
-            'click_properties': self.click_properties,
+            'hover_properties': self._normalize_state(self.hover_properties),
+            'click_properties': self._normalize_state(self.click_properties),
             'animation': self.animation.to_dict(),
         }
     
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> 'ConditionalStyle':
         props = data.get('properties', {})
+        hover = cls._normalize_state(data.get('hover_properties', {}))
+        click = cls._normalize_state(data.get('click_properties', {}))
         style = cls(
             style_id=data.get('style_id', ''),
             tooltip=data.get('tooltip', ''),
@@ -195,8 +246,8 @@ class ConditionalStyle:
             v_align=data.get('v_align', props.get('vertical_align', 'middle')),
             offset=data.get('offset', props.get('offset_to_frame', 0)),
             properties=props,
-            hover_properties=data.get('hover_properties', {}),
-            click_properties=data.get('click_properties', {}),
+            hover_properties=hover,
+            click_properties=click,
         )
         if 'animation' in data:
             style.animation = AnimationProperties.from_dict(data['animation'])
@@ -533,6 +584,11 @@ class ConditionalStyleEditorDialog(QDialog):
         comment_number = TagSelector(allowed_tag_types=["INT16"])
         comment_column = TagSelector(allowed_tag_types=["INT16"])
         comment_row = TagSelector(allowed_tag_types=["INT16"])
+        comment = props.get("comment_ref", {})
+        if comment:
+            comment_number.set_data(comment.get("number"))
+            comment_column.set_data(comment.get("column"))
+            comment_row.set_data(comment.get("row"))
         c_layout.addWidget(QLabel("Comment number:"), 0, 0)
         c_layout.addWidget(comment_number, 0, 1)
         c_layout.addWidget(QLabel("Comment column no:"), 1, 0)
@@ -545,6 +601,7 @@ class ConditionalStyleEditorDialog(QDialog):
         t_layout = QGridLayout(text_page)
         text_edit = QTextEdit()
         text_edit.setPlaceholderText("Enter text...")
+        text_edit.setPlainText(props.get("text_value", props.get("text", "")))
         t_layout.addWidget(text_edit, 0, 0)
         t_layout.setColumnStretch(0, 1)
 
@@ -594,21 +651,21 @@ class ConditionalStyleEditorDialog(QDialog):
         layout.addWidget(QLabel("Vertical Align:"), 5, 0)
         v_widget, v_group = self._create_alignment_widget(
             [("top", "T"), ("middle", "M"), ("bottom", "B")],
-            props.get("vertical_align", "middle"),
+            props.get("v_align", props.get("vertical_align", "middle")),
         )
         layout.addWidget(v_widget, 5, 1)
 
         layout.addWidget(QLabel("Horizontal Align:"), 5, 2)
         h_widget, h_group = self._create_alignment_widget(
             [("left", "L"), ("center", "C"), ("right", "R")],
-            props.get("horizontal_align", "center"),
+            props.get("h_align", props.get("horizontal_align", "center")),
         )
         layout.addWidget(h_widget, 5, 3)
 
         layout.addWidget(QLabel("Offset To Frame:"), 6, 0)
         offset_spin = QSpinBox()
         offset_spin.setRange(-1000, 1000)
-        offset_spin.setValue(props.get("offset_to_frame", 0))
+        offset_spin.setValue(props.get("offset", props.get("offset_to_frame", 0)))
         layout.addWidget(offset_spin, 6, 1)
 
         layout.setColumnStretch(1, 1)
@@ -1080,31 +1137,21 @@ class ConditionalStyleEditorDialog(QDialog):
             "bold": self.hover_controls["bold_btn"].isChecked(),
             "italic": self.hover_controls["italic_btn"].isChecked(),
             "underline": self.hover_controls["underline_btn"].isChecked(),
-            "vertical_align": self.hover_controls["v_align_group"].checkedButton().property("align_value")
+            "v_align": self.hover_controls["v_align_group"].checkedButton().property("align_value")
                 if self.hover_controls["v_align_group"].checkedButton() else "middle",
-            "horizontal_align": self.hover_controls["h_align_group"].checkedButton().property("align_value")
+            "h_align": self.hover_controls["h_align_group"].checkedButton().property("align_value")
                 if self.hover_controls["h_align_group"].checkedButton() else "center",
-            "offset_to_frame": self.hover_controls["offset_spin"].value(),
+            "offset": self.hover_controls["offset_spin"].value(),
             "text_type": self.hover_controls["text_type_combo"].currentText(),
         }
         if hover_properties["text_type"] == "Comment":
-            hover_properties["comment_number"] = self.hover_controls["comment_number"].get_data()
-            hover_properties["comment_column"] = self.hover_controls["comment_column"].get_data()
-            hover_properties["comment_row"] = self.hover_controls["comment_row"].get_data()
-        else:
-            hover_properties["text"] = self.hover_controls["text_edit"].toPlainText()
-
-        hover_properties["h_align"] = hover_properties.get("horizontal_align", "center")
-        hover_properties["v_align"] = hover_properties.get("vertical_align", "middle")
-        hover_properties["offset"] = hover_properties.get("offset_to_frame", 0)
-        if hover_properties["text_type"] == "Comment":
             hover_properties["comment_ref"] = {
-                "number": hover_properties.get("comment_number", 0),
-                "column": hover_properties.get("comment_column", 0),
-                "row": hover_properties.get("comment_row", 0),
+                "number": self.hover_controls["comment_number"].get_data(),
+                "column": self.hover_controls["comment_column"].get_data(),
+                "row": self.hover_controls["comment_row"].get_data(),
             }
         else:
-            hover_properties["text_value"] = hover_properties.get("text", "")
+            hover_properties["text_value"] = self.hover_controls["text_edit"].toPlainText()
 
         click_properties = {
             "background_color": self._button_color(self.click_bg_btn),
@@ -1114,42 +1161,35 @@ class ConditionalStyleEditorDialog(QDialog):
             "bold": self.click_controls["bold_btn"].isChecked(),
             "italic": self.click_controls["italic_btn"].isChecked(),
             "underline": self.click_controls["underline_btn"].isChecked(),
-            "vertical_align": self.click_controls["v_align_group"].checkedButton().property("align_value")
+            "v_align": self.click_controls["v_align_group"].checkedButton().property("align_value")
                 if self.click_controls["v_align_group"].checkedButton() else "middle",
-            "horizontal_align": self.click_controls["h_align_group"].checkedButton().property("align_value")
+            "h_align": self.click_controls["h_align_group"].checkedButton().property("align_value")
                 if self.click_controls["h_align_group"].checkedButton() else "center",
-            "offset_to_frame": self.click_controls["offset_spin"].value(),
+            "offset": self.click_controls["offset_spin"].value(),
             "text_type": self.click_controls["text_type_combo"].currentText(),
         }
         if click_properties["text_type"] == "Comment":
-            click_properties["comment_number"] = self.click_controls["comment_number"].get_data()
-            click_properties["comment_column"] = self.click_controls["comment_column"].get_data()
-            click_properties["comment_row"] = self.click_controls["comment_row"].get_data()
-        else:
-            click_properties["text"] = self.click_controls["text_edit"].toPlainText()
-
-        click_properties["h_align"] = click_properties.get("horizontal_align", "center")
-        click_properties["v_align"] = click_properties.get("vertical_align", "middle")
-        click_properties["offset"] = click_properties.get("offset_to_frame", 0)
-        if click_properties["text_type"] == "Comment":
             click_properties["comment_ref"] = {
-                "number": click_properties.get("comment_number", 0),
-                "column": click_properties.get("comment_column", 0),
-                "row": click_properties.get("comment_row", 0),
+                "number": self.click_controls["comment_number"].get_data(),
+                "column": self.click_controls["comment_column"].get_data(),
+                "row": self.click_controls["comment_row"].get_data(),
             }
         else:
-            click_properties["text_value"] = click_properties.get("text", "")
+            click_properties["text_value"] = self.click_controls["text_edit"].toPlainText()
 
         style = ConditionalStyle(
             style_id=self.style.style_id,
             tooltip=self.tooltip_edit.text(),
             text_type=properties.get("text_type", "Text"),
-            text_value=properties.get("text", ""),
-            comment_ref={
-                "number": properties.get("comment_number", 0),
-                "column": properties.get("comment_column", 0),
-                "row": properties.get("comment_row", 0),
-            } if properties.get("text_type") == "Comment" else {},
+            text_value=properties.get("text_value", properties.get("text", "")),
+            comment_ref=properties.get(
+                "comment_ref",
+                {
+                    "number": properties.get("comment_number", 0),
+                    "column": properties.get("comment_column", 0),
+                    "row": properties.get("comment_row", 0),
+                } if properties.get("text_type") == "Comment" else {},
+            ),
             font_family=properties.get("font_family", ""),
             font_size=properties.get("font_size", 0),
             bold=properties.get("bold", False),
@@ -1157,9 +1197,9 @@ class ConditionalStyleEditorDialog(QDialog):
             underline=properties.get("underline", False),
             background_color=properties.get("background_color", ""),
             text_color=properties.get("text_color", ""),
-            h_align=properties.get("horizontal_align", "center"),
-            v_align=properties.get("vertical_align", "middle"),
-            offset=properties.get("offset_to_frame", 0),
+            h_align=properties.get("h_align", properties.get("horizontal_align", "center")),
+            v_align=properties.get("v_align", properties.get("vertical_align", "middle")),
+            offset=properties.get("offset", properties.get("offset_to_frame", 0)),
             properties=properties,
             hover_properties=hover_properties,
             click_properties=click_properties,
