@@ -582,8 +582,11 @@ class ConditionalStyleEditorDialog(QDialog):
         comment_page = QWidget()
         c_layout = QGridLayout(comment_page)
         comment_number = TagSelector(allowed_tag_types=["INT16"])
+        comment_number.main_tag_selector.set_allow_arrays(False)
         comment_column = TagSelector(allowed_tag_types=["INT16"])
+        comment_column.main_tag_selector.set_allow_arrays(False)
         comment_row = TagSelector(allowed_tag_types=["INT16"])
+        comment_row.main_tag_selector.set_allow_arrays(False)
         comment = props.get("comment_ref", {})
         if comment:
             comment_number.set_data(comment.get("number"))
@@ -677,8 +680,11 @@ class ConditionalStyleEditorDialog(QDialog):
             stack.setCurrentIndex(0)
 
         text_type_combo.currentIndexChanged.connect(self.update_preview)
+        comment_number.tag_selected.connect(lambda *_: self.update_preview())
         comment_number.inputChanged.connect(self.update_preview)
+        comment_column.tag_selected.connect(lambda *_: self.update_preview())
         comment_column.inputChanged.connect(self.update_preview)
+        comment_row.tag_selected.connect(lambda *_: self.update_preview())
         comment_row.inputChanged.connect(self.update_preview)
         text_edit.textChanged.connect(self.update_preview)
         font_combo.currentTextChanged.connect(self.update_preview)
