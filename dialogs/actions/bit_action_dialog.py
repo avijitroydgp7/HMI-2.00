@@ -2,13 +2,12 @@
 # Configuration dialog for Bit Actions.
 
 from PyQt6.QtWidgets import (
-    QFormLayout, QDialogButtonBox, QButtonGroup, QRadioButton, QWidget,
+    QDialogButtonBox, QButtonGroup, QRadioButton, QWidget,
     QVBoxLayout, QGroupBox, QGridLayout, QLabel, QComboBox, QStackedWidget,
     QScrollArea, QHBoxLayout, QDialog
 )
 from typing import Dict, Optional
 
-from services.tag_data_service import tag_data_service
 from ..widgets import TagSelector, CollapsibleBox
 
 class BitActionDialog(QDialog):
