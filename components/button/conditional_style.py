@@ -20,11 +20,16 @@ from PyQt6.QtWidgets import (
     QWidget,
     QStackedWidget,
     QFrame,
+    QTextEdit,
+    QToolButton,
+    QButtonGroup,
+    QHBoxLayout,
 )
-from PyQt6.QtGui import QColor, QPixmap, QIcon, QPalette, QPainter, QLinearGradient, QPen
+from PyQt6.QtGui import QColor, QPixmap, QIcon, QPalette, QPainter, QLinearGradient, QPen, QFontDatabase
 
 from button_creator import IconButton, SwitchButton
 from utils.icon_manager import IconManager
+from dialogs.widgets import TagSelector
 
 # Predefined gradient orientations used for visual selection
 _GRADIENT_STYLES = {
@@ -147,6 +152,7 @@ class ConditionalStyle:
         if 'animation' in data:
             style.animation = AnimationProperties.from_dict(data['animation'])
         return style
+
 
 @dataclass
 class ConditionalStyleManager(QObject):
@@ -383,56 +389,23 @@ class ConditionalStyleEditorDialog(QDialog):
         # Style tabs
         style_tabs = QTabWidget()
 
-        # Base tab
-        base_tab = QWidget(); base_layout = QGridLayout(base_tab)
-        self.bg_color_btn = self.create_color_button(self.style.properties.get("background_color", ""))
-        self.text_color_btn = self.create_color_button(self.style.properties.get("text_color", ""))
-        self.font_size_spin = QSpinBox(); self.font_size_spin.setRange(1, 1000)
-        self.font_size_spin.setValue(self.style.properties.get("font_size", 10))
-        self.width_spin = QSpinBox(); self.width_spin.setRange(0, 10000)
-        self.width_spin.setValue(self.style.properties.get("width", 0))
-        self.height_spin = QSpinBox(); self.height_spin.setRange(0, 10000)
-        self.height_spin.setValue(self.style.properties.get("height", 0))
-        self.border_color_btn = self.create_color_button(self.style.properties.get("border_color", ""))
-        base_layout.addWidget(QLabel("Background:"), 0, 0); base_layout.addWidget(self.bg_color_btn, 0, 1)
-        base_layout.addWidget(QLabel("Text Color:"), 1, 0); base_layout.addWidget(self.text_color_btn, 1, 1)
-        base_layout.addWidget(QLabel("Font Size:"), 2, 0); base_layout.addWidget(self.font_size_spin, 2, 1)
-        base_layout.addWidget(QLabel("Width:"), 3, 0); base_layout.addWidget(self.width_spin, 3, 1)
-        base_layout.addWidget(QLabel("Height:"), 4, 0); base_layout.addWidget(self.height_spin, 4, 1)
-        base_layout.addWidget(QLabel("Border Color:"), 5, 0); base_layout.addWidget(self.border_color_btn, 5, 1)
-        style_tabs.addTab(base_tab, "Base")
+        self.base_tab, self.base_controls = self._build_state_tab(self.style.properties)
+        style_tabs.addTab(self.base_tab, "Base")
 
-        # Hover tab
-        hover_tab = QWidget(); hover_layout = QGridLayout(hover_tab)
-        self.hover_bg_btn = self.create_color_button(self.style.hover_properties.get("background_color", ""))
-        self.hover_text_btn = self.create_color_button(self.style.hover_properties.get("text_color", ""))
-        self.hover_border_radius_slider = QSlider(Qt.Orientation.Horizontal); self.hover_border_radius_slider.setRange(0, 1000)
-        self.hover_border_radius_slider.setValue(self.style.hover_properties.get("border_radius", 0))
-        self.hover_border_width_slider = QSlider(Qt.Orientation.Horizontal); self.hover_border_width_slider.setRange(0, 20)
-        self.hover_border_width_slider.setValue(self.style.hover_properties.get("border_width", 0))
-        self.hover_border_color_btn = self.create_color_button(self.style.hover_properties.get("border_color", ""))
-        hover_layout.addWidget(QLabel("Background:"), 0, 0); hover_layout.addWidget(self.hover_bg_btn, 0, 1)
-        hover_layout.addWidget(QLabel("Text Color:"), 1, 0); hover_layout.addWidget(self.hover_text_btn, 1, 1)
-        hover_layout.addWidget(QLabel("Border Radius:"), 2, 0); hover_layout.addWidget(self.hover_border_radius_slider, 2, 1)
-        hover_layout.addWidget(QLabel("Border Width:"), 3, 0); hover_layout.addWidget(self.hover_border_width_slider, 3, 1)
-        hover_layout.addWidget(QLabel("Border Color:"), 4, 0); hover_layout.addWidget(self.hover_border_color_btn, 4, 1)
-        style_tabs.addTab(hover_tab, "Hover")
+        self.hover_tab, self.hover_controls = self._build_state_tab(self.style.hover_properties)
+        style_tabs.addTab(self.hover_tab, "Hover")
 
-        # Click tab
-        click_tab = QWidget(); click_layout = QGridLayout(click_tab)
-        self.click_bg_btn = self.create_color_button(self.style.click_properties.get("background_color", ""))
-        self.click_text_btn = self.create_color_button(self.style.click_properties.get("text_color", ""))
-        self.click_border_radius_slider = QSlider(Qt.Orientation.Horizontal); self.click_border_radius_slider.setRange(0, 1000)
-        self.click_border_radius_slider.setValue(self.style.click_properties.get("border_radius", 0))
-        self.click_border_width_slider = QSlider(Qt.Orientation.Horizontal); self.click_border_width_slider.setRange(0, 20)
-        self.click_border_width_slider.setValue(self.style.click_properties.get("border_width", 0))
-        self.click_border_color_btn = self.create_color_button(self.style.click_properties.get("border_color", ""))
-        click_layout.addWidget(QLabel("Background:"), 0, 0); click_layout.addWidget(self.click_bg_btn, 0, 1)
-        click_layout.addWidget(QLabel("Text Color:"), 1, 0); click_layout.addWidget(self.click_text_btn, 1, 1)
-        click_layout.addWidget(QLabel("Border Radius:"), 2, 0); click_layout.addWidget(self.click_border_radius_slider, 2, 1)
-        click_layout.addWidget(QLabel("Border Width:"), 3, 0); click_layout.addWidget(self.click_border_width_slider, 3, 1)
-        click_layout.addWidget(QLabel("Border Color:"), 4, 0); click_layout.addWidget(self.click_border_color_btn, 4, 1)
-        style_tabs.addTab(click_tab, "Click")
+        self.click_tab, self.click_controls = self._build_state_tab(self.style.click_properties)
+        style_tabs.addTab(self.click_tab, "Click")
+
+        # Convenience shortcuts for commonly used controls
+        self.bg_color_btn = self.base_controls["bg_color_btn"]
+        self.text_color_btn = self.base_controls["text_color_btn"]
+        self.font_size_spin = self.base_controls["font_size_spin"]
+        self.hover_bg_btn = self.hover_controls["bg_color_btn"]
+        self.hover_text_btn = self.hover_controls["text_color_btn"]
+        self.click_bg_btn = self.click_controls["bg_color_btn"]
+        self.click_text_btn = self.click_controls["text_color_btn"]
 
         # Conditions group - left empty for future use
         cond_group = QGroupBox("Conditions")
@@ -461,14 +434,9 @@ class ConditionalStyleEditorDialog(QDialog):
         preview_group.setMinimumHeight(style_group.sizeHint().height())
         cond_group.setMinimumHeight(self.border_group.sizeHint().height())
 
-        for w in [self.font_size_spin, self.width_spin, self.height_spin,
-                  self.border_width_spin, self.hover_border_radius_slider, self.hover_border_width_slider,
-                  self.click_border_radius_slider, self.click_border_width_slider,
-                  self.x1_spin, self.y1_spin, self.x2_spin, self.y2_spin]:
+        for w in [self.border_width_spin, self.x1_spin, self.y1_spin, self.x2_spin, self.y2_spin]:
             w.valueChanged.connect(self.update_preview)
         self.component_type_combo.currentTextChanged.connect(self.update_preview)
-        self.width_spin.valueChanged.connect(self.update_controls_state)
-        self.height_spin.valueChanged.connect(self.update_controls_state)
 
         self.set_initial_colors()
         self.update_controls_state()
@@ -481,6 +449,160 @@ class ConditionalStyleEditorDialog(QDialog):
         self._set_button_color(btn, initial)
         btn.clicked.connect(lambda: self._choose_color(btn))
         return btn
+
+    def _create_alignment_widget(self, options, current):
+        widget = QWidget()
+        layout = QHBoxLayout(widget)
+        layout.setContentsMargins(0, 0, 0, 0)
+        group = QButtonGroup(widget)
+        for value, label in options:
+            btn = QToolButton()
+            btn.setCheckable(True)
+            btn.setText(label)
+            btn.setProperty("align_value", value)
+            group.addButton(btn)
+            layout.addWidget(btn)
+            if value == current:
+                btn.setChecked(True)
+        group.setExclusive(True)
+        return widget, group
+
+    def _build_state_tab(self, props):
+        tab = QWidget()
+        layout = QGridLayout(tab)
+
+        text_type_combo = QComboBox()
+        text_type_combo.addItems(["Comment", "Text"])
+        text_type_combo.setCurrentText(props.get("text_type", "Comment"))
+        layout.addWidget(QLabel("Text type:"), 0, 0)
+        layout.addWidget(text_type_combo, 0, 1)
+
+        stack = QStackedWidget()
+
+        comment_page = QWidget()
+        c_layout = QGridLayout(comment_page)
+        comment_number = TagSelector(allowed_tag_types=["INT16"])
+        comment_column = TagSelector(allowed_tag_types=["INT16"])
+        comment_row = TagSelector(allowed_tag_types=["INT16"])
+        c_layout.addWidget(QLabel("Comment number:"), 0, 0)
+        c_layout.addWidget(comment_number, 0, 1)
+        c_layout.addWidget(QLabel("Comment column no:"), 1, 0)
+        c_layout.addWidget(comment_column, 1, 1)
+        c_layout.addWidget(QLabel("Comment row no:"), 2, 0)
+        c_layout.addWidget(comment_row, 2, 1)
+        c_layout.setColumnStretch(1, 1)
+
+        text_page = QWidget()
+        t_layout = QGridLayout(text_page)
+        text_edit = QTextEdit()
+        text_edit.setPlaceholderText("Enter text...")
+        t_layout.addWidget(text_edit, 0, 0)
+        t_layout.setColumnStretch(0, 1)
+
+        stack.addWidget(comment_page)
+        stack.addWidget(text_page)
+        layout.addWidget(stack, 1, 0, 1, 4)
+
+        text_type_combo.currentIndexChanged.connect(stack.setCurrentIndex)
+
+        layout.addWidget(QLabel("Font:"), 2, 0)
+        font_combo = QComboBox()
+        font_combo.setEditable(True)
+        font_combo.addItems(QFontDatabase().families())
+        if props.get("font_family"):
+            font_combo.setCurrentText(props.get("font_family"))
+        layout.addWidget(font_combo, 2, 1)
+
+        layout.addWidget(QLabel("Font Size:"), 2, 2)
+        font_size_spin = QSpinBox()
+        font_size_spin.setRange(1, 1000)
+        font_size_spin.setValue(props.get("font_size", 10))
+        layout.addWidget(font_size_spin, 2, 3)
+
+        bold_btn = QToolButton()
+        bold_btn.setText("B")
+        bold_btn.setCheckable(True)
+        bold_btn.setChecked(props.get("bold", False))
+        italic_btn = QToolButton()
+        italic_btn.setText("I")
+        italic_btn.setCheckable(True)
+        italic_btn.setChecked(props.get("italic", False))
+        underline_btn = QToolButton()
+        underline_btn.setText("U")
+        underline_btn.setCheckable(True)
+        underline_btn.setChecked(props.get("underline", False))
+        layout.addWidget(bold_btn, 3, 0)
+        layout.addWidget(italic_btn, 3, 1)
+        layout.addWidget(underline_btn, 3, 2)
+
+        layout.addWidget(QLabel("Background Colour:"), 4, 0)
+        bg_color_btn = self.create_color_button(props.get("background_color", ""))
+        layout.addWidget(bg_color_btn, 4, 1)
+        layout.addWidget(QLabel("Text Colour:"), 4, 2)
+        text_color_btn = self.create_color_button(props.get("text_color", ""))
+        layout.addWidget(text_color_btn, 4, 3)
+
+        layout.addWidget(QLabel("Vertical Align:"), 5, 0)
+        v_widget, v_group = self._create_alignment_widget(
+            [("top", "T"), ("middle", "M"), ("bottom", "B")],
+            props.get("vertical_align", "middle"),
+        )
+        layout.addWidget(v_widget, 5, 1)
+
+        layout.addWidget(QLabel("Horizontal Align:"), 5, 2)
+        h_widget, h_group = self._create_alignment_widget(
+            [("left", "L"), ("center", "C"), ("right", "R")],
+            props.get("horizontal_align", "center"),
+        )
+        layout.addWidget(h_widget, 5, 3)
+
+        layout.addWidget(QLabel("Offset To Frame:"), 6, 0)
+        offset_spin = QSpinBox()
+        offset_spin.setRange(-1000, 1000)
+        offset_spin.setValue(props.get("offset_to_frame", 0))
+        layout.addWidget(offset_spin, 6, 1)
+
+        layout.setColumnStretch(1, 1)
+        layout.setColumnStretch(3, 1)
+
+        if text_type_combo.currentText() == "Text":
+            stack.setCurrentIndex(1)
+        else:
+            stack.setCurrentIndex(0)
+
+        text_type_combo.currentIndexChanged.connect(self.update_preview)
+        comment_number.inputChanged.connect(self.update_preview)
+        comment_column.inputChanged.connect(self.update_preview)
+        comment_row.inputChanged.connect(self.update_preview)
+        text_edit.textChanged.connect(self.update_preview)
+        font_combo.currentTextChanged.connect(self.update_preview)
+        font_size_spin.valueChanged.connect(self.update_preview)
+        bold_btn.toggled.connect(self.update_preview)
+        italic_btn.toggled.connect(self.update_preview)
+        underline_btn.toggled.connect(self.update_preview)
+        v_group.buttonToggled.connect(lambda *_: self.update_preview())
+        h_group.buttonToggled.connect(lambda *_: self.update_preview())
+        offset_spin.valueChanged.connect(self.update_preview)
+
+        controls = {
+            "text_type_combo": text_type_combo,
+            "comment_number": comment_number,
+            "comment_column": comment_column,
+            "comment_row": comment_row,
+            "text_edit": text_edit,
+            "font_family_combo": font_combo,
+            "font_size_spin": font_size_spin,
+            "bold_btn": bold_btn,
+            "italic_btn": italic_btn,
+            "underline_btn": underline_btn,
+            "bg_color_btn": bg_color_btn,
+            "text_color_btn": text_color_btn,
+            "v_align_group": v_group,
+            "h_align_group": h_group,
+            "offset_spin": offset_spin,
+            "stack": stack,
+        }
+        return tab, controls
 
     def _set_button_color(self, btn, color):
         if color:
@@ -498,8 +620,6 @@ class ConditionalStyleEditorDialog(QDialog):
                 self._bg_color = QColor(color_name)
             elif btn is self.hover_bg_btn:
                 self._hover_bg_color = QColor(color_name)
-            elif btn in [self.border_color_btn, self.hover_border_color_btn, self.click_border_color_btn]:
-                self._border_color = QColor(color_name)
             elif btn is self.click_bg_btn:
                 self._click_bg_color = QColor(color_name)
             self.update_preview()
@@ -574,12 +694,6 @@ class ConditionalStyleEditorDialog(QDialog):
             self.bg_color_btn.setProperty("color", self._bg_color.name())
             self._set_button_color(self.hover_bg_btn, self._hover_bg_color.name())
             self.hover_bg_btn.setProperty("color", self._hover_bg_color.name())
-            self._set_button_color(self.border_color_btn, self._border_color.name())
-            self.border_color_btn.setProperty("color", self._border_color.name())
-            self._set_button_color(self.hover_border_color_btn, self._border_color.name())
-            self.hover_border_color_btn.setProperty("color", self._border_color.name())
-            self._set_button_color(self.click_border_color_btn, self._border_color.name())
-            self.click_border_color_btn.setProperty("color", self._border_color.name())
             self._set_button_color(self.click_bg_btn, self._click_bg_color.name())
             self.click_bg_btn.setProperty("color", self._click_bg_color.name())
         self.update_preview()
@@ -725,23 +839,21 @@ class ConditionalStyleEditorDialog(QDialog):
         self.update_preview()
 
     def update_dynamic_ranges(self):
-        width = self.width_spin.value() or 200
-        height = self.height_spin.value() or 100
+        width = 200
+        height = 100
         # Corner radii can be up to half of the smaller dimension.
         radius_limit = min(width, height) // 2
         # Border widths are limited to 10% of the smaller dimension, capped at 20px.
         border_limit = min(20, max(1, min(width, height) // 10))
-        for s in [self.tl_radius_spin, self.tr_radius_spin, self.br_radius_spin, self.bl_radius_spin,
-                  self.hover_border_radius_slider, self.click_border_radius_slider]:
+        for s in [self.tl_radius_spin, self.tr_radius_spin, self.br_radius_spin, self.bl_radius_spin]:
             s.setMaximum(radius_limit)
-        for s in [self.border_width_spin, self.hover_border_width_slider, self.click_border_width_slider]:
-            s.setMaximum(border_limit)
+        self.border_width_spin.setMaximum(border_limit)
 
     def generate_qss(self, component_type):
         shape_style = self.shape_style_combo.currentText()
         bg_type = self.bg_type_combo.currentText()
-        width = self.width_spin.value() or 200
-        height = self.height_spin.value() or 100
+        width = 200
+        height = 100
         padding = min(width, height) // 10
         tl_radius = self.tl_radius_spin.value()
         tr_radius = self.tr_radius_spin.value()
@@ -755,21 +867,23 @@ class ConditionalStyleEditorDialog(QDialog):
         border_color = self._border_color
         text_color = self._button_color(self.text_color_btn) or self.palette().color(QPalette.ColorRole.ButtonText).name()
         font_size = self.font_size_spin.value()
-        hover_border_color = QColor(self._button_color(self.hover_border_color_btn) or border_color.name())
-        click_border_color = QColor(self._button_color(self.click_border_color_btn) or border_color.name())
+        font_family = self.base_controls["font_family_combo"].currentText()
+        font_weight = "bold" if self.base_controls["bold_btn"].isChecked() else "normal"
+        font_style = "italic" if self.base_controls["italic_btn"].isChecked() else "normal"
+        text_decoration = "underline" if self.base_controls["underline_btn"].isChecked() else "none"
 
         if component_type == "Circle Button":
-            size = max(self.width_spin.value() or 150, self.height_spin.value() or 150)
+            size = max(width, height)
             radius = size // 2
             tl_radius = tr_radius = br_radius = bl_radius = radius
             self.preview_button.setFixedSize(size, size)
         elif component_type == "Square Button":
-            size = max(self.width_spin.value() or 150, self.height_spin.value() or 150)
+            size = max(width, height)
             self.preview_button.setFixedSize(size, size)
         elif component_type == "Toggle Switch":
-            self.preview_switch.setFixedSize(self.width_spin.value() or 200, self.height_spin.value() or 100)
+            self.preview_switch.setFixedSize(width, height)
         else:
-            self.preview_button.setFixedSize(self.width_spin.value() or 200, self.height_spin.value() or 100)
+            self.preview_button.setFixedSize(width, height)
 
         main_qss, hover_qss, pressed_qss = [], [], []
         main_qss.extend([
@@ -779,7 +893,11 @@ class ConditionalStyleEditorDialog(QDialog):
             f"border-bottom-right-radius: {br_radius}px;",
             f"border-bottom-left-radius: {bl_radius}px;",
             f"color: {text_color};",
-            f"font-size: {font_size}pt;"
+            f"font-size: {font_size}pt;",
+            f"font-family: '{font_family}';",
+            f"font-weight: {font_weight};",
+            f"font-style: {font_style};",
+            f"text-decoration: {text_decoration};",
         ])
 
         if shape_style == "Glass":
@@ -830,11 +948,6 @@ class ConditionalStyleEditorDialog(QDialog):
             hover_qss.append(f"background-color: {hover_bg_color.name()};")
             pressed_qss.append(f"background-color: {click_bg_color.name()};")
 
-        if hover_border_color != border_color:
-            hover_qss.append(f"border-color: {hover_border_color.name()};")
-        if click_border_color != border_color:
-            pressed_qss.append(f"border-color: {click_border_color.name()};")
-
         main_qss_str = "\n    ".join(main_qss)
         hover_qss_str = "\n    ".join(hover_qss) if hover_qss else ""
         pressed_qss_str = "\n    ".join(pressed_qss) if pressed_qss else ""
@@ -852,6 +965,10 @@ class ConditionalStyleEditorDialog(QDialog):
             self.preview_switch.setStyleSheet(qss)
         else:
             self.preview_button.setStyleSheet(qss)
+            text = ""
+            if self.base_controls["text_type_combo"].currentText() == "Text":
+                text = self.base_controls["text_edit"].toPlainText()
+            self.preview_button.setText(text or "Preview")
 
 
     def get_style(self) -> ConditionalStyle:
@@ -867,33 +984,75 @@ class ConditionalStyleEditorDialog(QDialog):
             "gradient_x2": self.x2_spin.value(),
             "gradient_y2": self.y2_spin.value(),
             "text_color": self._button_color(self.text_color_btn),
-            "font_size": self.font_size_spin.value(),
-            "width": self.width_spin.value(),
-            "height": self.height_spin.value(),
+            "font_size": self.base_controls["font_size_spin"].value(),
+            "font_family": self.base_controls["font_family_combo"].currentText(),
+            "bold": self.base_controls["bold_btn"].isChecked(),
+            "italic": self.base_controls["italic_btn"].isChecked(),
+            "underline": self.base_controls["underline_btn"].isChecked(),
+            "vertical_align": self.base_controls["v_align_group"].checkedButton().property("align_value")
+                if self.base_controls["v_align_group"].checkedButton() else "middle",
+            "horizontal_align": self.base_controls["h_align_group"].checkedButton().property("align_value")
+                if self.base_controls["h_align_group"].checkedButton() else "center",
+            "offset_to_frame": self.base_controls["offset_spin"].value(),
             "border_radius_tl": self.tl_radius_spin.value(),
             "border_radius_tr": self.tr_radius_spin.value(),
             "border_radius_br": self.br_radius_spin.value(),
             "border_radius_bl": self.bl_radius_spin.value(),
             "border_width": self.border_width_spin.value(),
             "border_style": self.border_style_combo.currentData(),
-            "border_color": self._button_color(self.border_color_btn),
+            "border_color": self._border_color.name(),
+            "text_type": self.base_controls["text_type_combo"].currentText(),
         }
+        if properties["text_type"] == "Comment":
+            properties["comment_number"] = self.base_controls["comment_number"].get_data()
+            properties["comment_column"] = self.base_controls["comment_column"].get_data()
+            properties["comment_row"] = self.base_controls["comment_row"].get_data()
+        else:
+            properties["text"] = self.base_controls["text_edit"].toPlainText()
 
         hover_properties = {
             "background_color": self._button_color(self.hover_bg_btn),
             "text_color": self._button_color(self.hover_text_btn),
-            "border_radius": self.hover_border_radius_slider.value(),
-            "border_width": self.hover_border_width_slider.value(),
-            "border_color": self._button_color(self.hover_border_color_btn),
+            "font_size": self.hover_controls["font_size_spin"].value(),
+            "font_family": self.hover_controls["font_family_combo"].currentText(),
+            "bold": self.hover_controls["bold_btn"].isChecked(),
+            "italic": self.hover_controls["italic_btn"].isChecked(),
+            "underline": self.hover_controls["underline_btn"].isChecked(),
+            "vertical_align": self.hover_controls["v_align_group"].checkedButton().property("align_value")
+                if self.hover_controls["v_align_group"].checkedButton() else "middle",
+            "horizontal_align": self.hover_controls["h_align_group"].checkedButton().property("align_value")
+                if self.hover_controls["h_align_group"].checkedButton() else "center",
+            "offset_to_frame": self.hover_controls["offset_spin"].value(),
+            "text_type": self.hover_controls["text_type_combo"].currentText(),
         }
+        if hover_properties["text_type"] == "Comment":
+            hover_properties["comment_number"] = self.hover_controls["comment_number"].get_data()
+            hover_properties["comment_column"] = self.hover_controls["comment_column"].get_data()
+            hover_properties["comment_row"] = self.hover_controls["comment_row"].get_data()
+        else:
+            hover_properties["text"] = self.hover_controls["text_edit"].toPlainText()
 
         click_properties = {
             "background_color": self._button_color(self.click_bg_btn),
             "text_color": self._button_color(self.click_text_btn),
-            "border_radius": self.click_border_radius_slider.value(),
-            "border_width": self.click_border_width_slider.value(),
-            "border_color": self._button_color(self.click_border_color_btn),
+            "font_size": self.click_controls["font_size_spin"].value(),
+            "font_family": self.click_controls["font_family_combo"].currentText(),
+            "bold": self.click_controls["bold_btn"].isChecked(),
+            "italic": self.click_controls["italic_btn"].isChecked(),
+            "underline": self.click_controls["underline_btn"].isChecked(),
+            "vertical_align": self.click_controls["v_align_group"].checkedButton().property("align_value")
+                if self.click_controls["v_align_group"].checkedButton() else "middle",
+            "horizontal_align": self.click_controls["h_align_group"].checkedButton().property("align_value")
+                if self.click_controls["h_align_group"].checkedButton() else "center",
+            "offset_to_frame": self.click_controls["offset_spin"].value(),
+            "text_type": self.click_controls["text_type_combo"].currentText(),
         }
+        if click_properties["text_type"] == "Comment":
+            click_properties["comment_number"] = self.click_controls["comment_number"].get_data()
+            click_properties["comment_column"] = self.click_controls["comment_column"].get_data()
+            click_properties["comment_row"] = self.click_controls["comment_row"].get_data()
+        else:
+            click_properties["text"] = self.click_controls["text_edit"].toPlainText()
 
         style = ConditionalStyle(
             style_id=self.style.style_id,
