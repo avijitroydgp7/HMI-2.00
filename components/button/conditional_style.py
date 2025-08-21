@@ -390,7 +390,7 @@ class ConditionalStyleEditorDialog(QDialog):
 
         self.init_colors()
 
-        style_group = QGroupBox("Component Style")
+        style_group = QGroupBox("Component Style & background")
         style_layout = QGridLayout()
         style_layout.addWidget(QLabel("Component Type:"), 0, 0)
         self.component_type_combo = QComboBox()
@@ -407,22 +407,17 @@ class ConditionalStyleEditorDialog(QDialog):
         self.shape_style_combo.currentTextChanged.connect(self.update_preview)
         style_layout.addWidget(self.shape_style_combo, 1, 1)
 
-        style_group.setLayout(style_layout)
-        controls_layout.addWidget(style_group)
-
-        self.background_group = QGroupBox("Background")
-        background_layout = QGridLayout()
-        background_layout.addWidget(QLabel("Background Type:"), 0, 0)
+        style_layout.addWidget(QLabel("Background Type:"), 2, 0)
         self.bg_type_combo = QComboBox()
         self.bg_type_combo.addItems(["Solid", "Linear Gradient"])
         self.bg_type_combo.setCurrentText(self.style.properties.get("background_type", "Solid"))
         self.bg_type_combo.currentTextChanged.connect(self.update_controls_state)
-        background_layout.addWidget(self.bg_type_combo, 0, 1)
+        style_layout.addWidget(self.bg_type_combo, 2, 1)
 
-        background_layout.addWidget(QLabel("Main Color:"), 1, 0)
+        style_layout.addWidget(QLabel("Main Color:"), 3, 0)
         self.bg_base_color_combo, self.bg_shade_combo = self.create_color_selection_widgets(self.on_bg_color_changed)
-        background_layout.addWidget(self.bg_base_color_combo, 1, 1)
-        background_layout.addWidget(self.bg_shade_combo, 2, 1)
+        style_layout.addWidget(self.bg_base_color_combo, 3, 1)
+        style_layout.addWidget(self.bg_shade_combo, 4, 1)
 
         # Hidden coordinate spin boxes used internally to build the QSS gradient
         self.x1_spin = self.create_coord_spinbox(self.style.properties.get("gradient_x1", 0))
@@ -433,12 +428,13 @@ class ConditionalStyleEditorDialog(QDialog):
             w.setVisible(False)
 
         self.gradient_dir_label = QLabel("Gradient Direction:")
-        background_layout.addWidget(self.gradient_dir_label, 3, 0)
+        style_layout.addWidget(self.gradient_dir_label, 5, 0)
         self.gradient_type_combo = QComboBox()
         self._init_gradient_type_combo()
-        background_layout.addWidget(self.gradient_type_combo, 3, 1)
-        self.background_group.setLayout(background_layout)
-        controls_layout.addWidget(self.background_group)
+        style_layout.addWidget(self.gradient_type_combo, 5, 1)
+
+        style_group.setLayout(style_layout)
+        controls_layout.addWidget(style_group)
 
         self.border_group = QGroupBox("Border")
         border_layout = QGridLayout()
@@ -599,7 +595,8 @@ class ConditionalStyleEditorDialog(QDialog):
         self.preview_stack.addWidget(self.preview_switch)
         preview_group_layout.addWidget(self.preview_stack)
         preview_group.setLayout(preview_group_layout)
-        preview_layout.addStretch(1); preview_layout.addWidget(preview_group); preview_layout.addStretch(1)
+        preview_layout.addWidget(preview_group)
+        preview_layout.addStretch(1)
 
         main_layout.addLayout(controls_layout, 0, 0)
         main_layout.addLayout(preview_layout, 0, 1)
