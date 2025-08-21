@@ -242,10 +242,15 @@ class ValueSelector(QWidget):
         self.source_combo.setVisible(False)
 
     def setError(self, message: Optional[str]):
-        self.error_label.setText(message or "")
-        self.error_label.setVisible(bool(message))
-        self.setProperty("error", bool(message))
-        self.style().polish(self)
+        try:
+            if hasattr(self, 'error_label') and self.error_label is not None:
+                self.error_label.setText(message or "")
+                self.error_label.setVisible(bool(message))
+                self.setProperty("error", bool(message))
+                self.style().polish(self)
+        except (RuntimeError, AttributeError):
+            # QLabel has been deleted, ignore the error
+            pass
 
 class TagSelector(QWidget):
     """An advanced widget that handles selecting a main tag and its array indices."""
@@ -363,11 +368,23 @@ class TagSelector(QWidget):
                 self.index_selectors[i].set_data(index_data)
     
     def setError(self, message: Optional[str]):
-        self.main_tag_selector.setError(message)
-        self.setProperty("error", bool(message))
-        self.style().polish(self)
+        try:
+            self.main_tag_selector.setError(message)
+            self.setProperty("error", bool(message))
+            self.style().polish(self)
+        except (RuntimeError, AttributeError):
+            # Widget has been deleted, ignore the error
+            pass
 
     def clear_errors_recursive(self):
-        self.setError(None)
-        for selector in self.index_selectors:
-            selector.setError(None)
+        try:
+            self.setError(None)
+            for selector in self.index_selectors:
+                try:
+                    selector.setError(None)
+                except (RuntimeError, AttributeError):
+                    # Selector has been deleted, skip it
+                    pass
+        except (RuntimeError, AttributeError):
+            # Widget has been deleted, ignore the error
+            pass
