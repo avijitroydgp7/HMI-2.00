@@ -24,6 +24,7 @@ from PyQt6.QtWidgets import (
     QToolButton,
     QButtonGroup,
     QHBoxLayout,
+    QCheckBox,
 )
 from PyQt6.QtGui import QColor, QPixmap, QIcon, QPalette, QPainter, QLinearGradient, QPen, QFontDatabase
 
@@ -254,6 +255,7 @@ class ConditionalStyle:
         return style
 
 
+
 @dataclass
 class ConditionalStyleManager(QObject):
     """Manages conditional styles for buttons"""
@@ -335,6 +337,22 @@ class PreviewButton(IconButton):
 
 
 class ConditionalStyleEditorDialog(QDialog):
+    _TEXT_KEYS = [
+        "text_type_combo",
+        "comment_number",
+        "comment_column",
+        "comment_row",
+        "text_edit",
+        "font_family_combo",
+        "font_size_spin",
+        "bold_btn",
+        "italic_btn",
+        "underline_btn",
+        "v_align_group",
+        "h_align_group",
+        "offset_spin",
+    ]
+
     def __init__(self, parent=None, style: Optional[ConditionalStyle] = None):
         super().__init__(parent)
         self.setWindowTitle("Conditional Style")
@@ -507,16 +525,36 @@ class ConditionalStyleEditorDialog(QDialog):
         self.click_bg_btn = self.click_controls["bg_color_btn"]
         self.click_text_btn = self.click_controls["text_color_btn"]
 
+        # checkboxes for syncing text properties
+        self.copy_hover_chk = QCheckBox("Text base = Hover")
+        self.copy_click_chk = QCheckBox("Text base = Click")
+        self.copy_hover_chk.toggled.connect(self.on_copy_hover_toggled)
+        self.copy_click_chk.toggled.connect(self.on_copy_click_toggled)
+
+        # connect base text controls to keep synced when needed
+        self._connect_base_text_signals()
+
+        self.on_copy_hover_toggled(False)
+        self.on_copy_click_toggled(False)
+
         # Conditions group - left empty for future use
         cond_group = QGroupBox("Conditions")
         QVBoxLayout(cond_group)
         main_layout.addWidget(cond_group, 2, 1)
 
+        main_layout.addWidget(style_tabs, 3, 0, 1, 2)
+
+        cb_layout = QHBoxLayout()
+        cb_layout.addStretch()
+        cb_layout.addWidget(self.copy_hover_chk)
+        cb_layout.addWidget(self.copy_click_chk)
+        cb_layout.addStretch()
+        main_layout.addLayout(cb_layout, 4, 0, 1, 2)
+
         self.button_box = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
         self.button_box.accepted.connect(self.accept)
         self.button_box.rejected.connect(self.reject)
-        main_layout.addWidget(style_tabs, 3, 0, 1, 2)
-        main_layout.addWidget(self.button_box, 4, 0, 1, 2)
+        main_layout.addWidget(self.button_box, 5, 0, 1, 2)
 
         preview_group = QGroupBox("Preview")
         preview_group_layout = QVBoxLayout(); preview_group_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -715,6 +753,82 @@ class ConditionalStyleEditorDialog(QDialog):
             "stack": stack,
         }
         return tab, controls
+
+    def _connect_base_text_signals(self):
+        bc = self.base_controls
+        bc["text_type_combo"].currentIndexChanged.connect(self.on_base_text_changed)
+        bc["comment_number"].tag_selected.connect(self.on_base_text_changed)
+        bc["comment_number"].inputChanged.connect(self.on_base_text_changed)
+        bc["comment_column"].tag_selected.connect(self.on_base_text_changed)
+        bc["comment_column"].inputChanged.connect(self.on_base_text_changed)
+        bc["comment_row"].tag_selected.connect(self.on_base_text_changed)
+        bc["comment_row"].inputChanged.connect(self.on_base_text_changed)
+        bc["text_edit"].textChanged.connect(self.on_base_text_changed)
+        bc["font_family_combo"].currentTextChanged.connect(self.on_base_text_changed)
+        bc["font_size_spin"].valueChanged.connect(self.on_base_text_changed)
+        bc["bold_btn"].toggled.connect(self.on_base_text_changed)
+        bc["italic_btn"].toggled.connect(self.on_base_text_changed)
+        bc["underline_btn"].toggled.connect(self.on_base_text_changed)
+        bc["v_align_group"].buttonToggled.connect(lambda *_: self.on_base_text_changed())
+        bc["h_align_group"].buttonToggled.connect(lambda *_: self.on_base_text_changed())
+        bc["offset_spin"].valueChanged.connect(self.on_base_text_changed)
+
+    def _set_state_controls_enabled(self, controls, enabled):
+        for key in self._TEXT_KEYS:
+            w = controls.get(key)
+            if not w:
+                continue
+            if key in ["v_align_group", "h_align_group"]:
+                for btn in w.buttons():
+                    btn.setEnabled(enabled)
+            else:
+                w.setEnabled(enabled)
+
+    def copy_base_to_state(self, target):
+        src = self.base_controls
+        for key in self._TEXT_KEYS:
+            if key not in src or key not in target:
+                continue
+            s, t = src[key], target[key]
+            if key == "text_type_combo" or key.endswith("_combo"):
+                t.setCurrentText(s.currentText())
+                if key == "text_type_combo":
+                    target["stack"].setCurrentIndex(src["stack"].currentIndex())
+            elif key.endswith("_spin"):
+                t.setValue(s.value())
+            elif key.endswith("_btn"):
+                t.setChecked(s.isChecked())
+            elif key.endswith("_group"):
+                checked = s.checkedButton()
+                if checked:
+                    value = checked.property("align_value")
+                    for btn in t.buttons():
+                        if btn.property("align_value") == value:
+                            btn.setChecked(True)
+                            break
+            elif key in ["comment_number", "comment_column", "comment_row"]:
+                t.set_data(s.get_data())
+            elif key == "text_edit":
+                t.setPlainText(s.toPlainText())
+
+    def on_copy_hover_toggled(self, checked):
+        self._set_state_controls_enabled(self.hover_controls, not checked)
+        if checked:
+            self.copy_base_to_state(self.hover_controls)
+        self.update_preview()
+
+    def on_copy_click_toggled(self, checked):
+        self._set_state_controls_enabled(self.click_controls, not checked)
+        if checked:
+            self.copy_base_to_state(self.click_controls)
+        self.update_preview()
+
+    def on_base_text_changed(self, *args):
+        if self.copy_hover_chk.isChecked():
+            self.copy_base_to_state(self.hover_controls)
+        if self.copy_click_chk.isChecked():
+            self.copy_base_to_state(self.click_controls)
+        self.update_preview()
 
     def _set_button_color(self, btn, color):
         if color:
@@ -1084,6 +1198,11 @@ class ConditionalStyleEditorDialog(QDialog):
 
 
     def get_style(self) -> ConditionalStyle:
+        if self.copy_hover_chk.isChecked():
+            self.copy_base_to_state(self.hover_controls)
+        if self.copy_click_chk.isChecked():
+            self.copy_base_to_state(self.click_controls)
+
         properties = {
             "component_type": self.component_type_combo.currentText(),
             "shape_style": self.shape_style_combo.currentText(),
