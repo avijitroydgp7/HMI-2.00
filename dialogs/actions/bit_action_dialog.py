@@ -313,7 +313,7 @@ class BitActionDialog(QDialog):
             else:
                 op2_type = op2_selector.current_tag_data.get('data_type') if op2_selector.current_tag_data else None
                 if op2_type:
-                    op2_type = {"INT": "INT16", "DINT": "INT32"}.get(op2_type, op1_type)
+                    op2_type = {"INT": "INT16", "DINT": "INT32"}.get(op2_type, op2_type)
                     if op2_type != op1_type:
                         op2_selector.setError("Data type must match Operand 1.")
                         is_valid = False
