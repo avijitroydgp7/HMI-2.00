@@ -482,8 +482,7 @@ class ConditionalStyleEditorDialog(QDialog):
         self.br_radius_spin.setValue(self.style.properties.get("border_radius_br", 0))
         corner_layout.addWidget(self.br_radius_spin, 3, 2)
 
-        for w in [header, self.link_radius_btn, left_label, right_label, top_label, bottom_label,
-                   self.tl_radius_spin, self.tr_radius_spin, self.bl_radius_spin, self.br_radius_spin]:
+        for w in [header, self.link_radius_btn, left_label, right_label, top_label, bottom_label]:
             w.setStyleSheet("border: 1px solid #666;")
 
         self.corner_spins = {
