@@ -264,7 +264,13 @@ class BitActionDialog(QDialog):
                 trigger_is_valid = False
         elif trigger_mode == "Range":
             if hasattr(self, 'range_operand1_selector'):
-                trigger_is_valid &= self._validate_range_section(self.range_operand1_selector, self.range_operator_combo.currentText(), self.range_operand2_selector, self.range_lower_bound_selector, self.range_upper_bound_selector)
+                trigger_is_valid &= self._validate_range_section(
+                    self.range_operand1_selector,
+                    self.range_operator_combo.currentText(),
+                    self.range_operand2_selector,
+                    self.range_lower_bound_selector,
+                    self.range_upper_bound_selector,
+                )
         
         is_valid &= trigger_is_valid
         if trigger_mode == "Ordinary":
