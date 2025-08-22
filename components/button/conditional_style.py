@@ -534,9 +534,6 @@ class ConditionalStyleEditorDialog(QDialog):
         # connect base text controls to keep synced when needed
         self._connect_base_text_signals()
 
-        self.on_copy_hover_toggled(False)
-        self.on_copy_click_toggled(False)
-
         # Conditions group - left empty for future use
         cond_group = QGroupBox("Conditions")
         QVBoxLayout(cond_group)
@@ -577,6 +574,11 @@ class ConditionalStyleEditorDialog(QDialog):
         self.component_type_combo.currentTextChanged.connect(self.update_preview)
 
         self.set_initial_colors()
+
+        # Initialize copy states after colors and preview widgets are ready
+        self.on_copy_hover_toggled(False)
+        self.on_copy_click_toggled(False)
+
         self.update_controls_state()
         self.update_preview()
 
