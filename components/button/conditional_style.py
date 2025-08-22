@@ -480,6 +480,8 @@ class ConditionalStyleEditorDialog(QDialog):
         "bold_btn",
         "italic_btn",
         "underline_btn",
+        "bg_color_btn",
+        "text_color_btn",
         "v_align_group",
         "h_align_group",
         "offset_spin",
@@ -903,6 +905,8 @@ class ConditionalStyleEditorDialog(QDialog):
         bc["bold_btn"].toggled.connect(self.on_base_text_changed)
         bc["italic_btn"].toggled.connect(self.on_base_text_changed)
         bc["underline_btn"].toggled.connect(self.on_base_text_changed)
+        bc["bg_color_btn"].clicked.connect(self.on_base_text_changed)
+        bc["text_color_btn"].clicked.connect(self.on_base_text_changed)
         bc["v_align_group"].buttonToggled.connect(lambda *_: self.on_base_text_changed())
         bc["h_align_group"].buttonToggled.connect(lambda *_: self.on_base_text_changed())
         bc["offset_spin"].valueChanged.connect(self.on_base_text_changed)
@@ -930,6 +934,15 @@ class ConditionalStyleEditorDialog(QDialog):
                     target["stack"].setCurrentIndex(src["stack"].currentIndex())
             elif key.endswith("_spin"):
                 t.setValue(s.value())
+            elif key in ["bg_color_btn", "text_color_btn"]:
+                color = self._button_color(s)
+                t.setProperty("color", color)
+                self._set_button_color(t, color)
+                if key == "bg_color_btn":
+                    if target is self.hover_controls:
+                        self._hover_bg_color = QColor(color) if color else QColor()
+                    elif target is self.click_controls:
+                        self._click_bg_color = QColor(color) if color else QColor()
             elif key.endswith("_btn"):
                 t.setChecked(s.isChecked())
             elif key.endswith("_group"):
