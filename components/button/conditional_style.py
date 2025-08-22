@@ -25,8 +25,6 @@ from PyQt6.QtWidgets import (
     QComboBox,
     QGridLayout,
     QLabel,
-    QColorDialog,
-    QSlider,
     QTabWidget,
     QWidget,
     QStackedWidget,
@@ -480,8 +478,10 @@ class ConditionalStyleEditorDialog(QDialog):
         "bold_btn",
         "italic_btn",
         "underline_btn",
-        "bg_color_btn",
-        "text_color_btn",
+        "bg_base_combo",
+        "bg_shade_combo",
+        "text_base_combo",
+        "text_shade_combo",
         "v_align_group",
         "h_align_group",
         "offset_spin",
@@ -491,6 +491,9 @@ class ConditionalStyleEditorDialog(QDialog):
         super().__init__(parent)
         self.setWindowTitle("Conditional Style")
         self.style = copy.deepcopy(style) if style else ConditionalStyle()
+        self._text_color = self.style.properties.get("text_color", "")
+        self._hover_text_color = self.style.hover_properties.get("text_color", "")
+        self._click_text_color = self.style.click_properties.get("text_color", "")
 
         main_layout = QGridLayout(self)
         main_layout.setColumnStretch(0, 1)
@@ -530,7 +533,9 @@ class ConditionalStyleEditorDialog(QDialog):
         style_layout.addWidget(self.bg_type_combo, 2, 1)
 
         style_layout.addWidget(QLabel("Main Color:"), 3, 0)
-        self.bg_base_color_combo, self.bg_shade_combo = self.create_color_selection_widgets(self.on_bg_color_changed)
+        self.bg_base_color_combo, self.bg_shade_combo = self.create_color_selection_widgets(
+            self.on_bg_color_changed, emit_initial=False
+        )
         style_layout.addWidget(self.bg_base_color_combo, 3, 1)
         style_layout.addWidget(self.bg_shade_combo, 4, 1)
 
@@ -641,23 +646,17 @@ class ConditionalStyleEditorDialog(QDialog):
         # Style tabs
         style_tabs = QTabWidget()
 
-        self.base_tab, self.base_controls = self._build_state_tab(self.style.properties)
+        self.base_tab, self.base_controls = self._build_state_tab(self.style.properties, "base")
         style_tabs.addTab(self.base_tab, "Base")
 
-        self.hover_tab, self.hover_controls = self._build_state_tab(self.style.hover_properties)
+        self.hover_tab, self.hover_controls = self._build_state_tab(self.style.hover_properties, "hover")
         style_tabs.addTab(self.hover_tab, "Hover")
 
-        self.click_tab, self.click_controls = self._build_state_tab(self.style.click_properties)
+        self.click_tab, self.click_controls = self._build_state_tab(self.style.click_properties, "click")
         style_tabs.addTab(self.click_tab, "Click")
 
         # Convenience shortcuts for commonly used controls
-        self.bg_color_btn = self.base_controls["bg_color_btn"]
-        self.text_color_btn = self.base_controls["text_color_btn"]
         self.font_size_spin = self.base_controls["font_size_spin"]
-        self.hover_bg_btn = self.hover_controls["bg_color_btn"]
-        self.hover_text_btn = self.hover_controls["text_color_btn"]
-        self.click_bg_btn = self.click_controls["bg_color_btn"]
-        self.click_text_btn = self.click_controls["text_color_btn"]
 
         # checkboxes for syncing text properties
         self.copy_hover_chk = QCheckBox("Text base = Hover")
@@ -716,14 +715,6 @@ class ConditionalStyleEditorDialog(QDialog):
         self.update_controls_state()
         self.update_preview()
 
-    def create_color_button(self, initial):
-        btn = QPushButton()
-        btn.setFixedSize(40, 20)
-        btn.setProperty("color", initial)
-        self._set_button_color(btn, initial)
-        btn.clicked.connect(lambda: self._choose_color(btn))
-        return btn
-
     def _create_alignment_widget(self, options, current):
         widget = QWidget()
         layout = QHBoxLayout(widget)
@@ -741,7 +732,7 @@ class ConditionalStyleEditorDialog(QDialog):
         group.setExclusive(True)
         return widget, group
 
-    def _build_state_tab(self, props):
+    def _build_state_tab(self, props, state_name):
         tab = QWidget()
         layout = QGridLayout(tab)
 
@@ -819,31 +810,41 @@ class ConditionalStyleEditorDialog(QDialog):
         layout.addWidget(underline_btn, 3, 2)
 
         layout.addWidget(QLabel("Background Colour:"), 4, 0)
-        bg_color_btn = self.create_color_button(props.get("background_color", ""))
-        layout.addWidget(bg_color_btn, 4, 1)
-        layout.addWidget(QLabel("Text Colour:"), 4, 2)
-        text_color_btn = self.create_color_button(props.get("text_color", ""))
-        layout.addWidget(text_color_btn, 4, 3)
+        bg_base_combo, bg_shade_combo = self.create_color_selection_widgets(
+            lambda n, c: self.on_state_bg_color_changed(state_name, c),
+            props.get("background_color", ""),
+            emit_initial=False,
+        )
+        layout.addWidget(bg_base_combo, 4, 1)
+        layout.addWidget(bg_shade_combo, 4, 2)
+        layout.addWidget(QLabel("Text Colour:"), 5, 0)
+        text_base_combo, text_shade_combo = self.create_color_selection_widgets(
+            lambda n, c: self.on_state_text_color_changed(state_name, c),
+            props.get("text_color", ""),
+            emit_initial=False,
+        )
+        layout.addWidget(text_base_combo, 5, 1)
+        layout.addWidget(text_shade_combo, 5, 2)
 
-        layout.addWidget(QLabel("Vertical Align:"), 5, 0)
+        layout.addWidget(QLabel("Vertical Align:"), 6, 0)
         v_widget, v_group = self._create_alignment_widget(
             [("top", "T"), ("middle", "M"), ("bottom", "B")],
             props.get("v_align", props.get("vertical_align", "middle")),
         )
-        layout.addWidget(v_widget, 5, 1)
+        layout.addWidget(v_widget, 6, 1)
 
-        layout.addWidget(QLabel("Horizontal Align:"), 5, 2)
+        layout.addWidget(QLabel("Horizontal Align:"), 6, 2)
         h_widget, h_group = self._create_alignment_widget(
             [("left", "L"), ("center", "C"), ("right", "R")],
             props.get("h_align", props.get("horizontal_align", "center")),
         )
-        layout.addWidget(h_widget, 5, 3)
+        layout.addWidget(h_widget, 6, 3)
 
-        layout.addWidget(QLabel("Offset To Frame:"), 6, 0)
+        layout.addWidget(QLabel("Offset To Frame:"), 7, 0)
         offset_spin = QSpinBox()
         offset_spin.setRange(-1000, 1000)
         offset_spin.setValue(props.get("offset", props.get("offset_to_frame", 0)))
-        layout.addWidget(offset_spin, 6, 1)
+        layout.addWidget(offset_spin, 7, 1)
 
         layout.setColumnStretch(1, 1)
         layout.setColumnStretch(3, 1)
@@ -881,8 +882,10 @@ class ConditionalStyleEditorDialog(QDialog):
             "bold_btn": bold_btn,
             "italic_btn": italic_btn,
             "underline_btn": underline_btn,
-            "bg_color_btn": bg_color_btn,
-            "text_color_btn": text_color_btn,
+            "bg_base_combo": bg_base_combo,
+            "bg_shade_combo": bg_shade_combo,
+            "text_base_combo": text_base_combo,
+            "text_shade_combo": text_shade_combo,
             "v_align_group": v_group,
             "h_align_group": h_group,
             "offset_spin": offset_spin,
@@ -905,8 +908,10 @@ class ConditionalStyleEditorDialog(QDialog):
         bc["bold_btn"].toggled.connect(self.on_base_text_changed)
         bc["italic_btn"].toggled.connect(self.on_base_text_changed)
         bc["underline_btn"].toggled.connect(self.on_base_text_changed)
-        bc["bg_color_btn"].clicked.connect(self.on_base_text_changed)
-        bc["text_color_btn"].clicked.connect(self.on_base_text_changed)
+        bc["bg_base_combo"].currentIndexChanged.connect(self.on_base_text_changed)
+        bc["bg_shade_combo"].currentIndexChanged.connect(self.on_base_text_changed)
+        bc["text_base_combo"].currentIndexChanged.connect(self.on_base_text_changed)
+        bc["text_shade_combo"].currentIndexChanged.connect(self.on_base_text_changed)
         bc["v_align_group"].buttonToggled.connect(lambda *_: self.on_base_text_changed())
         bc["h_align_group"].buttonToggled.connect(lambda *_: self.on_base_text_changed())
         bc["offset_spin"].valueChanged.connect(self.on_base_text_changed)
@@ -928,21 +933,17 @@ class ConditionalStyleEditorDialog(QDialog):
             if key not in src or key not in target:
                 continue
             s, t = src[key], target[key]
-            if key == "text_type_combo" or key.endswith("_combo"):
+            if key == "text_type_combo":
                 t.setCurrentText(s.currentText())
-                if key == "text_type_combo":
-                    target["stack"].setCurrentIndex(src["stack"].currentIndex())
+                target["stack"].setCurrentIndex(src["stack"].currentIndex())
+            elif key in ["bg_base_combo", "text_base_combo"]:
+                t.setCurrentText(s.currentText())
+            elif key in ["bg_shade_combo", "text_shade_combo"]:
+                t.setCurrentIndex(s.currentIndex())
+            elif key.endswith("_combo"):
+                t.setCurrentText(s.currentText())
             elif key.endswith("_spin"):
                 t.setValue(s.value())
-            elif key in ["bg_color_btn", "text_color_btn"]:
-                color = self._button_color(s)
-                t.setProperty("color", color)
-                self._set_button_color(t, color)
-                if key == "bg_color_btn":
-                    if target is self.hover_controls:
-                        self._hover_bg_color = QColor(color) if color else QColor()
-                    elif target is self.click_controls:
-                        self._click_bg_color = QColor(color) if color else QColor()
             elif key.endswith("_btn"):
                 t.setChecked(s.isChecked())
             elif key.endswith("_group"):
@@ -973,32 +974,24 @@ class ConditionalStyleEditorDialog(QDialog):
     def on_base_text_changed(self, *args):
         if self.copy_hover_chk.isChecked():
             self.copy_base_to_state(self.hover_controls)
-        if self.copy_click_chk.isChecked():
-            self.copy_base_to_state(self.click_controls)
+    def on_state_bg_color_changed(self, state, color):
+        if state == "base":
+            self._bg_color = color
+        elif state == "hover":
+            self._hover_bg_color = color
+        elif state == "click":
+            self._click_bg_color = color
         self.update_preview()
 
-    def _set_button_color(self, btn, color):
-        if color:
-            btn.setStyleSheet(f"background-color: {color};")
-        else:
-            btn.setStyleSheet("")
-
-    def _choose_color(self, btn):
-        color = QColorDialog.getColor(parent=self)
-        if color.isValid():
-            color_name = color.name()
-            btn.setProperty("color", color_name)
-            self._set_button_color(btn, color_name)
-            if btn is self.bg_color_btn:
-                self._bg_color = QColor(color_name)
-            elif btn is self.hover_bg_btn:
-                self._hover_bg_color = QColor(color_name)
-            elif btn is self.click_bg_btn:
-                self._click_bg_color = QColor(color_name)
-            self.update_preview()
-
-    def _button_color(self, btn):
-        return btn.property("color") or ""
+    def on_state_text_color_changed(self, state, color):
+        name = color.name() if isinstance(color, QColor) else str(color)
+        if state == "base":
+            self._text_color = name
+        elif state == "hover":
+            self._hover_text_color = name
+        elif state == "click":
+            self._click_text_color = name
+        self.update_preview()
 
     def init_colors(self):
         self.color_schemes = {
@@ -1026,7 +1019,7 @@ class ConditionalStyleEditorDialog(QDialog):
             shades.append(base_color.lighter(int(100 * factor)) if factor > 1.0 else base_color.darker(int(100 / factor)))
         return shades
 
-    def create_color_selection_widgets(self, final_slot):
+    def create_color_selection_widgets(self, final_slot, initial_color=None, emit_initial=True):
         base_combo = QComboBox()
         for color_name, color_value in self.base_colors.items():
             pixmap = QPixmap(16, 16)
@@ -1035,7 +1028,7 @@ class ConditionalStyleEditorDialog(QDialog):
 
         shade_combo = QComboBox()
 
-        def update_shades(color_name):
+        def update_shades(color_name, select_index=None, emit=True):
             shade_combo.blockSignals(True)
             shade_combo.clear()
             shades = self.get_shades(color_name)
@@ -1044,14 +1037,74 @@ class ConditionalStyleEditorDialog(QDialog):
                 pixmap.fill(shade)
                 shade_combo.addItem(QIcon(pixmap), f"Shade {i+1}")
                 shade_combo.setItemData(i, shade)
-            shade_combo.setCurrentIndex(7)
+            shade_combo.setCurrentIndex(select_index if select_index is not None else 7)
             shade_combo.blockSignals(False)
-            final_slot(color_name, shade_combo.currentData())
+            if emit:
+                final_slot(color_name, shade_combo.currentData())
 
-        base_combo.currentTextChanged.connect(update_shades)
+        base_combo.currentTextChanged.connect(lambda name: update_shades(name))
         shade_combo.currentIndexChanged.connect(lambda: final_slot(base_combo.currentText(), shade_combo.currentData()))
 
+        if initial_color:
+            found_name, found_idx = None, None
+            for name in self.base_colors:
+                shades = self.get_shades(name)
+                for i, shade in enumerate(shades):
+                    if shade.name().lower() == str(initial_color).lower():
+                        found_name, found_idx = name, i
+                        break
+                if found_name:
+                    break
+            if found_name:
+                base_combo.setCurrentText(found_name)
+                update_shades(found_name, found_idx, emit_initial)
+            else:
+                base_combo.setCurrentIndex(0)
+                update_shades(base_combo.currentText(), emit_initial)
+        else:
+            base_combo.setCurrentIndex(0)
+            update_shades(base_combo.currentText(), emit_initial)
+
         return base_combo, shade_combo
+
+    def set_combo_selection(self, base_combo, shade_combo, color):
+        color_hex = color.name() if isinstance(color, QColor) else str(color)
+        found_name, found_idx = None, 7
+        for name in self.base_colors:
+            shades = self.get_shades(name)
+            for i, shade in enumerate(shades):
+                if shade.name().lower() == color_hex.lower():
+                    found_name, found_idx = name, i
+                    break
+            if found_name:
+                break
+        if not found_name:
+            found_name = base_combo.currentText()
+        base_combo.blockSignals(True)
+        shade_combo.blockSignals(True)
+        base_combo.setCurrentText(found_name)
+        shade_combo.clear()
+        for i, shade in enumerate(self.get_shades(found_name)):
+            pixmap = QPixmap(16, 16)
+            pixmap.fill(shade)
+            shade_combo.addItem(QIcon(pixmap), f"Shade {i+1}")
+            shade_combo.setItemData(i, shade)
+        shade_combo.setCurrentIndex(found_idx)
+        base_combo.blockSignals(False)
+        shade_combo.blockSignals(False)
+        final_color = shade_combo.currentData()
+        if base_combo is self.base_controls.get("bg_base_combo"):
+            self.on_state_bg_color_changed("base", final_color)
+        elif base_combo is self.hover_controls.get("bg_base_combo"):
+            self.on_state_bg_color_changed("hover", final_color)
+        elif base_combo is self.click_controls.get("bg_base_combo"):
+            self.on_state_bg_color_changed("click", final_color)
+        elif base_combo is self.base_controls.get("text_base_combo"):
+            self.on_state_text_color_changed("base", final_color)
+        elif base_combo is self.hover_controls.get("text_base_combo"):
+            self.on_state_text_color_changed("hover", final_color)
+        elif base_combo is self.click_controls.get("text_base_combo"):
+            self.on_state_text_color_changed("click", final_color)
 
     def on_bg_color_changed(self, color_name, color):
         if not color:
@@ -1063,16 +1116,15 @@ class ConditionalStyleEditorDialog(QDialog):
             self._border_color = scheme["border"]
             self._bg_color2 = scheme["gradient2"]
             self._click_bg_color = self._bg_color.darker(120)
-            self._set_button_color(self.bg_color_btn, self._bg_color.name())
-            self.bg_color_btn.setProperty("color", self._bg_color.name())
-            self._set_button_color(self.hover_bg_btn, self._hover_bg_color.name())
-            self.hover_bg_btn.setProperty("color", self._hover_bg_color.name())
-            self._set_button_color(self.click_bg_btn, self._click_bg_color.name())
-            self.click_bg_btn.setProperty("color", self._click_bg_color.name())
+            self.set_combo_selection(self.base_controls["bg_base_combo"], self.base_controls["bg_shade_combo"], self._bg_color)
+            self.set_combo_selection(self.hover_controls["bg_base_combo"], self.hover_controls["bg_shade_combo"], self._hover_bg_color)
+            self.set_combo_selection(self.click_controls["bg_base_combo"], self.click_controls["bg_shade_combo"], self._click_bg_color)
         self.update_preview()
 
     def set_initial_colors(self):
+        self.bg_base_color_combo.blockSignals(True)
         self.bg_base_color_combo.setCurrentText("Green")
+        self.bg_base_color_combo.blockSignals(False)
         scheme = self.color_schemes.get("Green")
         if scheme:
             self._bg_color = scheme["main"]
@@ -1087,6 +1139,12 @@ class ConditionalStyleEditorDialog(QDialog):
             self._bg_color2 = QColor("#16a085")
             self._click_bg_color = self._bg_color.darker(120)
         self.on_bg_color_changed("Green", self._bg_color)
+        base_text = QColor(self._text_color) if self._text_color else self.palette().color(QPalette.ColorRole.ButtonText)
+        hover_text = QColor(self._hover_text_color) if self._hover_text_color else base_text
+        click_text = QColor(self._click_text_color) if self._click_text_color else base_text
+        self.set_combo_selection(self.base_controls["text_base_combo"], self.base_controls["text_shade_combo"], base_text)
+        self.set_combo_selection(self.hover_controls["text_base_combo"], self.hover_controls["text_shade_combo"], hover_text)
+        self.set_combo_selection(self.click_controls["text_base_combo"], self.click_controls["text_shade_combo"], click_text)
 
     def create_coord_spinbox(self, value=0):
         spinbox = QSpinBox()
@@ -1238,7 +1296,7 @@ class ConditionalStyleEditorDialog(QDialog):
         hover_bg_color = self._hover_bg_color
         click_bg_color = self._click_bg_color
         border_color = self._border_color
-        text_color = self._button_color(self.text_color_btn) or self.palette().color(QPalette.ColorRole.ButtonText).name()
+        text_color = self._text_color or self.palette().color(QPalette.ColorRole.ButtonText).name()
         font_size = self.font_size_spin.value()
         font_family = self.base_controls["font_family_combo"].currentText()
         font_weight = "bold" if self.base_controls["bold_btn"].isChecked() else "normal"
@@ -1354,14 +1412,14 @@ class ConditionalStyleEditorDialog(QDialog):
             "component_type": self.component_type_combo.currentText(),
             "shape_style": self.shape_style_combo.currentText(),
             "background_type": self.bg_type_combo.currentText(),
-            "background_color": self._button_color(self.bg_color_btn),
+            "background_color": self._bg_color.name(),
             "background_color2": self._bg_color2.name(),
             "gradient_type": self.gradient_type_combo.currentText(),
             "gradient_x1": self.x1_spin.value(),
             "gradient_y1": self.y1_spin.value(),
             "gradient_x2": self.x2_spin.value(),
             "gradient_y2": self.y2_spin.value(),
-            "text_color": self._button_color(self.text_color_btn),
+            "text_color": self._text_color,
             "font_size": self.base_controls["font_size_spin"].value(),
             "font_family": self.base_controls["font_family_combo"].currentText(),
             "bold": self.base_controls["bold_btn"].isChecked(),
@@ -1402,8 +1460,8 @@ class ConditionalStyleEditorDialog(QDialog):
             properties["text_value"] = properties.get("text", "")
 
         hover_properties = {
-            "background_color": self._button_color(self.hover_bg_btn),
-            "text_color": self._button_color(self.hover_text_btn),
+            "background_color": self._hover_bg_color.name(),
+            "text_color": self._hover_text_color,
             "font_size": self.hover_controls["font_size_spin"].value(),
             "font_family": self.hover_controls["font_family_combo"].currentText(),
             "bold": self.hover_controls["bold_btn"].isChecked(),
@@ -1426,8 +1484,8 @@ class ConditionalStyleEditorDialog(QDialog):
             hover_properties["text_value"] = self.hover_controls["text_edit"].toPlainText()
 
         click_properties = {
-            "background_color": self._button_color(self.click_bg_btn),
-            "text_color": self._button_color(self.click_text_btn),
+            "background_color": self._click_bg_color.name(),
+            "text_color": self._click_text_color,
             "font_size": self.click_controls["font_size_spin"].value(),
             "font_family": self.click_controls["font_family_combo"].currentText(),
             "bold": self.click_controls["bold_btn"].isChecked(),
