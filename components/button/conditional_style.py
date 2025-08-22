@@ -2,7 +2,18 @@ from typing import Dict, Any, List, Optional, ClassVar
 from dataclasses import dataclass, field
 import copy
 
-from PyQt6.QtCore import QObject, pyqtSignal, Qt, QSize
+from PyQt6.QtCore import (
+    QObject,
+    pyqtSignal,
+    Qt,
+    QSize,
+    QPropertyAnimation,
+    QEasingCurve,
+    pyqtProperty,
+    QPoint,
+    QRect,
+    QRectF,
+)
 from PyQt6.QtWidgets import (
     QDialog,
     QVBoxLayout,
@@ -26,11 +37,132 @@ from PyQt6.QtWidgets import (
     QHBoxLayout,
     QCheckBox,
 )
-from PyQt6.QtGui import QColor, QPixmap, QIcon, QPalette, QPainter, QLinearGradient, QPen, QFontDatabase
+from PyQt6.QtGui import (
+    QColor,
+    QPixmap,
+    QIcon,
+    QPalette,
+    QPainter,
+    QLinearGradient,
+    QPen,
+    QFontDatabase,
+    QBrush,
+)
 
-from button_creator import IconButton, SwitchButton
+from PyQt6.QtSvg import QSvgRenderer
 from utils.icon_manager import IconManager
 from dialogs.widgets import TagSelector
+
+# ---------------------------------------------------------------------------
+# Helper widgets previously provided by button_creator
+# ---------------------------------------------------------------------------
+
+
+class SwitchButton(QPushButton):
+    """A custom toggle switch used for previewing switch styles."""
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setMinimumSize(200, 100)
+
+        self._handle_x_pos = 50
+        self.animation = QPropertyAnimation(self, b"handle_x_pos", self)
+        self.animation.setEasingCurve(QEasingCurve.Type.InOutCubic)
+        self.animation.setDuration(200)
+
+        self._handle_color = QColor("white")
+        self._on_is_left = False  # Default: 'on' state is on the right
+
+        # Set initial state based on default alignment without animation
+        self.set_alignment(False)
+
+    @pyqtProperty(int)
+    def handle_x_pos(self):
+        return self._handle_x_pos
+
+    @handle_x_pos.setter
+    def handle_x_pos(self, pos):
+        self._handle_x_pos = pos
+        self.update()
+
+    def set_alignment(self, on_is_left):
+        """Sets the toggle direction and initial state."""
+        self._on_is_left = on_is_left
+        off_pos = self.width() - 50 if self._on_is_left else 50
+        self.handle_x_pos = off_pos
+
+    def paintEvent(self, event):
+        super().paintEvent(event)
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+
+        brush = QBrush(self._handle_color)
+        painter.setBrush(brush)
+        painter.setPen(Qt.PenStyle.NoPen)
+
+        handle_y = self.height() / 2
+        handle_center = QPoint(self.handle_x_pos, int(handle_y))
+        painter.drawEllipse(handle_center, 40, 40)
+
+    def mousePressEvent(self, e):
+        on_pos = 50 if self._on_is_left else self.width() - 50
+        self.animation.setEndValue(on_pos)
+        self.animation.start()
+        super().mousePressEvent(e)
+
+    def mouseReleaseEvent(self, e):
+        off_pos = self.width() - 50 if self._on_is_left else 50
+        self.animation.setEndValue(off_pos)
+        self.animation.start()
+        super().mouseReleaseEvent(e)
+
+
+class IconButton(QPushButton):
+    """Button capable of displaying SVG icons for previewing styles."""
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.svg_renderer: Optional[QSvgRenderer] = None
+        self.svg_renderer_clicked: Optional[QSvgRenderer] = None
+        self.icon_size = QSize(50, 50)
+        self._is_pressed = False
+
+    def set_icon(self, path: str):
+        self.svg_renderer = QSvgRenderer(path) if path else None
+        self.update()
+
+    def set_icon_clicked(self, path: str):
+        self.svg_renderer_clicked = QSvgRenderer(path) if path else None
+        self.update()
+
+    def set_icon_size(self, size: int):
+        self.icon_size = QSize(size, size)
+        self.update()
+
+    def mousePressEvent(self, e):
+        self._is_pressed = True
+        self.update()
+        super().mousePressEvent(e)
+
+    def mouseReleaseEvent(self, e):
+        self._is_pressed = False
+        self.update()
+        super().mouseReleaseEvent(e)
+
+    def paintEvent(self, event):
+        super().paintEvent(event)
+        renderer = (
+            self.svg_renderer_clicked
+            if self._is_pressed and self.svg_renderer_clicked
+            else self.svg_renderer
+        )
+
+        if renderer:
+            painter = QPainter(self)
+            target_rect = self.rect()
+            icon_rect = QRect(0, 0, self.icon_size.width(), self.icon_size.height())
+            icon_rect.moveCenter(target_rect.center())
+            renderer.render(painter, QRectF(icon_rect))
 
 # Predefined gradient orientations used for visual selection
 _GRADIENT_STYLES = {

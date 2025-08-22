@@ -12,6 +12,7 @@ def main():
     and starts the event loop.
     """
     app = QApplication(sys.argv)
+    app.setStyle("Fusion")
 
     # Check for a project file passed as a command-line argument
     initial_project = None
