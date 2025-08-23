@@ -1026,6 +1026,7 @@ class ConditionalStyleEditorDialog(QDialog):
         for i in range(16):
             factor = 1.2 - (i / 15.0) * 0.6
             shades.append(base_color.lighter(int(100 * factor)) if factor > 1.0 else base_color.darker(int(100 / factor)))
+
         return shades
 
     def create_color_selection_widgets(self, final_slot, initial_color=None, emit_initial=True):
@@ -1051,9 +1052,9 @@ class ConditionalStyleEditorDialog(QDialog):
             if emit:
                 final_slot(color_name, shade_combo.currentData())
 
-        base_combo.currentTextChanged.connect(lambda name: update_shades(name))
-        shade_combo.currentIndexChanged.connect(lambda: final_slot(base_combo.currentText(), shade_combo.currentData()))
-
+        # Configure initial selection before connecting signals to avoid
+        # premature emissions that would call ``final_slot`` while widgets
+        # are still being constructed.
         if initial_color:
             found_name, found_idx = None, None
             for name in self.base_colors:
@@ -1066,7 +1067,7 @@ class ConditionalStyleEditorDialog(QDialog):
                     break
             if found_name:
                 base_combo.setCurrentText(found_name)
-                update_shades(found_name, found_idx, emit_initial)
+                update_shades(found_name, found_idx, emit=emit_initial)
             else:
                 base_combo.setCurrentIndex(0)
                 update_shades(base_combo.currentText(), emit=emit_initial)
@@ -1074,7 +1075,10 @@ class ConditionalStyleEditorDialog(QDialog):
             base_combo.setCurrentIndex(0)
             update_shades(base_combo.currentText(), emit=emit_initial)
 
-        return base_combo, shade_combo
+        base_combo.currentTextChanged.connect(lambda name: update_shades(name))
+        shade_combo.currentIndexChanged.connect(
+            lambda: final_slot(base_combo.currentText(), shade_combo.currentData())
+        )
 
         return base_combo, shade_combo
 
