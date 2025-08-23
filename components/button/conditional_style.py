@@ -1060,10 +1060,12 @@ class ConditionalStyleEditorDialog(QDialog):
                 update_shades(found_name, found_idx, emit_initial)
             else:
                 base_combo.setCurrentIndex(0)
-                update_shades(base_combo.currentText(), emit_initial)
+                update_shades(base_combo.currentText(), emit=emit_initial)
         else:
             base_combo.setCurrentIndex(0)
-            update_shades(base_combo.currentText(), emit_initial)
+            update_shades(base_combo.currentText(), emit=emit_initial)
+
+        return base_combo, shade_combo
 
         return base_combo, shade_combo
 
