@@ -495,6 +495,15 @@ class ConditionalStyleEditorDialog(QDialog):
         self._hover_text_color = self.style.hover_properties.get("text_color", "")
         self._click_text_color = self.style.click_properties.get("text_color", "")
 
+        # Initialize background-related colors so early update/preview calls
+        # have default values to work with.  These will be overwritten once
+        # the proper colour scheme is applied via ``set_initial_colors``.
+        self._bg_color = QColor()
+        self._hover_bg_color = QColor()
+        self._click_bg_color = QColor()
+        self._bg_color2 = QColor()
+        self._border_color = QColor()
+
         main_layout = QGridLayout(self)
         main_layout.setColumnStretch(0, 1)
         main_layout.setColumnStretch(1, 1)
