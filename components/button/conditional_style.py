@@ -844,16 +844,28 @@ class ConditionalStyleEditorDialog(QDialog):
             props.get("h_align", props.get("horizontal_align", "center")),
         )
 
+        # Group text style buttons for consistent alignment
         layout.addWidget(QLabel("Text Style:"), 3, 0)
-        layout.addWidget(bold_btn, 3, 1)
-        layout.addWidget(italic_btn, 3, 2)
-        layout.addWidget(underline_btn, 3, 3)
+        text_style_widget = QWidget()
+        text_style_layout = QHBoxLayout(text_style_widget)
+        text_style_layout.setContentsMargins(0, 0, 0, 0)
+        text_style_layout.addWidget(bold_btn)
+        text_style_layout.addWidget(italic_btn)
+        text_style_layout.addWidget(underline_btn)
+        text_style_layout.addStretch()
+        layout.addWidget(text_style_widget, 3, 1, 1, 4)
 
+        # Group alignment controls to reduce spacing
         layout.addWidget(QLabel("Alignment:"), 4, 0)
-        layout.addWidget(QLabel("X:"), 4, 1)
-        layout.addWidget(h_widget, 4, 2)
-        layout.addWidget(QLabel("Y:"), 4, 3)
-        layout.addWidget(v_widget, 4, 4)
+        alignment_widget = QWidget()
+        alignment_layout = QHBoxLayout(alignment_widget)
+        alignment_layout.setContentsMargins(0, 0, 0, 0)
+        alignment_layout.addWidget(QLabel("X:"))
+        alignment_layout.addWidget(h_widget)
+        alignment_layout.addWidget(QLabel("Y:"))
+        alignment_layout.addWidget(v_widget)
+        alignment_layout.addStretch()
+        layout.addWidget(alignment_widget, 4, 1, 1, 4)
 
         layout.addWidget(QLabel("Background Colour:"), 5, 0)
         bg_base_combo, bg_shade_combo = self.create_color_selection_widgets(
