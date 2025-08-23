@@ -806,28 +806,25 @@ class ConditionalStyleEditorDialog(QDialog):
         layout.addWidget(font_size_spin, 2, 3)
 
         bold_btn = QToolButton()
-        bold_btn.setText("B")
         bold_btn.setCheckable(True)
         bold_btn.setChecked(props.get("bold", False))
-        b_font = bold_btn.font()
-        b_font.setBold(True)
-        bold_btn.setFont(b_font)
+        bold_btn.setIcon(IconManager.create_icon("mdi.format-bold"))
+        bold_btn.setIconSize(QSize(16, 16))
+        bold_btn.setToolTip("Bold")
 
         italic_btn = QToolButton()
-        italic_btn.setText("I")
         italic_btn.setCheckable(True)
         italic_btn.setChecked(props.get("italic", False))
-        i_font = italic_btn.font()
-        i_font.setItalic(True)
-        italic_btn.setFont(i_font)
+        italic_btn.setIcon(IconManager.create_icon("mdi.format-italic"))
+        italic_btn.setIconSize(QSize(16, 16))
+        italic_btn.setToolTip("Italic")
 
         underline_btn = QToolButton()
-        underline_btn.setText("U")
         underline_btn.setCheckable(True)
         underline_btn.setChecked(props.get("underline", False))
-        u_font = underline_btn.font()
-        u_font.setUnderline(True)
-        underline_btn.setFont(u_font)
+        underline_btn.setIcon(IconManager.create_icon("mdi.format-underline"))
+        underline_btn.setIconSize(QSize(16, 16))
+        underline_btn.setToolTip("Underline")
 
         v_widget, v_group = self._create_alignment_widget(
             [
@@ -851,37 +848,40 @@ class ConditionalStyleEditorDialog(QDialog):
         layout.addWidget(bold_btn, 3, 1)
         layout.addWidget(italic_btn, 3, 2)
         layout.addWidget(underline_btn, 3, 3)
-        layout.addWidget(v_widget, 3, 4)
-        layout.addWidget(h_widget, 3, 5)
 
-        layout.addWidget(QLabel("Background Colour:"), 4, 0)
+        layout.addWidget(QLabel("Alignment:"), 4, 0)
+        layout.addWidget(QLabel("X:"), 4, 1)
+        layout.addWidget(h_widget, 4, 2)
+        layout.addWidget(QLabel("Y:"), 4, 3)
+        layout.addWidget(v_widget, 4, 4)
+
+        layout.addWidget(QLabel("Background Colour:"), 5, 0)
         bg_base_combo, bg_shade_combo = self.create_color_selection_widgets(
             lambda n, c: self.on_state_bg_color_changed(state_name, c),
             props.get("background_color", ""),
             emit_initial=False,
         )
-        layout.addWidget(bg_base_combo, 4, 1)
-        layout.addWidget(bg_shade_combo, 4, 2)
-        layout.addWidget(QLabel("Text Colour:"), 5, 0)
+        layout.addWidget(bg_base_combo, 5, 1)
+        layout.addWidget(bg_shade_combo, 5, 2)
+        layout.addWidget(QLabel("Text Colour:"), 6, 0)
         text_base_combo, text_shade_combo = self.create_color_selection_widgets(
             lambda n, c: self.on_state_text_color_changed(state_name, c),
             props.get("text_color", ""),
             emit_initial=False,
         )
-        layout.addWidget(text_base_combo, 5, 1)
-        layout.addWidget(text_shade_combo, 5, 2)
+        layout.addWidget(text_base_combo, 6, 1)
+        layout.addWidget(text_shade_combo, 6, 2)
 
-        layout.addWidget(QLabel("Offset To Frame:"), 6, 0)
+        layout.addWidget(QLabel("Offset To Frame:"), 7, 0)
         offset_spin = QSpinBox()
         offset_spin.setRange(-1000, 1000)
         offset_spin.setValue(props.get("offset", props.get("offset_to_frame", 0)))
-        layout.addWidget(offset_spin, 6, 1)
+        layout.addWidget(offset_spin, 7, 1)
 
         layout.setColumnStretch(1, 1)
         layout.setColumnStretch(2, 1)
         layout.setColumnStretch(3, 1)
         layout.setColumnStretch(4, 1)
-        layout.setColumnStretch(5, 1)
 
         if text_type_combo.currentText() == "Text":
             stack.setCurrentIndex(1)
