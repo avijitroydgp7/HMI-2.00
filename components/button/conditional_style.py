@@ -728,11 +728,14 @@ class ConditionalStyleEditorDialog(QDialog):
         widget = QWidget()
         layout = QHBoxLayout(widget)
         layout.setContentsMargins(0, 0, 0, 0)
+        layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
         group = QButtonGroup(widget)
-        for value, label in options:
+        for value, icon_name, tooltip in options:
             btn = QToolButton()
             btn.setCheckable(True)
-            btn.setText(label)
+            btn.setIcon(IconManager.create_icon(icon_name))
+            btn.setIconSize(QSize(16, 16))
+            btn.setToolTip(tooltip)
             btn.setProperty("align_value", value)
             group.addButton(btn)
             layout.addWidget(btn)
@@ -784,7 +787,7 @@ class ConditionalStyleEditorDialog(QDialog):
 
         stack.addWidget(comment_page)
         stack.addWidget(text_page)
-        layout.addWidget(stack, 1, 0, 1, 4)
+        layout.addWidget(stack, 1, 0, 1, 6)
 
         text_type_combo.currentIndexChanged.connect(stack.setCurrentIndex)
 
@@ -826,10 +829,30 @@ class ConditionalStyleEditorDialog(QDialog):
         u_font.setUnderline(True)
         underline_btn.setFont(u_font)
 
+        v_widget, v_group = self._create_alignment_widget(
+            [
+                ("top", "mdi.format-align-top", "Top"),
+                ("middle", "mdi.format-align-middle", "Middle"),
+                ("bottom", "mdi.format-align-bottom", "Bottom"),
+            ],
+            props.get("v_align", props.get("vertical_align", "middle")),
+        )
+
+        h_widget, h_group = self._create_alignment_widget(
+            [
+                ("left", "mdi.format-align-left", "Left"),
+                ("center", "mdi.format-align-center", "Center"),
+                ("right", "mdi.format-align-right", "Right"),
+            ],
+            props.get("h_align", props.get("horizontal_align", "center")),
+        )
+
         layout.addWidget(QLabel("Text Style:"), 3, 0)
         layout.addWidget(bold_btn, 3, 1)
         layout.addWidget(italic_btn, 3, 2)
         layout.addWidget(underline_btn, 3, 3)
+        layout.addWidget(v_widget, 3, 4)
+        layout.addWidget(h_widget, 3, 5)
 
         layout.addWidget(QLabel("Background Colour:"), 4, 0)
         bg_base_combo, bg_shade_combo = self.create_color_selection_widgets(
@@ -848,28 +871,17 @@ class ConditionalStyleEditorDialog(QDialog):
         layout.addWidget(text_base_combo, 5, 1)
         layout.addWidget(text_shade_combo, 5, 2)
 
-        layout.addWidget(QLabel("Alignment:"), 6, 0)
-        v_widget, v_group = self._create_alignment_widget(
-            [("top", "T"), ("middle", "M"), ("bottom", "B")],
-            props.get("v_align", props.get("vertical_align", "middle")),
-        )
-        layout.addWidget(v_widget, 6, 1)
-
-        h_widget, h_group = self._create_alignment_widget(
-            [("left", "L"), ("center", "C"), ("right", "R")],
-            props.get("h_align", props.get("horizontal_align", "center")),
-        )
-        layout.addWidget(h_widget, 6, 2, 1, 2)
-
-        layout.addWidget(QLabel("Offset To Frame:"), 7, 0)
+        layout.addWidget(QLabel("Offset To Frame:"), 6, 0)
         offset_spin = QSpinBox()
         offset_spin.setRange(-1000, 1000)
         offset_spin.setValue(props.get("offset", props.get("offset_to_frame", 0)))
-        layout.addWidget(offset_spin, 7, 1)
+        layout.addWidget(offset_spin, 6, 1)
 
         layout.setColumnStretch(1, 1)
         layout.setColumnStretch(2, 1)
         layout.setColumnStretch(3, 1)
+        layout.setColumnStretch(4, 1)
+        layout.setColumnStretch(5, 1)
 
         if text_type_combo.currentText() == "Text":
             stack.setCurrentIndex(1)
