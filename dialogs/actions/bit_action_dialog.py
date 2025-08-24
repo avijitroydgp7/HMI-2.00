@@ -46,11 +46,19 @@ class BitActionDialog(QDialog):
         scrollable_layout.addStretch(1)
         content_layout.addWidget(scroll_area)
 
-        # --- Dialog Buttons ---
+        # --- Error display and Dialog Buttons ---
         self.button_box = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
         self.button_box.accepted.connect(self.accept)
         self.button_box.rejected.connect(self.reject)
-        content_layout.addWidget(self.button_box)
+
+        self.error_label = QLabel()
+        self.error_label.setStyleSheet("color: #E57373;")
+
+        bottom_layout = QHBoxLayout()
+        bottom_layout.addWidget(self.error_label)
+        bottom_layout.addStretch(1)
+        bottom_layout.addWidget(self.button_box)
+        content_layout.addLayout(bottom_layout)
 
         # --- Connect signals & initialize ---
         self._connect_signals()
@@ -241,65 +249,60 @@ class BitActionDialog(QDialog):
             selector.set_data(data)
 
     def _validate_form(self, *args):
+        error_msg = None
         is_valid = True
-        
-        self.target_tag_selector.clear_errors_recursive()
-        if hasattr(self, 'on_off_tag_selector'):
-            self.on_off_tag_selector.clear_errors_recursive()
-        if hasattr(self, 'range_operand1_selector'):
-            self.range_operand1_selector.clear_errors_recursive()
-            self.range_operand2_selector.clear_errors_recursive()
-            self.range_lower_bound_selector.clear_errors_recursive()
-            self.range_upper_bound_selector.clear_errors_recursive()
 
         if not self.target_tag_selector.get_data():
-            self.target_tag_selector.setError("Target Tag must be selected.")
+            error_msg = "Target Tag must be selected."
             is_valid = False
 
         trigger_mode = self.trigger_mode_combo.currentText()
         trigger_is_valid = True
         if trigger_mode in ["On", "Off"]:
             if hasattr(self, 'on_off_tag_selector') and not self.on_off_tag_selector.get_data():
-                self.on_off_tag_selector.setError(f"A tag must be selected for '{trigger_mode}' trigger.")
+                if error_msg is None:
+                    error_msg = f"A tag must be selected for '{trigger_mode}' trigger."
                 trigger_is_valid = False
         elif trigger_mode == "Range":
             if hasattr(self, 'range_operand1_selector'):
-                trigger_is_valid &= self._validate_range_section(
+                trigger_is_valid, range_error = self._validate_range_section(
                     self.range_operand1_selector,
                     self.range_operator_combo.currentText(),
                     self.range_operand2_selector,
                     self.range_lower_bound_selector,
                     self.range_upper_bound_selector,
                 )
-        
+                if not trigger_is_valid and error_msg is None:
+                    error_msg = range_error
+
         is_valid &= trigger_is_valid
         if trigger_mode == "Ordinary":
             self.trigger_box.setStatus(CollapsibleBox.Status.NEUTRAL)
         else:
             self.trigger_box.setStatus(CollapsibleBox.Status.OK if trigger_is_valid else CollapsibleBox.Status.ERROR)
-        
+
         ok_button = self.button_box.button(QDialogButtonBox.StandardButton.Ok)
         if ok_button:
             ok_button.setEnabled(is_valid)
 
+        self.error_label.setText(error_msg or "")
+
     def _validate_range_section(self, op1_selector, operator, op2_selector, lower_selector, upper_selector, prefix="Range Trigger"):
-        is_valid = True
+        error_msg = None
         if not op1_selector.get_data():
-            op1_selector.setError(f"{prefix}: Operand 1 must be specified.")
-            is_valid = False
-        
-        if operator in ["between", "outside"]:
+            error_msg = f"{prefix}: Operand 1 must be specified."
+        elif operator in ["between", "outside"]:
             if not lower_selector.get_data():
-                lower_selector.setError(f"{prefix}: Lower Bound must be specified.")
-                is_valid = False
-            if not upper_selector.get_data():
-                upper_selector.setError(f"{prefix}: Upper Bound must be specified.")
-                is_valid = False
+                error_msg = f"{prefix}: Lower Bound must be specified."
+            elif not upper_selector.get_data():
+                error_msg = f"{prefix}: Upper Bound must be specified."
         else:
             if not op2_selector.get_data():
-                op2_selector.setError(f"{prefix}: Operand 2 must be specified.")
-                is_valid = False
-        
+                error_msg = f"{prefix}: Operand 2 must be specified."
+
+        if error_msg:
+            return False, error_msg
+
         op1_type = op1_selector.current_tag_data.get('data_type') if op1_selector.current_tag_data else None
         if op1_type:
             op1_type = {"INT": "INT16", "DINT": "INT32"}.get(op1_type, op1_type)
@@ -308,22 +311,20 @@ class BitActionDialog(QDialog):
                 if lower_type:
                     lower_type = {"INT": "INT16", "DINT": "INT32"}.get(lower_type, lower_type)
                     if lower_type != op1_type:
-                        lower_selector.setError("Data type must match Operand 1.")
-                        is_valid = False
+                        return False, "Data type must match Operand 1."
                 upper_type = upper_selector.current_tag_data.get('data_type') if upper_selector.current_tag_data else None
                 if upper_type:
                     upper_type = {"INT": "INT16", "DINT": "INT32"}.get(upper_type, upper_type)
                     if upper_type != op1_type:
-                        upper_selector.setError("Data type must match Operand 1.")
-                        is_valid = False
+                        return False, "Data type must match Operand 1."
             else:
                 op2_type = op2_selector.current_tag_data.get('data_type') if op2_selector.current_tag_data else None
                 if op2_type:
                     op2_type = {"INT": "INT16", "DINT": "INT32"}.get(op2_type, op2_type)
                     if op2_type != op1_type:
-                        op2_selector.setError("Data type must match Operand 1.")
-                        is_valid = False
-        return is_valid
+                        return False, "Data type must match Operand 1."
+
+        return True, None
 
     def get_data(self) -> Optional[Dict]:
         target_tag_data = self.target_tag_selector.get_data()

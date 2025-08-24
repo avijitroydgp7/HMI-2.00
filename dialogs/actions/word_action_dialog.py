@@ -75,11 +75,19 @@ class WordActionDialog(QDialog):
         # Add the scroll area to the main dialog layout
         content_layout.addWidget(scroll_area)
 
-        # --- Dialog Buttons ---
+        # --- Error display and Dialog Buttons ---
         self.button_box = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
         self.button_box.accepted.connect(self.accept)
         self.button_box.rejected.connect(self.reject)
-        content_layout.addWidget(self.button_box)
+
+        self.error_label = QLabel()
+        self.error_label.setStyleSheet("color: #E57373;")
+
+        bottom_layout = QHBoxLayout()
+        bottom_layout.addWidget(self.error_label)
+        bottom_layout.addStretch(1)
+        bottom_layout.addWidget(self.button_box)
+        content_layout.addLayout(bottom_layout)
 
         # --- Connect signals after all UI is built ---
         self._connect_signals()
@@ -386,39 +394,39 @@ class WordActionDialog(QDialog):
 
     def _validate_form(self, *args):
         """Main validation method that coordinates all validation checks."""
-        # Clear all existing errors
-        self._clear_all_errors()
-        
-        # Validate each section
-        main_action_valid = self._validate_main_action()
-        trigger_valid = self._validate_trigger_section()
-        conditional_valid = self._validate_conditional_section()
-        
+
+        error_msg = None
+
+        main_action_valid, main_error = self._validate_main_action()
+        if error_msg is None and main_error:
+            error_msg = main_error
+
+        trigger_valid, trigger_error = self._validate_trigger_section()
+        if error_msg is None and trigger_error:
+            error_msg = trigger_error
+
+        conditional_valid, conditional_error = self._validate_conditional_section()
+        if error_msg is None and conditional_error:
+            error_msg = conditional_error
+
         # Update UI based on validation results
         self._update_validation_ui(trigger_valid, conditional_valid)
-        
+
         # Enable/disable OK button
         overall_valid = main_action_valid and trigger_valid and conditional_valid
         ok_button = self.button_box.button(QDialogButtonBox.StandardButton.Ok)
         if ok_button:
             ok_button.setEnabled(overall_valid)
 
-    def _clear_all_errors(self):
-        """Clear all error states from tag selectors."""
-        for selector in self.findChildren(TagSelector):
-            selector.clear_errors_recursive()
+        self.error_label.setText(error_msg or "")
 
-    def _validate_main_action(self) -> bool:
+    def _validate_main_action(self):
         """Validate the main action section."""
-        is_valid = True
-        
         if not self.target_tag_selector.get_data():
-            self.target_tag_selector.setError("Target Tag must be selected.")
-            is_valid = False
-            
+            return False, "Target Tag must be selected."
+
         if not self.value_selector.get_data():
-            self.value_selector.setError("A value or tag must be provided.")
-            is_valid = False
+            return False, "A value or tag must be provided."
 
         # Validate data type compatibility between target and value
         target_type = None
@@ -435,74 +443,67 @@ class WordActionDialog(QDialog):
 
         if target_type and value_type:
             if not DataTypeMapper.are_types_compatible(target_type, value_type):
-                self.value_selector.setError("Data type must match Target Tag.")
-                is_valid = False
+                return False, "Data type must match Target Tag."
 
-        return is_valid
+        return True, None
 
-    def _validate_trigger_section(self) -> bool:
+    def _validate_trigger_section(self):
         """Validate the trigger section."""
         trigger_mode = self.trigger_mode_combo.currentText()
-        
+
         if trigger_mode == "Ordinary":
-            return True
+            return True, None
         elif trigger_mode in ["On", "Off"]:
             return self._validate_on_off_trigger()
         elif trigger_mode == "Range":
             return self._validate_range_trigger()
-        
-        return True
 
-    def _validate_on_off_trigger(self) -> bool:
+        return True, None
+
+    def _validate_on_off_trigger(self):
         """Validate On/Off trigger configuration."""
         if hasattr(self, 'on_off_tag_selector') and not self.on_off_tag_selector.get_data():
             trigger_mode = self.trigger_mode_combo.currentText()
-            self.on_off_tag_selector.setError(f"A tag must be selected for '{trigger_mode}' trigger.")
-            return False
-        return True
+            return False, f"A tag must be selected for '{trigger_mode}' trigger."
+        return True, None
 
-    def _validate_range_trigger(self) -> bool:
+    def _validate_range_trigger(self):
         """Validate Range trigger configuration."""
         if not hasattr(self, 'range_operand1_selector'):
-            return True
-        
+            return True, None
+
         return self._validate_range_section(
             self.range_operand1_selector,
             self.range_operator_combo.currentText(),
             self.range_operand2_selector,
             self.range_lower_bound_selector,
             self.range_upper_bound_selector,
-            "Range Trigger"
+            "Range Trigger",
         )
 
-    def _validate_conditional_section(self) -> bool:
+    def _validate_conditional_section(self):
         """Validate the conditional reset section."""
         if not self.conditional_reset_group.isChecked():
-            return True
-        
-        is_valid = True
-        
-        # Validate the conditional logic
-        is_valid &= self._validate_range_section(
+            return True, None
+
+        valid, error = self._validate_range_section(
             self.operand1_selector,
             self.operator_combo.currentText(),
             self.cond_operand2_selector,
             self.cond_lower_bound_selector,
             self.cond_upper_bound_selector,
-            "Conditional Reset"
+            "Conditional Reset",
         )
-        
-        # Validate reset value
+        if not valid:
+            return False, error
+
         if not self.reset_selector.get_data():
-            self.reset_selector.setError("Reset value must be specified.")
-            is_valid = False
-        
-        # Validate else value if enabled
+            return False, "Reset value must be specified."
+
         if self.else_checkbox.isChecked() and not self.else_selector.get_data():
-            self.else_selector.setError("Else value must be specified.")
-            is_valid = False
-        
-        return is_valid
+            return False, "Else value must be specified."
+
+        return True, None
 
     def _update_validation_ui(self, trigger_valid: bool, conditional_valid: bool):
         """Update the UI status indicators based on validation results."""
@@ -519,49 +520,39 @@ class WordActionDialog(QDialog):
             self.conditional_reset_group.setStatus(CollapsibleBox.Status.NEUTRAL)
 
     def _validate_range_section(self, op1_selector, operator, op2_selector, lower_selector, upper_selector, prefix="Range Trigger"):
-        is_valid = True
+        error_msg = None
         if not op1_selector.get_data():
-            op1_selector.setError(f"{prefix}: Operand 1 must be specified.")
-            is_valid = False
-        
-        if operator in ["between", "outside"]:
+            error_msg = f"{prefix}: Operand 1 must be specified."
+        elif operator in ["between", "outside"]:
             if not lower_selector.get_data():
-                lower_selector.setError(f"{prefix}: Lower Bound must be specified.")
-                is_valid = False
-            if not upper_selector.get_data():
-                upper_selector.setError(f"{prefix}: Upper Bound must be specified.")
-                is_valid = False
+                error_msg = f"{prefix}: Lower Bound must be specified."
+            elif not upper_selector.get_data():
+                error_msg = f"{prefix}: Upper Bound must be specified."
         else:
             if not op2_selector.get_data():
-                op2_selector.setError(f"{prefix}: Operand 2 must be specified.")
-                is_valid = False
-        
+                error_msg = f"{prefix}: Operand 2 must be specified."
+
+        if error_msg:
+            return False, error_msg
+
         # Validate data type compatibility using centralized mapper
         op1_type = op1_selector.current_tag_data.get('data_type') if op1_selector.current_tag_data else None
         if op1_type:
             op1_type = DataTypeMapper.normalize_type(op1_type)
             if operator in ["between", "outside"]:
-                # Validate lower bound type compatibility
                 lower_type = lower_selector.current_tag_data.get('data_type') if lower_selector.current_tag_data else None
-                if lower_type:
-                    if not DataTypeMapper.are_types_compatible(lower_type, op1_type):
-                        lower_selector.setError("Data type must match Operand 1.")
-                        is_valid = False
-                
-                # Validate upper bound type compatibility
+                if lower_type and not DataTypeMapper.are_types_compatible(lower_type, op1_type):
+                    return False, "Data type must match Operand 1."
+
                 upper_type = upper_selector.current_tag_data.get('data_type') if upper_selector.current_tag_data else None
-                if upper_type:
-                    if not DataTypeMapper.are_types_compatible(upper_type, op1_type):
-                        upper_selector.setError("Data type must match Operand 1.")
-                        is_valid = False
+                if upper_type and not DataTypeMapper.are_types_compatible(upper_type, op1_type):
+                    return False, "Data type must match Operand 1."
             else:
-                # Validate operand 2 type compatibility
                 op2_type = op2_selector.current_tag_data.get('data_type') if op2_selector.current_tag_data else None
-                if op2_type:
-                    if not DataTypeMapper.are_types_compatible(op2_type, op1_type):
-                        op2_selector.setError("Data type must match Operand 1.")
-                        is_valid = False
-        return is_valid
+                if op2_type and not DataTypeMapper.are_types_compatible(op2_type, op1_type):
+                    return False, "Data type must match Operand 1."
+
+        return True, None
 
     # -------------------------------------------------------------------------
     # Data Load/Save
