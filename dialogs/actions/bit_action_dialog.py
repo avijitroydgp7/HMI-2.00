@@ -20,6 +20,7 @@ class BitActionDialog(QDialog):
         self.setWindowTitle("Bit Action Configuration")
         self.setMinimumWidth(600)
         self.setFixedHeight(650)
+        self.setStyleSheet("QLineEdit, QComboBox { border: none; }")
 
         content_layout = QVBoxLayout(self)
         content_layout.setContentsMargins(0,0,0,0)

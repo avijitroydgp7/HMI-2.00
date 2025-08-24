@@ -128,6 +128,7 @@ class TagLineEdit(QLineEdit):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setReadOnly(True)
+        self.setFrame(False)
         self.setPlaceholderText("Double-click to select a tag...")
 
     def mouseDoubleClickEvent(self, event):
@@ -159,6 +160,7 @@ class ValueSelector(QWidget):
         self.input_stack = QStackedWidget()
         self.constant_input = QLineEdit()
         self.constant_input.setValidator(QDoubleValidator())
+        self.constant_input.setFrame(False)
         self.tag_input = TagLineEdit()
         
         self.input_stack.addWidget(self.constant_input)
@@ -272,13 +274,7 @@ class TagSelector(QWidget):
         self.main_tag_selector.tagChanged.connect(self._on_main_tag_changed)
         self.main_tag_selector.inputChanged.connect(self.inputChanged.emit)
 
-        self.main_tag_frame = QFrame()
-        self.main_tag_frame.setFrameShape(QFrame.Shape.StyledPanel)
-        self.main_tag_frame.setLineWidth(1)
-        frame_layout = QVBoxLayout(self.main_tag_frame)
-        frame_layout.setContentsMargins(2, 2, 2, 2)
-        frame_layout.addWidget(self.main_tag_selector)
-        main_layout.addWidget(self.main_tag_frame)
+        main_layout.addWidget(self.main_tag_selector)
         
         self.index_widget = QWidget()
         self.index_layout = QFormLayout(self.index_widget)

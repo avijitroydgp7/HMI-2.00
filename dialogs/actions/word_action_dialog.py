@@ -4,7 +4,7 @@
 from PyQt6.QtWidgets import (
     QGroupBox, QGridLayout, QHBoxLayout, QVBoxLayout,
     QLabel, QComboBox, QDialogButtonBox, QCheckBox, QWidget,
-    QStackedWidget, QFrame, QScrollArea, QDialog
+    QStackedWidget, QScrollArea, QDialog
 )
 from PyQt6.QtCore import Qt
 from typing import Dict, Optional
@@ -46,6 +46,7 @@ class WordActionDialog(QDialog):
         self.setWindowTitle("Word Action Configuration")
         self.setMinimumWidth(800)
         self.setFixedHeight(750)
+        self.setStyleSheet("QLineEdit, QComboBox { border: none; }")
 
         # Main layout for the dialog
         content_layout = QVBoxLayout(self)
