@@ -1023,6 +1023,8 @@ class ConditionalStyleEditorDialog(QDialog):
     def on_state_bg_color_changed(self, state, color):
         if state == "base":
             self._bg_color = color
+            # Keep border colour in sync with the base background colour
+            self._border_color = color.darker(150)
             txt = self.get_contrast_color(self._bg_color)
             self._text_color = txt.name()
             self.set_combo_selection(
@@ -1451,13 +1453,13 @@ class ConditionalStyleEditorDialog(QDialog):
 
         if shape_style == "Glass":
             light_color, dark_color = bg_color.lighter(150).name(), bg_color.name()
-            border_c = bg_color.darker(120).name()
+            border_c = self._border_color.name()
             main_qss.append(
                 f"background-color: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 {light_color}, stop:1 {dark_color});"
             )
             main_qss.append(f"border: 1px solid {border_c};")
-            hover_qss.append(f"background-color: {bg_color.lighter(120).name()};")
-            pressed_qss.append(f"background-color: {bg_color.darker(120).name()};")
+            hover_qss.append(f"background-color: {hover_bg_color.name()};")
+            pressed_qss.append(f"background-color: {click_bg_color.name()};")
         elif shape_style == "3D":
             main_qss.extend([f"border-width: {border_width}px;", f"border-color: {border_color.name()};", "border-style: outset;"])
             if bg_type == "Solid":
@@ -1468,7 +1470,7 @@ class ConditionalStyleEditorDialog(QDialog):
                     f"background-color: qlineargradient(x1:{x1}, y1:{y1}, x2:{x2}, y2:{y2}, stop:0 {bg_color.name()}, stop:1 {self._bg_color2.name()});"
                 )
             hover_qss.append(f"background-color: {hover_bg_color.name()};")
-            pressed_qss.extend(["border-style: inset;", f"background-color: {bg_color.darker(120).name()};"])
+            pressed_qss.extend(["border-style: inset;", f"background-color: {click_bg_color.name()};"])
         elif shape_style == "Neumorphic":
             base_color = self.palette().color(QPalette.ColorRole.Window)
             main_qss.extend([f"background-color: {base_color.name()};", f"border: 2px solid {base_color.name()};"])
@@ -1476,13 +1478,19 @@ class ConditionalStyleEditorDialog(QDialog):
                                 f"border-top-color: {base_color.lighter(115).name()};",
                                 f"border-left-color: {base_color.lighter(115).name()};"])
         elif shape_style == "Outline":
-            main_qss.extend(["background-color: transparent;",
-                             f"border: {border_width}px solid {border_color.name()};",
-                             f"color: {border_color.name()};"])
-            hover_qss.extend([f"background-color: {border_color.name()};",
-                              f"color: {self.palette().color(QPalette.ColorRole.Window).name()};"])
-            pressed_qss.extend([f"background-color: {border_color.darker(120).name()};",
-                                f"color: {self.palette().color(QPalette.ColorRole.Window).name()};"])
+            main_qss.extend([
+                "background-color: transparent;",
+                f"border: {border_width}px solid {bg_color.name()};",
+                f"color: {bg_color.name()};",
+            ])
+            hover_qss.extend([
+                f"background-color: {hover_bg_color.name()};",
+                f"color: {self.palette().color(QPalette.ColorRole.Window).name()};",
+            ])
+            pressed_qss.extend([
+                f"background-color: {click_bg_color.name()};",
+                f"color: {self.palette().color(QPalette.ColorRole.Window).name()};",
+            ])
         else:
             main_qss.extend([f"border-width: {border_width}px;",
                              f"border-style: {border_style};",
