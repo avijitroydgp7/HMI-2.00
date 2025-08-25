@@ -187,7 +187,7 @@ class PropertyEditor(QStackedWidget):
         style_combo = QComboBox()
         styles = button_styles.get_styles()
         for style in styles:
-            icon_path = style.get('svg_icon')
+            icon_path = style.get('icon') or style.get('svg_icon')
             if icon_path:
                 style_combo.addItem(QIcon(icon_path), style['name'], style['id'])
             else:
@@ -221,10 +221,12 @@ class PropertyEditor(QStackedWidget):
                     new_props['hover_properties'] = copy.deepcopy(style_def['hover_properties'])
                 if 'click_properties' in style_def:
                     new_props['click_properties'] = copy.deepcopy(style_def['click_properties'])
-                if style_def.get('svg_icon'):
-                    new_props['svg_icon'] = style_def['svg_icon']
-                if style_def.get('svg_icon_clicked'):
-                    new_props['svg_icon_clicked'] = style_def['svg_icon_clicked']
+                if style_def.get('icon'):
+                    new_props['icon'] = style_def['icon']
+                if style_def.get('hover_icon'):
+                    new_props['hover_icon'] = style_def['hover_icon']
+                if style_def.get('click_icon'):
+                    new_props['click_icon'] = style_def['click_icon']
                 # Update UI to reflect style change
                 bg_color_edit.setText(new_props.get('background_color', ''))
                 text_color_edit.setText(new_props.get('text_color', ''))

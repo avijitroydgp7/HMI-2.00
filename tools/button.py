@@ -19,10 +19,12 @@ if "click_properties" in _default_style:
     DEFAULT_PROPERTIES["click_properties"] = copy.deepcopy(
         _default_style["click_properties"]
     )
-if _default_style.get("svg_icon"):
-    DEFAULT_PROPERTIES["svg_icon"] = _default_style["svg_icon"]
-if _default_style.get("svg_icon_clicked"):
-    DEFAULT_PROPERTIES["svg_icon_clicked"] = _default_style["svg_icon_clicked"]
+if _default_style.get("icon"):
+    DEFAULT_PROPERTIES["icon"] = _default_style["icon"]
+if _default_style.get("hover_icon"):
+    DEFAULT_PROPERTIES["hover_icon"] = _default_style["hover_icon"]
+if _default_style.get("click_icon"):
+    DEFAULT_PROPERTIES["click_icon"] = _default_style["click_icon"]
 
 
 def get_default_properties():

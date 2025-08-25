@@ -34,6 +34,7 @@ from PyQt6.QtWidgets import (
     QButtonGroup,
     QHBoxLayout,
     QCheckBox,
+    QFileDialog,
 )
 from PyQt6.QtGui import (
     QColor,
@@ -121,7 +122,8 @@ class IconButton(QPushButton):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.svg_renderer: Optional[QSvgRenderer] = None
-        self.svg_renderer_clicked: Optional[QSvgRenderer] = None
+        self.svg_renderer_hover: Optional[QSvgRenderer] = None
+        self.svg_renderer_click: Optional[QSvgRenderer] = None
         self.icon_size = QSize(50, 50)
         self._is_pressed = False
 
@@ -129,9 +131,16 @@ class IconButton(QPushButton):
         self.svg_renderer = QSvgRenderer(path) if path else None
         self.update()
 
-    def set_icon_clicked(self, path: str):
-        self.svg_renderer_clicked = QSvgRenderer(path) if path else None
+    def set_hover_icon(self, path: str):
+        self.svg_renderer_hover = QSvgRenderer(path) if path else None
         self.update()
+
+    def set_click_icon(self, path: str):
+        self.svg_renderer_click = QSvgRenderer(path) if path else None
+        self.update()
+
+    def set_icon_clicked(self, path: str):
+        self.set_click_icon(path)
 
     def set_icon_size(self, size: int):
         self.icon_size = QSize(size, size)
@@ -147,13 +156,22 @@ class IconButton(QPushButton):
         self.update()
         super().mouseReleaseEvent(e)
 
+    def enterEvent(self, e):
+        self.update()
+        super().enterEvent(e)
+
+    def leaveEvent(self, e):
+        self.update()
+        super().leaveEvent(e)
+
     def paintEvent(self, event):
         super().paintEvent(event)
-        renderer = (
-            self.svg_renderer_clicked
-            if self._is_pressed and self.svg_renderer_clicked
-            else self.svg_renderer
-        )
+        if self._is_pressed and self.svg_renderer_click:
+            renderer = self.svg_renderer_click
+        elif self.underMouse() and self.svg_renderer_hover:
+            renderer = self.svg_renderer_hover
+        else:
+            renderer = self.svg_renderer
 
         if renderer:
             painter = QPainter(self)
@@ -276,8 +294,8 @@ _DEFAULT_STYLES = [
     {
         "id": "icon_play",
         "name": "Icon Play",
-        "svg_icon": "lib/icon/bolt-circle-svgrepo-com.svg",
-        "svg_icon_clicked": "lib/icon/bolt-circle-svgrepo-com.svg",
+        "icon": "lib/icon/bolt-circle-svgrepo-com.svg",
+        "click_icon": "lib/icon/bolt-circle-svgrepo-com.svg",
         "properties": {
             "background_color": "#ffffff",
             "text_color": "#333333",
@@ -361,6 +379,9 @@ class ConditionalStyle:
     h_align: str = "center"
     v_align: str = "middle"
     offset: int = 0
+    icon: str = ""
+    hover_icon: str = ""
+    click_icon: str = ""
     # miscellaneous properties remain grouped
     properties: Dict[str, Any] = field(default_factory=dict)
     tooltip: str = ""
@@ -435,6 +456,9 @@ class ConditionalStyle:
             'h_align': self.h_align,
             'v_align': self.v_align,
             'offset': self.offset,
+            'icon': self.icon,
+            'hover_icon': self.hover_icon,
+            'click_icon': self.click_icon,
             'properties': self.properties,
             'hover_properties': self._normalize_state(self.hover_properties),
             'click_properties': self._normalize_state(self.click_properties),
@@ -450,6 +474,9 @@ class ConditionalStyle:
             style_id=data.get('style_id', ''),
             condition=data.get('condition'),
             tooltip=data.get('tooltip', ''),
+            icon=data.get('icon', data.get('svg_icon', '')),
+            hover_icon=data.get('hover_icon', ''),
+            click_icon=data.get('click_icon', data.get('svg_icon_clicked', '')),
             text_type=data.get('text_type', props.get('text_type', 'Text')),
             text_value=data.get('text_value', props.get('text', '')),
             comment_ref=data.get(
@@ -546,8 +573,15 @@ class ConditionalStyleManager(QObject):
 
             if match:
                 props = dict(style.properties)
+                props['icon'] = style.icon
+                props['hover_icon'] = style.hover_icon
+                props['click_icon'] = style.click_icon
                 if state:
                     props.update(getattr(style, f"{state}_properties", {}))
+                    if state == 'hover' and style.hover_icon:
+                        props['icon'] = style.hover_icon
+                    if state == 'click' and style.click_icon:
+                        props['icon'] = style.click_icon
                 if style.tooltip:
                     props['tooltip'] = style.tooltip
                 return props
@@ -796,6 +830,10 @@ class ConditionalStyleEditorDialog(QDialog):
         self.click_tab, self.click_controls = self._build_state_tab(self.style.click_properties, "click")
         style_tabs.addTab(self.click_tab, "Click")
 
+        self.base_controls["icon_edit"].setText(self.style.icon)
+        self.hover_controls["icon_edit"].setText(self.style.hover_icon)
+        self.click_controls["icon_edit"].setText(self.style.click_icon)
+
         # Convenience shortcuts for commonly used controls
         self.font_size_spin = self.base_controls["font_size_spin"]
 
@@ -1024,6 +1062,21 @@ class ConditionalStyleEditorDialog(QDialog):
         offset_spin.setValue(props.get("offset", props.get("offset_to_frame", 0)))
         layout.addWidget(offset_spin, 7, 1)
 
+        layout.addWidget(QLabel("Icon:"), 8, 0)
+        icon_edit = QLineEdit()
+        icon_btn = QToolButton()
+        icon_btn.setText("...")
+        icon_btn.clicked.connect(lambda _=None, e=icon_edit: self._select_icon_file(e))
+        icon_layout = QHBoxLayout()
+        icon_layout.setContentsMargins(0, 0, 0, 0)
+        icon_layout.addWidget(icon_edit)
+        icon_layout.addWidget(icon_btn)
+        icon_widget = QWidget()
+        icon_widget.setLayout(icon_layout)
+        layout.addWidget(icon_widget, 8, 1, 1, 2)
+
+        icon_edit.textChanged.connect(self.update_preview)
+
         layout.setColumnStretch(1, 1)
         layout.setColumnStretch(2, 1)
         layout.setColumnStretch(3, 1)
@@ -1069,6 +1122,7 @@ class ConditionalStyleEditorDialog(QDialog):
             "v_align_group": v_group,
             "h_align_group": h_group,
             "offset_spin": offset_spin,
+            "icon_edit": icon_edit,
             "stack": stack,
         }
         return tab, controls
@@ -1095,6 +1149,7 @@ class ConditionalStyleEditorDialog(QDialog):
         bc["v_align_group"].buttonToggled.connect(lambda *_: self.on_base_text_changed())
         bc["h_align_group"].buttonToggled.connect(lambda *_: self.on_base_text_changed())
         bc["offset_spin"].valueChanged.connect(self.on_base_text_changed)
+        bc["icon_edit"].textChanged.connect(self.on_base_text_changed)
 
     def _set_state_controls_enabled(self, controls, enabled):
         for key in self._TEXT_KEYS:
@@ -1138,15 +1193,21 @@ class ConditionalStyleEditorDialog(QDialog):
                 t.set_data(s.get_data())
             elif key == "text_edit":
                 t.setPlainText(s.toPlainText())
+        if 'icon_edit' in src and 'icon_edit' in target:
+            target['icon_edit'].setText(src['icon_edit'].text())
 
     def on_copy_hover_toggled(self, checked):
         self._set_state_controls_enabled(self.hover_controls, not checked)
+        if "icon_edit" in self.hover_controls:
+            self.hover_controls["icon_edit"].setEnabled(not checked)
         if checked:
             self.copy_base_to_state(self.hover_controls)
         self.update_preview()
 
     def on_copy_click_toggled(self, checked):
         self._set_state_controls_enabled(self.click_controls, not checked)
+        if "icon_edit" in self.click_controls:
+            self.click_controls["icon_edit"].setEnabled(not checked)
         if checked:
             self.copy_base_to_state(self.click_controls)
         self.update_preview()
@@ -1412,6 +1473,11 @@ class ConditionalStyleEditorDialog(QDialog):
         spinbox.setRange(0, 1000)
         spinbox.setValue(0)
         return spinbox
+
+    def _select_icon_file(self, edit: QLineEdit):
+        path, _ = QFileDialog.getOpenFileName(self, "Select Icon", "", "Images (*.svg *.png *.jpg *.jpeg)")
+        if path:
+            edit.setText(path)
 
     def on_corner_radius_changed(self, corner, value):
         if self.link_radius_btn.isChecked():
@@ -1696,18 +1762,14 @@ class ConditionalStyleEditorDialog(QDialog):
             self.preview_led.setStyleSheet(qss)
         else:
             self.preview_button.setStyleSheet(qss)
-            if component_type == "Icon-Only Button":
-                pix = IconManager.create_pixmap("fa5s.star", 48)
-                self.preview_button.setIcon(QIcon(pix))
-                self.preview_button.setIconSize(QSize(48, 48))
-                self.preview_button.setText("")
-            elif component_type == "Image Button":
-                pix = IconManager.create_pixmap("fa5s.image", 64)
-                self.preview_button.setIcon(QIcon(pix))
-                self.preview_button.setIconSize(self.preview_button.size())
+            self.preview_button.set_icon(self.base_controls["icon_edit"].text())
+            self.preview_button.set_hover_icon(self.hover_controls["icon_edit"].text())
+            self.preview_button.set_click_icon(self.click_controls["icon_edit"].text())
+            icon_sz = self.style.properties.get("icon_size", 48)
+            self.preview_button.set_icon_size(icon_sz)
+            if component_type in {"Icon-Only Button", "Image Button"}:
                 self.preview_button.setText("")
             else:
-                self.preview_button.setIcon(QIcon())
                 text = ""
                 if self.base_controls["text_type_combo"].currentText() == "Text":
                     text = self.base_controls["text_edit"].toPlainText()
@@ -1822,6 +1884,9 @@ class ConditionalStyleEditorDialog(QDialog):
         style = ConditionalStyle(
             style_id=self.style.style_id,
             tooltip=self.tooltip_edit.text(),
+            icon=self.base_controls["icon_edit"].text(),
+            hover_icon=self.hover_controls["icon_edit"].text(),
+            click_icon=self.click_controls["icon_edit"].text(),
             text_type=properties.get("text_type", "Text"),
             text_value=properties.get("text_value", properties.get("text", "")),
             comment_ref=properties.get(
