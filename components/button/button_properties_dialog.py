@@ -17,6 +17,7 @@ from .conditional_style import (
     ConditionalStyleManager,
     ConditionalStyle,
     ConditionalStyleEditorDialog,
+    PreviewButton,
 )
 
 
@@ -436,7 +437,7 @@ class ButtonPropertiesDialog(QDialog):
     def _populate_style_tab(self):
         # Overall layout for the tab
         layout = QVBoxLayout(self.style_tab)
-        
+
         # Splitter for top area
         splitter = QSplitter(Qt.Orientation.Horizontal)
         
@@ -453,14 +454,52 @@ class ButtonPropertiesDialog(QDialog):
         header.setSectionResizeMode(1, QHeaderView.ResizeMode.ResizeToContents)
         splitter.addWidget(self.style_table)
 
-        # Right panel: Style properties (placeholder)
+        # Right panel: Style properties and preview
         right_panel = QWidget()
         right_layout = QVBoxLayout(right_panel)
-        properties_group = QGroupBox("Style Properties")
-        properties_layout = QVBoxLayout(properties_group)
-        properties_layout.addWidget(QLabel("Select a style to see its properties."))
-        properties_layout.addStretch()
-        right_layout.addWidget(properties_group)
+
+        # Group box with stacked widget for property display
+        self.style_properties_group = QGroupBox("Style Properties")
+        properties_layout = QVBoxLayout(self.style_properties_group)
+        self.style_properties_stack = QStackedWidget()
+        properties_layout.addWidget(self.style_properties_stack)
+
+        # 0: Default widget when no style selected
+        default_widget = QWidget()
+        default_layout = QVBoxLayout(default_widget)
+        default_layout.addWidget(QLabel("Select a style to see its properties."))
+        default_layout.addStretch()
+        self.style_properties_stack.addWidget(default_widget)
+
+        # 1: Style info widget
+        info_widget = QWidget()
+        info_layout = QFormLayout(info_widget)
+        self.style_id_label = QLabel()
+        self.tooltip_label = QLabel()
+        self.bg_color_label = QLabel()
+        self.text_color_label = QLabel()
+        self.hover_bg_color_label = QLabel()
+        self.hover_text_color_label = QLabel()
+        self.click_bg_color_label = QLabel()
+        self.click_text_color_label = QLabel()
+        info_layout.addRow("Style ID:", self.style_id_label)
+        info_layout.addRow("Tooltip:", self.tooltip_label)
+        info_layout.addRow("Base BG:", self.bg_color_label)
+        info_layout.addRow("Base Text:", self.text_color_label)
+        info_layout.addRow("Hover BG:", self.hover_bg_color_label)
+        info_layout.addRow("Hover Text:", self.hover_text_color_label)
+        info_layout.addRow("Click BG:", self.click_bg_color_label)
+        info_layout.addRow("Click Text:", self.click_text_color_label)
+        self.style_properties_stack.addWidget(info_widget)
+
+        right_layout.addWidget(self.style_properties_group)
+
+        # Preview widget
+        self.preview_button = PreviewButton("Preview")
+        self.preview_button.setMinimumSize(200, 100)
+        right_layout.addWidget(self.preview_button, alignment=Qt.AlignmentFlag.AlignCenter)
+        right_layout.addStretch()
+
         splitter.addWidget(right_panel)
 
         splitter.setStretchFactor(0, 1)
@@ -495,7 +534,9 @@ class ButtonPropertiesDialog(QDialog):
         move_down_btn.clicked.connect(self._move_style_down)
 
         self.style_table.cellDoubleClicked.connect(self._on_style_double_click)
+        self.style_table.itemSelectionChanged.connect(self._on_style_selection_changed)
         self._refresh_style_table()
+        self._on_style_selection_changed()
 
     def _refresh_style_table(self):
         self.style_table.setRowCount(0)
@@ -573,6 +614,71 @@ class ButtonPropertiesDialog(QDialog):
 
     def _on_style_double_click(self, row, column):
         self._edit_style()
+
+    def _on_style_selection_changed(self):
+        selected_rows = self.style_table.selectionModel().selectedRows()
+        if not selected_rows:
+            self.style_properties_stack.setCurrentIndex(0)
+            self.style_properties_group.setTitle("Style Properties")
+            self.preview_button.setStyleSheet("")
+            self.preview_button.setText("Preview")
+            self.preview_button.set_icon("")
+            self.preview_button.set_hover_icon("")
+            self.preview_button.set_click_icon("")
+            return
+
+        row = selected_rows[0].row()
+        if row >= len(self.style_manager.conditional_styles):
+            self.style_properties_stack.setCurrentIndex(0)
+            return
+
+        style = self.style_manager.conditional_styles[row]
+
+        # Populate labels
+        self.style_id_label.setText(style.style_id)
+        self.tooltip_label.setText(style.tooltip)
+        self.bg_color_label.setText(style.properties.get("background_color", ""))
+        self.text_color_label.setText(style.properties.get("text_color", ""))
+        self.hover_bg_color_label.setText(style.hover_properties.get("background_color", ""))
+        self.hover_text_color_label.setText(style.hover_properties.get("text_color", ""))
+        self.click_bg_color_label.setText(style.click_properties.get("background_color", ""))
+        self.click_text_color_label.setText(style.click_properties.get("text_color", ""))
+
+        self.style_properties_stack.setCurrentIndex(1)
+        self.style_properties_group.setTitle(f"Style Properties - {style.style_id}")
+
+        # Apply style to preview button using manager helper
+        temp_manager = ConditionalStyleManager()
+        temp_manager.add_style(copy.deepcopy(style))
+        base_props = temp_manager.get_active_style()
+        hover_props = temp_manager.get_active_style(state='hover')
+        click_props = temp_manager.get_active_style(state='click')
+
+        qss = (
+            "QPushButton {\n"
+            f"    background-color: {base_props.get('background_color', 'transparent')};\n"
+            f"    color: {base_props.get('text_color', '#000000')};\n"
+            f"    border-radius: {base_props.get('border_radius', 0)}px;\n"
+            "}\n"
+            "QPushButton:hover {\n"
+            f"    background-color: {hover_props.get('background_color', base_props.get('background_color', 'transparent'))};\n"
+            f"    color: {hover_props.get('text_color', base_props.get('text_color', '#000000'))};\n"
+            "}\n"
+            "QPushButton:pressed {\n"
+            f"    background-color: {click_props.get('background_color', hover_props.get('background_color', base_props.get('background_color', 'transparent')))};\n"
+            f"    color: {click_props.get('text_color', hover_props.get('text_color', base_props.get('text_color', '#000000')))};\n"
+            "}\n"
+        )
+        self.preview_button.setStyleSheet(qss)
+        self.preview_button.set_icon(base_props.get('icon', ''))
+        self.preview_button.set_hover_icon(hover_props.get('icon', ''))
+        self.preview_button.set_click_icon(click_props.get('icon', ''))
+        icon_sz = base_props.get('icon_size', 48)
+        self.preview_button.set_icon_size(icon_sz)
+
+        text = style.text_value if style.text_type == "Text" else ""
+        self.preview_button.setText(text or "Preview")
+        self.preview_button.setToolTip(style.tooltip)
 
     def _populate_extended_style_tab(self):
         pass
