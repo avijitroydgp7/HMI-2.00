@@ -444,16 +444,18 @@ class ButtonPropertiesDialog(QDialog):
         
         # Left panel: Style table
         self.style_table = QTableWidget()
-        self.style_table.setColumnCount(3)
-        self.style_table.setHorizontalHeaderLabels(["#", "Style ID", "Preview"])
+        self.style_table.setColumnCount(4)
+        self.style_table.setHorizontalHeaderLabels(["#", "Condition", "Preview", "Style ID"])
         self.style_table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         self.style_table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
         self.style_table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
         self.style_table.verticalHeader().setVisible(False)
         header = self.style_table.horizontalHeader()
         header.setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
-        header.setSectionResizeMode(1, QHeaderView.ResizeMode.ResizeToContents)
-        header.setSectionResizeMode(2, QHeaderView.ResizeMode.ResizeToContents)
+        header.setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
+        header.setSectionResizeMode(2, QHeaderView.ResizeMode.Fixed)
+        header.setSectionResizeMode(3, QHeaderView.ResizeMode.ResizeToContents)
+        self.style_table.setColumnWidth(2, 120)
         splitter.addWidget(self.style_table)
 
         # Right panel: Style properties and preview
@@ -545,7 +547,7 @@ class ButtonPropertiesDialog(QDialog):
         for i, style in enumerate(self.style_manager.conditional_styles):
             self.style_table.insertRow(i)
             self.style_table.setItem(i, 0, QTableWidgetItem(str(i + 1)))
-            self.style_table.setItem(i, 1, QTableWidgetItem(style.style_id))
+            self.style_table.setItem(i, 1, QTableWidgetItem(self._describe_condition(style)))
 
             preview_item = QTableWidgetItem()
             bg = style.properties.get("background_color")
@@ -560,6 +562,37 @@ class ButtonPropertiesDialog(QDialog):
             if icon_path:
                 preview_item.setIcon(QIcon(icon_path))
             self.style_table.setItem(i, 2, preview_item)
+            self.style_table.setItem(i, 3, QTableWidgetItem(style.style_id))
+
+    def _describe_condition(self, style: ConditionalStyle) -> str:
+        condition = getattr(style, 'condition', None)
+        if condition:
+            return str(condition)
+        cfg = getattr(style, 'condition_data', {}) or {}
+        mode = cfg.get('mode', 'Ordinary')
+        if mode == 'Ordinary':
+            return 'Always'
+        tag = self._format_value(cfg.get('tag'))
+        if mode in ('On', 'Off'):
+            return f"{tag} is {mode}"
+        if mode == 'Range':
+            op = cfg.get('operator', '==')
+            if op in ('between', 'outside'):
+                lower = self._format_value(cfg.get('lower'))
+                upper = self._format_value(cfg.get('upper'))
+                word = 'between' if op == 'between' else 'outside'
+                return f"{tag} {word} {lower} and {upper}"
+            operand = self._format_value(cfg.get('operand'))
+            return f"{tag} {op} {operand}"
+        return ''
+
+    def _format_value(self, data: Optional[Dict[str, Any]]) -> str:
+        if not data:
+            return '?' 
+        value = data.get('value')
+        if data.get('source') == 'tag' and isinstance(value, dict):
+            return value.get('tag_name', '')
+        return str(value)
 
     def _add_style(self):
         dialog = ConditionalStyleEditorDialog(self)
@@ -584,6 +617,7 @@ class ButtonPropertiesDialog(QDialog):
                 # Use manager helper to ensure internal structures stay consistent
                 self.style_manager.update_style(row, updated_style)
                 self._refresh_style_table()
+
 
     def _remove_style(self):
         selected_rows = self.style_table.selectionModel().selectedRows()
