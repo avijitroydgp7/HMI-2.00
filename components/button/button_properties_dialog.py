@@ -601,6 +601,9 @@ class ButtonPropertiesDialog(QDialog):
             if new_style:
                 self.style_manager.add_style(new_style)
                 self._refresh_style_table()
+                row = len(self.style_manager.conditional_styles) - 1
+                self.style_table.selectRow(row)
+                self._on_style_selection_changed()
 
     def _edit_style(self):
         selected_rows = self.style_table.selectionModel().selectedRows()
@@ -617,6 +620,8 @@ class ButtonPropertiesDialog(QDialog):
                 # Use manager helper to ensure internal structures stay consistent
                 self.style_manager.update_style(row, updated_style)
                 self._refresh_style_table()
+                self.style_table.selectRow(row)
+                self._on_style_selection_changed()
 
 
     def _remove_style(self):
@@ -639,6 +644,7 @@ class ButtonPropertiesDialog(QDialog):
             self.style_manager.conditional_styles.insert(row + 1, duplicated)
             self._refresh_style_table()
             self.style_table.selectRow(row + 1)
+            self._on_style_selection_changed()
 
     def _move_style_up(self):
         selected_rows = self.style_table.selectionModel().selectedRows()
