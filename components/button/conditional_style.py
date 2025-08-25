@@ -50,7 +50,7 @@ from PyQt6.QtGui import (
 
 from PyQt6.QtSvg import QSvgRenderer
 from utils.icon_manager import IconManager
-from dialogs.widgets import TagSelector
+from dialogs.widgets import TagSelector, CollapsibleBox
 
 # ---------------------------------------------------------------------------
 # Helper widgets previously provided by button_creator
@@ -365,6 +365,7 @@ class ConditionalStyle:
     """
     style_id: str = ""
     condition: Optional[Union[str, Callable[[Dict[str, Any]], bool]]] = None
+    condition_data: Dict[str, Any] = field(default_factory=lambda: {"mode": "Ordinary"})
     # core text/style attributes
     text_type: str = "Text"
     text_value: str = ""
@@ -442,6 +443,7 @@ class ConditionalStyle:
         return {
             'style_id': self.style_id,
             'condition': self.condition if isinstance(self.condition, str) else None,
+            'condition_data': self.condition_data,
             'tooltip': self.tooltip,
             'text_type': self.text_type,
             'text_value': self.text_value,
@@ -501,6 +503,7 @@ class ConditionalStyle:
             hover_properties=hover,
             click_properties=click,
         )
+        style.condition_data = data.get('condition_data', {"mode": "Ordinary"})
         if 'animation' in data:
             style.animation = AnimationProperties.from_dict(data['animation'])
         return style
@@ -556,9 +559,12 @@ class ConditionalStyleManager(QObject):
         tag_values = tag_values or {}
 
         for style in self.conditional_styles:
+            cond_cfg = getattr(style, 'condition_data', {"mode": "Ordinary"})
             cond = style.condition
             match = False
-            if cond is None:
+            if cond_cfg.get('mode', 'Ordinary') != 'Ordinary':
+                match = self._evaluate_condition(cond_cfg, tag_values)
+            elif cond is None:
                 match = True
             elif callable(cond):
                 try:
@@ -587,6 +593,44 @@ class ConditionalStyleManager(QObject):
                 return props
 
         return dict(self.default_style)
+
+    def _evaluate_condition(self, cfg: Dict[str, Any], tag_values: Dict[str, Any]) -> bool:
+        mode = cfg.get('mode', 'Ordinary')
+        if mode == 'Ordinary':
+            return True
+        if mode in ('On', 'Off'):
+            tag_val = self._extract_value(cfg.get('tag'), tag_values)
+            if tag_val is None:
+                return False
+            return bool(tag_val) if mode == 'On' else not bool(tag_val)
+        if mode == 'Range':
+            tag_val = self._extract_value(cfg.get('tag'), tag_values)
+            lower = self._extract_value(cfg.get('lower'), tag_values)
+            upper = self._extract_value(cfg.get('upper'), tag_values)
+            try:
+                return lower <= tag_val <= upper
+            except Exception:
+                return False
+        return False
+
+    def _extract_value(self, data: Optional[Dict[str, Any]], tag_values: Dict[str, Any]):
+        if not data:
+            return None
+        if 'source' in data:
+            source = data.get('source')
+            value = data.get('value')
+        else:
+            main = data.get('main_tag', {})
+            source = main.get('source')
+            value = main.get('value')
+        if source == 'constant':
+            try:
+                return float(value)
+            except Exception:
+                return None
+        if source == 'tag' and isinstance(value, dict):
+            return tag_values.get(value.get('tag_name'))
+        return None
     
     def to_dict(self) -> Dict[str, Any]:
         """Serialize to dictionary"""
@@ -846,10 +890,40 @@ class ConditionalStyleEditorDialog(QDialog):
         # connect base text controls to keep synced when needed
         self._connect_base_text_signals()
 
-        # Conditions group - left empty for future use
-        cond_group = QGroupBox("Conditions")
-        QVBoxLayout(cond_group)
-        main_layout.addWidget(cond_group, 2, 1)
+        # Condition configuration
+        self.condition_box = CollapsibleBox("Condition")
+        condition_content = QWidget()
+        condition_layout = QVBoxLayout(condition_content)
+        condition_layout.setContentsMargins(5, 10, 5, 5)
+
+        self.condition_mode_combo = QComboBox()
+        self.condition_mode_combo.addItems(["Ordinary", "On", "Off", "Range"])
+        condition_layout.addWidget(self.condition_mode_combo)
+
+        self.condition_options_container = QWidget()
+        condition_layout.addWidget(self.condition_options_container)
+
+        self.condition_box.setContent(condition_content)
+        main_layout.addWidget(self.condition_box, 2, 1)
+
+        self.condition_mode_combo.currentTextChanged.connect(self._on_condition_mode_changed)
+
+        initial_mode = self.style.condition_data.get("mode", "Ordinary")
+        self.condition_mode_combo.setCurrentText(initial_mode)
+        self._on_condition_mode_changed(initial_mode)
+        tag_cfg = self.style.condition_data.get("tag")
+        if initial_mode in ("On", "Off") and tag_cfg:
+            self.condition_tag_selector.set_data({'main_tag': tag_cfg, 'indices': []})
+        elif initial_mode == "Range":
+            if tag_cfg:
+                self.range_tag_selector.set_data({'main_tag': tag_cfg, 'indices': []})
+            lower = self.style.condition_data.get("lower")
+            upper = self.style.condition_data.get("upper")
+            if lower:
+                self.range_lower_selector.set_data(lower)
+            if upper:
+                self.range_upper_selector.set_data(upper)
+        self._validate_condition_section()
 
         main_layout.addWidget(style_tabs, 3, 0, 1, 2)
 
@@ -864,6 +938,7 @@ class ConditionalStyleEditorDialog(QDialog):
         self.button_box.accepted.connect(self.accept)
         self.button_box.rejected.connect(self.reject)
         main_layout.addWidget(self.button_box, 5, 0, 1, 2)
+        self._validate_condition_section()
 
         preview_group = QGroupBox("Preview")
         preview_group_layout = QVBoxLayout(); preview_group_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -881,7 +956,7 @@ class ConditionalStyleEditorDialog(QDialog):
 
         # Ensure group boxes line up neatly
         preview_group.setMinimumHeight(style_group.sizeHint().height())
-        cond_group.setMinimumHeight(self.border_group.sizeHint().height())
+        self.condition_box.setMinimumHeight(self.border_group.sizeHint().height())
 
         for w in [self.border_width_spin, self.x1_spin, self.y1_spin, self.x2_spin, self.y2_spin]:
             w.valueChanged.connect(self.update_preview)
@@ -1195,6 +1270,101 @@ class ConditionalStyleEditorDialog(QDialog):
                 t.setPlainText(s.toPlainText())
         if 'icon_edit' in src and 'icon_edit' in target:
             target['icon_edit'].setText(src['icon_edit'].text())
+
+    def _on_condition_mode_changed(self, mode: str):
+        self.condition_options_container.setVisible(False)
+        for child in self.condition_options_container.findChildren(QWidget):
+            child.deleteLater()
+
+        layout = self.condition_options_container.layout()
+        if layout is not None:
+            while layout.count():
+                item = layout.takeAt(0)
+                w = item.widget()
+                if w:
+                    w.deleteLater()
+        else:
+            layout = QVBoxLayout(self.condition_options_container)
+            self.condition_options_container.setLayout(layout)
+        layout.setContentsMargins(0, 10, 0, 0)
+
+        for attr in ["condition_tag_selector", "range_tag_selector", "range_lower_selector", "range_upper_selector"]:
+            if hasattr(self, attr):
+                getattr(self, attr).deleteLater()
+                delattr(self, attr)
+
+        if mode in ("On", "Off"):
+            self.condition_tag_selector = TagSelector()
+            self.condition_tag_selector.set_allowed_tag_types(["BOOL"])
+            self.condition_tag_selector.main_tag_selector.set_mode_fixed("Tag")
+            self.condition_tag_selector.inputChanged.connect(self._validate_condition_section)
+            layout.addWidget(self.condition_tag_selector)
+        elif mode == "Range":
+            self._build_range_condition_options(layout)
+
+        self.condition_options_container.setVisible(True)
+        self._validate_condition_section()
+
+    def _build_range_condition_options(self, parent_layout):
+        range_group = QGroupBox("Range Configuration")
+        range_group.setObjectName("CardGroup")
+        layout = QGridLayout(range_group)
+        layout.setSpacing(10)
+
+        allowed = ["INT16", "INT32", "REAL"]
+
+        tag_layout = QVBoxLayout()
+        self.range_tag_selector = TagSelector(allowed_tag_types=allowed)
+        self.range_tag_selector.main_tag_selector.set_mode_fixed("Tag")
+        tag_layout.addWidget(QLabel("Tag"))
+        tag_layout.addWidget(self.range_tag_selector)
+        tag_layout.addStretch(1)
+
+        lower_layout = QVBoxLayout()
+        self.range_lower_selector = TagSelector(allowed_tag_types=allowed)
+        lower_layout.addWidget(QLabel("Lower Bound"))
+        lower_layout.addWidget(self.range_lower_selector)
+        lower_layout.addStretch(1)
+
+        upper_layout = QVBoxLayout()
+        self.range_upper_selector = TagSelector(allowed_tag_types=allowed)
+        upper_layout.addWidget(QLabel("Upper Bound"))
+        upper_layout.addWidget(self.range_upper_selector)
+        upper_layout.addStretch(1)
+
+        layout.addLayout(tag_layout, 0, 0)
+        layout.addLayout(lower_layout, 0, 1)
+        layout.addLayout(upper_layout, 0, 2)
+        layout.setColumnStretch(0, 1)
+        layout.setColumnStretch(1, 1)
+        layout.setColumnStretch(2, 1)
+
+        parent_layout.addWidget(range_group)
+
+        for selector in [self.range_tag_selector, self.range_lower_selector, self.range_upper_selector]:
+            selector.inputChanged.connect(self._validate_condition_section)
+
+    def _validate_condition_section(self, *args):
+        mode = self.condition_mode_combo.currentText()
+        valid = True
+        if mode in ("On", "Off"):
+            valid = hasattr(self, 'condition_tag_selector') and self.condition_tag_selector.get_data() is not None
+        elif mode == "Range":
+            valid = all([
+                hasattr(self, 'range_tag_selector') and self.range_tag_selector.get_data() is not None,
+                hasattr(self, 'range_lower_selector') and self.range_lower_selector.get_data() is not None,
+                hasattr(self, 'range_upper_selector') and self.range_upper_selector.get_data() is not None,
+            ])
+        if mode == "Ordinary":
+            self.condition_box.setStatus(CollapsibleBox.Status.NEUTRAL)
+        else:
+            self.condition_box.setStatus(CollapsibleBox.Status.OK if valid else CollapsibleBox.Status.ERROR)
+        ok_btn = None
+        if hasattr(self, 'button_box'):
+            ok_btn = self.button_box.button(QDialogButtonBox.StandardButton.Ok)
+        if ok_btn:
+            ok_btn.setEnabled(valid)
+        return valid
 
     def on_copy_hover_toggled(self, checked):
         self._set_state_controls_enabled(self.hover_controls, not checked)
@@ -1857,6 +2027,7 @@ class ConditionalStyleEditorDialog(QDialog):
         else:
             hover_properties["text_value"] = self.hover_controls["text_edit"].toPlainText()
 
+
         click_properties = {
             "background_color": self._click_bg_color.name(),
             "text_color": self._click_text_color,
@@ -1880,6 +2051,16 @@ class ConditionalStyleEditorDialog(QDialog):
             }
         else:
             click_properties["text_value"] = self.click_controls["text_edit"].toPlainText()
+
+        condition_cfg = {"mode": self.condition_mode_combo.currentText()}
+        if condition_cfg["mode"] in ("On", "Off"):
+            data = self.condition_tag_selector.get_data() if hasattr(self, 'condition_tag_selector') else None
+            condition_cfg["tag"] = data.get("main_tag") if data else None
+        elif condition_cfg["mode"] == "Range":
+            data = self.range_tag_selector.get_data() if hasattr(self, 'range_tag_selector') else None
+            condition_cfg["tag"] = data.get("main_tag") if data else None
+            condition_cfg["lower"] = self.range_lower_selector.get_data() if hasattr(self, 'range_lower_selector') else None
+            condition_cfg["upper"] = self.range_upper_selector.get_data() if hasattr(self, 'range_upper_selector') else None
 
         style = ConditionalStyle(
             style_id=self.style.style_id,
@@ -1910,5 +2091,6 @@ class ConditionalStyleEditorDialog(QDialog):
             properties=properties,
             hover_properties=hover_properties,
             click_properties=click_properties,
+            condition_data=condition_cfg,
         )
         return style
