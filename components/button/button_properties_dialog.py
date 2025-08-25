@@ -710,19 +710,85 @@ class ButtonPropertiesDialog(QDialog):
         hover_props = temp_manager.get_active_style(state='hover')
         click_props = temp_manager.get_active_style(state='click')
 
+        # Build QSS for preview including font properties
+        base_font_family_name = base_props.get('font_family', '')
+        base_font_family = f"'{base_font_family_name}'" if base_font_family_name else 'inherit'
+        base_font_size = base_props.get('font_size', 10)
+        base_font_weight = 'bold' if base_props.get('bold', False) else 'normal'
+        base_font_style = 'italic' if base_props.get('italic', False) else 'normal'
+
+        hover_font_family_name = hover_props.get('font_family', base_font_family_name)
+        hover_font_family = (
+            f"'{hover_font_family_name}'" if hover_font_family_name else base_font_family
+        )
+        hover_font_size = hover_props.get('font_size', base_font_size)
+        hover_font_weight = 'bold' if hover_props.get('bold', base_props.get('bold', False)) else 'normal'
+        hover_font_style = 'italic' if hover_props.get('italic', base_props.get('italic', False)) else 'normal'
+
+        click_font_family_name = click_props.get('font_family', hover_font_family_name)
+        click_font_family = (
+            f"'{click_font_family_name}'" if click_font_family_name else hover_font_family
+        )
+        click_font_size = click_props.get('font_size', hover_font_size)
+        click_font_weight = (
+            'bold'
+            if click_props.get(
+                'bold', hover_props.get('bold', base_props.get('bold', False))
+            )
+            else 'normal'
+        )
+        click_font_style = (
+            'italic'
+            if click_props.get(
+                'italic', hover_props.get('italic', base_props.get('italic', False))
+            )
+            else 'normal'
+        )
+
+        h_align = base_props.get('h_align')
+        v_align = base_props.get('v_align')
+        alignment_css = ""
+        if h_align:
+            alignment_css += f"    text-align: {h_align};\n"
+        if h_align or v_align:
+            h_flag = {
+                'left': 'AlignLeft',
+                'center': 'AlignHCenter',
+                'right': 'AlignRight',
+            }.get(h_align, 'AlignHCenter')
+            v_flag = {
+                'top': 'AlignTop',
+                'middle': 'AlignVCenter',
+                'bottom': 'AlignBottom',
+            }.get(v_align, 'AlignVCenter')
+            alignment_css += f"    qproperty-alignment: {v_flag}|{h_flag};\n"
+
         qss = (
             "QPushButton {\n"
             f"    background-color: {base_props.get('background_color', 'transparent')};\n"
             f"    color: {base_props.get('text_color', '#000000')};\n"
             f"    border-radius: {base_props.get('border_radius', 0)}px;\n"
+            f"    font-family: {base_font_family};\n"
+            f"    font-size: {base_font_size}pt;\n"
+            f"    font-weight: {base_font_weight};\n"
+            f"    font-style: {base_font_style};\n"
+            f"{alignment_css}"
             "}\n"
             "QPushButton:hover {\n"
             f"    background-color: {hover_props.get('background_color', base_props.get('background_color', 'transparent'))};\n"
             f"    color: {hover_props.get('text_color', base_props.get('text_color', '#000000'))};\n"
+            f"    font-family: {hover_font_family};\n"
+            f"    font-size: {hover_font_size}pt;\n"
+            f"    font-weight: {hover_font_weight};\n"
+            f"    font-style: {hover_font_style};\n"
             "}\n"
             "QPushButton:pressed {\n"
             f"    background-color: {click_props.get('background_color', hover_props.get('background_color', base_props.get('background_color', 'transparent')))};\n"
             f"    color: {click_props.get('text_color', hover_props.get('text_color', base_props.get('text_color', '#000000')))};\n"
+            f"    font-family: {click_font_family};\n"
+            f"    font-size: {click_font_size}pt;\n"
+            f"    font-weight: {click_font_weight};\n"
+            f"    font-style: {click_font_style};\n"
             "}\n"
         )
         self.preview_button.setStyleSheet(qss)
@@ -747,6 +813,7 @@ class ButtonPropertiesDialog(QDialog):
 
     def _on_svg_style_selected(self, style: dict):
         pass
+
 
     def _populate_text_tab(self):
         pass
