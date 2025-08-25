@@ -50,7 +50,7 @@ from PyQt6.QtGui import (
 
 from PyQt6.QtSvg import QSvgRenderer
 from utils.icon_manager import IconManager
-from dialogs.widgets import TagSelector, CollapsibleBox
+from dialogs.widgets import TagSelector
 
 # ---------------------------------------------------------------------------
 # Helper widgets previously provided by button_creator
@@ -866,6 +866,7 @@ class ConditionalStyleEditorDialog(QDialog):
         style_tabs = QTabWidget()
 
         self.base_tab, self.base_controls = self._build_state_tab(self.style.properties, "base")
+
         style_tabs.addTab(self.base_tab, "Base")
 
         self.hover_tab, self.hover_controls = self._build_state_tab(self.style.hover_properties, "hover")
@@ -891,9 +892,8 @@ class ConditionalStyleEditorDialog(QDialog):
         self._connect_base_text_signals()
 
         # Condition configuration
-        self.condition_box = CollapsibleBox("Condition")
-        condition_content = QWidget()
-        condition_layout = QVBoxLayout(condition_content)
+        self.condition_group = QGroupBox("Condition")
+        condition_layout = QVBoxLayout()
         condition_layout.setContentsMargins(5, 10, 5, 5)
 
         self.condition_mode_combo = QComboBox()
@@ -903,8 +903,8 @@ class ConditionalStyleEditorDialog(QDialog):
         self.condition_options_container = QWidget()
         condition_layout.addWidget(self.condition_options_container)
 
-        self.condition_box.setContent(condition_content)
-        main_layout.addWidget(self.condition_box, 2, 1)
+        self.condition_group.setLayout(condition_layout)
+        main_layout.addWidget(self.condition_group, 2, 1)
 
         self.condition_mode_combo.currentTextChanged.connect(self._on_condition_mode_changed)
 
@@ -956,7 +956,7 @@ class ConditionalStyleEditorDialog(QDialog):
 
         # Ensure group boxes line up neatly
         preview_group.setMinimumHeight(style_group.sizeHint().height())
-        self.condition_box.setMinimumHeight(self.border_group.sizeHint().height())
+        self.condition_group.setMinimumHeight(self.border_group.sizeHint().height())
 
         for w in [self.border_width_spin, self.x1_spin, self.y1_spin, self.x2_spin, self.y2_spin]:
             w.valueChanged.connect(self.update_preview)
@@ -1355,10 +1355,6 @@ class ConditionalStyleEditorDialog(QDialog):
                 hasattr(self, 'range_lower_selector') and self.range_lower_selector.get_data() is not None,
                 hasattr(self, 'range_upper_selector') and self.range_upper_selector.get_data() is not None,
             ])
-        if mode == "Ordinary":
-            self.condition_box.setStatus(CollapsibleBox.Status.NEUTRAL)
-        else:
-            self.condition_box.setStatus(CollapsibleBox.Status.OK if valid else CollapsibleBox.Status.ERROR)
         ok_btn = None
         if hasattr(self, 'button_box'):
             ok_btn = self.button_box.button(QDialogButtonBox.StandardButton.Ok)
