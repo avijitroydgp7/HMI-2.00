@@ -582,6 +582,14 @@ class PreviewButton(IconButton):
         self.setText(text)
 
 
+class LedIndicator(QFrame):
+    """Simple circular widget representing an LED indicator in previews."""
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setFixedSize(40, 40)
+
+
 class ConditionalStyleEditorDialog(QDialog):
     _TEXT_KEYS = [
         "text_type_combo",
@@ -637,7 +645,15 @@ class ConditionalStyleEditorDialog(QDialog):
         style_layout = QGridLayout()
         style_layout.addWidget(QLabel("Component Type:"), 0, 0)
         self.component_type_combo = QComboBox()
-        self.component_type_combo.addItems(["Standard Button", "Circle Button", "Square Button", "Toggle Switch"])
+        self.component_type_combo.addItems([
+            "Standard Button",
+            "Circle Button",
+            "Square Button",
+            "Toggle Switch",
+            "Image Button",
+            "Icon-Only Button",
+            "LED Indicator",
+        ])
         self.component_type_combo.setCurrentText(self.style.properties.get("component_type", "Standard Button"))
         self.component_type_combo.currentTextChanged.connect(self.update_controls_state)
         style_layout.addWidget(self.component_type_combo, 0, 1)
@@ -817,8 +833,10 @@ class ConditionalStyleEditorDialog(QDialog):
         self.preview_button = PreviewButton("Preview")
         self.preview_button.setMinimumSize(200, 100)
         self.preview_switch = SwitchButton()
+        self.preview_led = LedIndicator()
         self.preview_stack.addWidget(self.preview_button)
         self.preview_stack.addWidget(self.preview_switch)
+        self.preview_stack.addWidget(self.preview_led)
         preview_group_layout.addWidget(self.preview_stack)
         preview_group.setLayout(preview_group_layout)
         main_layout.addWidget(preview_group, 1, 1)
@@ -1486,21 +1504,28 @@ class ConditionalStyleEditorDialog(QDialog):
     def update_controls_state(self):
         component_type = self.component_type_combo.currentText()
         is_switch = component_type == "Toggle Switch"
+        is_led = component_type == "LED Indicator"
         if is_switch:
             self.preview_stack.setCurrentWidget(self.preview_switch)
+        elif is_led:
+            self.preview_stack.setCurrentWidget(self.preview_led)
         else:
             self.preview_stack.setCurrentWidget(self.preview_button)
 
-        self.shape_style_label.setEnabled(not is_switch)
-        self.shape_style_combo.setEnabled(not is_switch)
+        self.shape_style_label.setEnabled(not is_switch and not is_led)
+        self.shape_style_combo.setEnabled(not is_switch and not is_led)
         self.border_group.setEnabled(not is_switch)
 
         is_circle = component_type == "Circle Button"
-        self.corner_frame.setEnabled(not is_circle and not is_switch)
+        self.corner_frame.setEnabled(not is_circle and not is_switch and not is_led)
 
         is_gradient = self.bg_type_combo.currentText() == "Linear Gradient"
         for w in [self.gradient_dir_label, self.gradient_type_combo]:
             w.setEnabled(is_gradient)
+
+        is_textless = component_type in {"Image Button", "Icon-Only Button", "LED Indicator"}
+        for controls in [self.base_controls, self.hover_controls, self.click_controls]:
+            self._set_state_controls_enabled(controls, not is_textless)
 
         self.update_dynamic_ranges()
         self.update_preview()
@@ -1551,6 +1576,16 @@ class ConditionalStyleEditorDialog(QDialog):
             self.preview_button.setFixedSize(size, size)
         elif component_type == "Toggle Switch":
             self.preview_switch.setFixedSize(width, height)
+        elif component_type == "LED Indicator":
+            size = 40
+            radius = size // 2
+            self.preview_led.setFixedSize(size, size)
+            main_qss = [
+                f"border-radius: {radius}px;",
+                f"background-color: {bg_color.name()};",
+                f"border: {border_width}px solid {border_color.name()};",
+            ]
+            return f"QFrame {{\n    {'\n    '.join(main_qss)}\n}}\n"
         else:
             self.preview_button.setFixedSize(width, height)
 
@@ -1657,12 +1692,26 @@ class ConditionalStyleEditorDialog(QDialog):
         qss = self.generate_qss(component_type)
         if component_type == "Toggle Switch":
             self.preview_switch.setStyleSheet(qss)
+        elif component_type == "LED Indicator":
+            self.preview_led.setStyleSheet(qss)
         else:
             self.preview_button.setStyleSheet(qss)
-            text = ""
-            if self.base_controls["text_type_combo"].currentText() == "Text":
-                text = self.base_controls["text_edit"].toPlainText()
-            self.preview_button.setText(text or "Preview")
+            if component_type == "Icon-Only Button":
+                pix = IconManager.create_pixmap("fa5s.star", 48)
+                self.preview_button.setIcon(QIcon(pix))
+                self.preview_button.setIconSize(QSize(48, 48))
+                self.preview_button.setText("")
+            elif component_type == "Image Button":
+                pix = IconManager.create_pixmap("fa5s.image", 64)
+                self.preview_button.setIcon(QIcon(pix))
+                self.preview_button.setIconSize(self.preview_button.size())
+                self.preview_button.setText("")
+            else:
+                self.preview_button.setIcon(QIcon())
+                text = ""
+                if self.base_controls["text_type_combo"].currentText() == "Text":
+                    text = self.base_controls["text_edit"].toPlainText()
+                self.preview_button.setText(text or "Preview")
 
 
     def get_style(self) -> ConditionalStyle:
