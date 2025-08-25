@@ -6,6 +6,7 @@ from PyQt6.QtWidgets import (
     QSplitter, QGroupBox, QStackedWidget, QDialog
 )
 from PyQt6.QtCore import Qt
+from PyQt6.QtGui import QIcon, QColor
 from typing import Dict, Any, Optional
 import copy
 
@@ -444,7 +445,7 @@ class ButtonPropertiesDialog(QDialog):
         # Left panel: Style table
         self.style_table = QTableWidget()
         self.style_table.setColumnCount(3)
-        self.style_table.setHorizontalHeaderLabels(["#", "Style ID"])
+        self.style_table.setHorizontalHeaderLabels(["#", "Style ID", "Preview"])
         self.style_table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         self.style_table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
         self.style_table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
@@ -452,6 +453,7 @@ class ButtonPropertiesDialog(QDialog):
         header = self.style_table.horizontalHeader()
         header.setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
         header.setSectionResizeMode(1, QHeaderView.ResizeMode.ResizeToContents)
+        header.setSectionResizeMode(2, QHeaderView.ResizeMode.ResizeToContents)
         splitter.addWidget(self.style_table)
 
         # Right panel: Style properties and preview
@@ -544,6 +546,20 @@ class ButtonPropertiesDialog(QDialog):
             self.style_table.insertRow(i)
             self.style_table.setItem(i, 0, QTableWidgetItem(str(i + 1)))
             self.style_table.setItem(i, 1, QTableWidgetItem(style.style_id))
+
+            preview_item = QTableWidgetItem()
+            bg = style.properties.get("background_color")
+            if bg:
+                preview_item.setBackground(QColor(bg))
+            fg = style.properties.get("text_color")
+            if fg:
+                preview_item.setForeground(QColor(fg))
+            text = style.text_value if getattr(style, "text_type", "") == "Text" else ""
+            preview_item.setText(text)
+            icon_path = style.properties.get("icon")
+            if icon_path:
+                preview_item.setIcon(QIcon(icon_path))
+            self.style_table.setItem(i, 2, preview_item)
 
     def _add_style(self):
         dialog = ConditionalStyleEditorDialog(self)
