@@ -1,4 +1,4 @@
-from typing import Dict, Any, List, Optional, ClassVar
+from typing import Dict, Any, List, Optional, ClassVar, Callable, Union
 from dataclasses import dataclass, field
 import copy
 
@@ -253,8 +253,18 @@ class AnimationProperties:
 
 @dataclass
 class ConditionalStyle:
-    """A style that can be applied to a button"""
+    """A style that can be applied to a button.
+
+    Attributes
+    ----------
+    condition:
+        Boolean expression or callable evaluated against tag values to
+        determine when this style is active.  String expressions are evaluated
+        with tag names available as variables, while callables receive the
+        ``tag_values`` dictionary.  ``None`` means the style always applies.
+    """
     style_id: str = ""
+    condition: Optional[Union[str, Callable[[Dict[str, Any]], bool]]] = None
     # core text/style attributes
     text_type: str = "Text"
     text_value: str = ""
@@ -328,6 +338,7 @@ class ConditionalStyle:
     def to_dict(self) -> Dict[str, Any]:
         return {
             'style_id': self.style_id,
+            'condition': self.condition if isinstance(self.condition, str) else None,
             'tooltip': self.tooltip,
             'text_type': self.text_type,
             'text_value': self.text_value,
@@ -355,6 +366,7 @@ class ConditionalStyle:
         click = cls._normalize_state(data.get('click_properties', {}))
         style = cls(
             style_id=data.get('style_id', ''),
+            condition=data.get('condition'),
             tooltip=data.get('tooltip', ''),
             text_type=data.get('text_type', props.get('text_type', 'Text')),
             text_value=data.get('text_value', props.get('text', '')),
@@ -417,24 +429,46 @@ class ConditionalStyleManager(QObject):
     def get_active_style(self, tag_values: Optional[Dict[str, Any]] = None, state: Optional[str] = None) -> Dict[str, Any]:
         """Determine which style should be active based on tag values.
 
+        Styles are checked in the order they appear in ``conditional_styles``.
+        The first style whose ``condition`` evaluates to ``True`` is used. A
+        condition may be a Python expression string evaluated with ``tag_values``
+        as the local namespace, or a callable accepting ``tag_values`` and
+        returning ``True``/``False``. If no conditions match, ``default_style``
+        is returned.
+
         Parameters
         ----------
         tag_values: Dict[str, Any], optional
-            Current tag values (reserved for future use).
+            Current tag values used when evaluating style conditions.
         state: Optional[str]
             Optional state for which to retrieve additional properties.
             Supported states: ``"hover"`` and ``"click"``.
         """
         tag_values = tag_values or {}
 
-        if self.conditional_styles:
-            style = self.conditional_styles[0]
-            props = dict(style.properties)
-            if state:
-                props.update(getattr(style, f"{state}_properties", {}))
-            if style.tooltip:
-                props['tooltip'] = style.tooltip
-            return props
+        for style in self.conditional_styles:
+            cond = style.condition
+            match = False
+            if cond is None:
+                match = True
+            elif callable(cond):
+                try:
+                    match = bool(cond(tag_values))
+                except Exception:
+                    match = False
+            else:
+                try:
+                    match = bool(eval(str(cond), {}, tag_values))
+                except Exception:
+                    match = False
+
+            if match:
+                props = dict(style.properties)
+                if state:
+                    props.update(getattr(style, f"{state}_properties", {}))
+                if style.tooltip:
+                    props['tooltip'] = style.tooltip
+                return props
 
         return dict(self.default_style)
     
