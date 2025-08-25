@@ -10,6 +10,7 @@ from PyQt6.QtWidgets import (
     QLineEdit,
     QComboBox,
 )
+from PyQt6.QtGui import QIcon
 from PyQt6.QtCore import pyqtSlot
 import copy
 from services.command_history_service import command_history_service
@@ -186,7 +187,11 @@ class PropertyEditor(QStackedWidget):
         style_combo = QComboBox()
         styles = button_styles.get_styles()
         for style in styles:
-            style_combo.addItem(style['name'], style['id'])
+            icon_path = style.get('svg_icon')
+            if icon_path:
+                style_combo.addItem(QIcon(icon_path), style['name'], style['id'])
+            else:
+                style_combo.addItem(style['name'], style['id'])
         
         current_style_id = self.current_properties.get("style_id", "default_rounded")
         index = style_combo.findData(current_style_id)
@@ -212,9 +217,17 @@ class PropertyEditor(QStackedWidget):
                 new_props['style_id'] = selected_style_id
                 style_def = button_styles.get_style_by_id(selected_style_id)
                 new_props.update(style_def['properties'])
+                if 'hover_properties' in style_def:
+                    new_props['hover_properties'] = copy.deepcopy(style_def['hover_properties'])
+                if 'click_properties' in style_def:
+                    new_props['click_properties'] = copy.deepcopy(style_def['click_properties'])
+                if style_def.get('svg_icon'):
+                    new_props['svg_icon'] = style_def['svg_icon']
+                if style_def.get('svg_icon_clicked'):
+                    new_props['svg_icon_clicked'] = style_def['svg_icon_clicked']
                 # Update UI to reflect style change
-                bg_color_edit.setText(new_props['background_color'])
-                text_color_edit.setText(new_props['text_color'])
+                bg_color_edit.setText(new_props.get('background_color', ''))
+                text_color_edit.setText(new_props.get('text_color', ''))
 
             if new_props != self.current_properties:
                 if self.current_object_id:

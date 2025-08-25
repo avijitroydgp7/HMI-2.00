@@ -212,6 +212,88 @@ _DEFAULT_STYLES = [
             "border_radius": 0,
         },
     },
+    {
+        "id": "gradient_blue",
+        "name": "Gradient Blue",
+        "properties": {
+            "background_type": "Linear Gradient",
+            "background_color": "#4facfe",
+            "background_color2": "#00f2fe",
+            "gradient_type": "Top to Bottom",
+            "text_color": "#ffffff",
+            "border_radius": 10,
+            "border_width": 2,
+            "border_style": "solid",
+            "border_color": "#4facfe",
+        },
+        "hover_properties": {
+            "background_color": "#00f2fe",
+            "text_color": "#ffffff",
+        },
+        "click_properties": {
+            "background_color": "#0099cc",
+            "text_color": "#ffffff",
+        },
+    },
+    {
+        "id": "outline_primary",
+        "name": "Outline Primary",
+        "properties": {
+            "background_color": "transparent",
+            "text_color": "#1976d2",
+            "border_radius": 5,
+            "border_width": 2,
+            "border_style": "solid",
+            "border_color": "#1976d2",
+        },
+        "hover_properties": {
+            "background_color": "#1976d2",
+            "text_color": "#ffffff",
+        },
+        "click_properties": {
+            "background_color": "#0d47a1",
+            "text_color": "#ffffff",
+        },
+    },
+    {
+        "id": "neumorphic_soft",
+        "name": "Neumorphic Soft",
+        "properties": {
+            "background_color": "#e0e0e0",
+            "text_color": "#333333",
+            "border_radius": 15,
+            "shape_style": "Neumorphic",
+        },
+        "hover_properties": {
+            "background_color": "#e8e8e8",
+            "text_color": "#333333",
+        },
+        "click_properties": {
+            "background_color": "#d0d0d0",
+            "text_color": "#333333",
+        },
+    },
+    {
+        "id": "icon_play",
+        "name": "Icon Play",
+        "svg_icon": "lib/icon/bolt-circle-svgrepo-com.svg",
+        "svg_icon_clicked": "lib/icon/bolt-circle-svgrepo-com.svg",
+        "properties": {
+            "background_color": "#ffffff",
+            "text_color": "#333333",
+            "border_radius": 50,
+            "border_width": 1,
+            "border_style": "solid",
+            "border_color": "#cccccc",
+            "icon_size": 32,
+        },
+        "hover_properties": {
+            "background_color": "#f0f0f0",
+        },
+        "click_properties": {
+            "background_color": "#e0e0e0",
+        },
+    },
 ]
 
 
