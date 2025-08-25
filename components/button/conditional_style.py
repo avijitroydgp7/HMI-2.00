@@ -440,10 +440,11 @@ class ConditionalStyle:
         return normalized
     
     def to_dict(self) -> Dict[str, Any]:
+        cond = copy.deepcopy(self.condition_data)
         return {
             'style_id': self.style_id,
             'condition': self.condition if isinstance(self.condition, str) else None,
-            'condition_data': self.condition_data,
+            'condition_data': cond,
             'tooltip': self.tooltip,
             'text_type': self.text_type,
             'text_value': self.text_value,
@@ -503,7 +504,13 @@ class ConditionalStyle:
             hover_properties=hover,
             click_properties=click,
         )
-        style.condition_data = data.get('condition_data', {"mode": "Ordinary"})
+        cond = data.get('condition_data', {"mode": "Ordinary"})
+        if cond.get('mode') == 'Range' and 'operator' not in cond:
+            if 'lower' in cond or 'upper' in cond:
+                cond['operator'] = 'between'
+            else:
+                cond['operator'] = '=='
+        style.condition_data = cond
         if 'animation' in data:
             style.animation = AnimationProperties.from_dict(data['animation'])
         return style
@@ -605,11 +612,38 @@ class ConditionalStyleManager(QObject):
             return bool(tag_val) if mode == 'On' else not bool(tag_val)
         if mode == 'Range':
             tag_val = self._extract_value(cfg.get('tag'), tag_values)
-            lower = self._extract_value(cfg.get('lower'), tag_values)
-            upper = self._extract_value(cfg.get('upper'), tag_values)
-            try:
-                return lower <= tag_val <= upper
-            except Exception:
+            if tag_val is None:
+                return False
+            operator = cfg.get('operator', '==')
+            if operator in ['between', 'outside']:
+                lower = self._extract_value(cfg.get('lower'), tag_values)
+                upper = self._extract_value(cfg.get('upper'), tag_values)
+                try:
+                    if operator == 'between':
+                        return lower <= tag_val <= upper
+                    else:
+                        return tag_val < lower or tag_val > upper
+                except Exception:
+                    return False
+            else:
+                operand = self._extract_value(cfg.get('operand'), tag_values)
+                if operand is None:
+                    return False
+                try:
+                    if operator == '==':
+                        return tag_val == operand
+                    if operator == '!=':
+                        return tag_val != operand
+                    if operator == '>':
+                        return tag_val > operand
+                    if operator == '>=':
+                        return tag_val >= operand
+                    if operator == '<':
+                        return tag_val < operand
+                    if operator == '<=':
+                        return tag_val <= operand
+                except Exception:
+                    return False
                 return False
         return False
 
@@ -917,12 +951,24 @@ class ConditionalStyleEditorDialog(QDialog):
         elif initial_mode == "Range":
             if tag_cfg:
                 self.range_tag_selector.set_data({'main_tag': tag_cfg, 'indices': []})
-            lower = self.style.condition_data.get("lower")
-            upper = self.style.condition_data.get("upper")
-            if lower:
-                self.range_lower_selector.set_data(lower)
-            if upper:
-                self.range_upper_selector.set_data(upper)
+            operator = self.style.condition_data.get("operator")
+            if not operator:
+                if self.style.condition_data.get("lower") is not None or self.style.condition_data.get("upper") is not None:
+                    operator = "between"
+                else:
+                    operator = "=="
+            self.range_operator_combo.setCurrentText(operator)
+            if operator in ["between", "outside"]:
+                lower = self.style.condition_data.get("lower")
+                upper = self.style.condition_data.get("upper")
+                if lower:
+                    self.range_lower_selector.set_data(lower)
+                if upper:
+                    self.range_upper_selector.set_data(upper)
+            else:
+                operand = self.style.condition_data.get("operand")
+                if operand:
+                    self.range_operand_selector.set_data(operand)
         self._validate_condition_section()
 
         main_layout.addWidget(style_tabs, 3, 0, 1, 2)
@@ -1288,7 +1334,15 @@ class ConditionalStyleEditorDialog(QDialog):
             self.condition_options_container.setLayout(layout)
         layout.setContentsMargins(0, 10, 0, 0)
 
-        for attr in ["condition_tag_selector", "range_tag_selector", "range_lower_selector", "range_upper_selector"]:
+        for attr in [
+            "condition_tag_selector",
+            "range_tag_selector",
+            "range_operand_selector",
+            "range_lower_selector",
+            "range_upper_selector",
+            "range_operator_combo",
+            "range_rhs_stack",
+        ]:
             if hasattr(self, attr):
                 getattr(self, attr).deleteLater()
                 delattr(self, attr)
@@ -1320,29 +1374,56 @@ class ConditionalStyleEditorDialog(QDialog):
         tag_layout.addWidget(self.range_tag_selector)
         tag_layout.addStretch(1)
 
-        lower_layout = QVBoxLayout()
-        self.range_lower_selector = TagSelector(allowed_tag_types=allowed)
-        lower_layout.addWidget(QLabel("Lower Bound"))
-        lower_layout.addWidget(self.range_lower_selector)
-        lower_layout.addStretch(1)
+        op_layout = QVBoxLayout()
+        self.range_operator_combo = QComboBox()
+        self.range_operator_combo.addItems(["==", "!=", ">", ">=", "<", "<=", "between", "outside"])
+        op_layout.addWidget(QLabel("Operator"))
+        op_layout.addWidget(self.range_operator_combo)
+        op_layout.addStretch(1)
 
-        upper_layout = QVBoxLayout()
+        self.range_rhs_stack = QStackedWidget()
+
+        op2_page = QWidget()
+        op2_layout = QVBoxLayout(op2_page)
+        op2_layout.setContentsMargins(0, 0, 0, 0)
+        self.range_operand_selector = TagSelector(allowed_tag_types=allowed)
+        op2_layout.addWidget(QLabel("Operand"))
+        op2_layout.addWidget(self.range_operand_selector)
+        op2_layout.addStretch(1)
+        self.range_rhs_stack.addWidget(op2_page)
+
+        between_page = QWidget()
+        between_layout = QGridLayout(between_page)
+        between_layout.setContentsMargins(0, 0, 0, 0)
+        self.range_lower_selector = TagSelector(allowed_tag_types=allowed)
         self.range_upper_selector = TagSelector(allowed_tag_types=allowed)
-        upper_layout.addWidget(QLabel("Upper Bound"))
-        upper_layout.addWidget(self.range_upper_selector)
-        upper_layout.addStretch(1)
+        between_layout.addWidget(QLabel("Lower Bound"), 0, 0)
+        between_layout.addWidget(self.range_lower_selector, 1, 0)
+        between_layout.addWidget(QLabel("Upper Bound"), 0, 1)
+        between_layout.addWidget(self.range_upper_selector, 1, 1)
+        between_layout.setRowStretch(2, 1)
+        self.range_rhs_stack.addWidget(between_page)
 
         layout.addLayout(tag_layout, 0, 0)
-        layout.addLayout(lower_layout, 0, 1)
-        layout.addLayout(upper_layout, 0, 2)
+        layout.addLayout(op_layout, 0, 1)
+        layout.addWidget(self.range_rhs_stack, 0, 2, alignment=Qt.AlignmentFlag.AlignTop)
         layout.setColumnStretch(0, 1)
-        layout.setColumnStretch(1, 1)
         layout.setColumnStretch(2, 1)
 
         parent_layout.addWidget(range_group)
 
-        for selector in [self.range_tag_selector, self.range_lower_selector, self.range_upper_selector]:
-            selector.inputChanged.connect(self._validate_condition_section)
+        self.range_tag_selector.inputChanged.connect(self._validate_condition_section)
+        self.range_operator_combo.currentTextChanged.connect(self._on_range_operator_changed)
+        self.range_operand_selector.inputChanged.connect(self._validate_condition_section)
+        self.range_lower_selector.inputChanged.connect(self._validate_condition_section)
+        self.range_upper_selector.inputChanged.connect(self._validate_condition_section)
+
+        self._on_range_operator_changed(self.range_operator_combo.currentText())
+
+    def _on_range_operator_changed(self, operator: str):
+        if hasattr(self, "range_rhs_stack"):
+            self.range_rhs_stack.setCurrentIndex(1 if operator in ["between", "outside"] else 0)
+        self._validate_condition_section()
 
     def _validate_condition_section(self, *args):
         mode = self.condition_mode_combo.currentText()
@@ -1350,11 +1431,18 @@ class ConditionalStyleEditorDialog(QDialog):
         if mode in ("On", "Off"):
             valid = hasattr(self, 'condition_tag_selector') and self.condition_tag_selector.get_data() is not None
         elif mode == "Range":
-            valid = all([
-                hasattr(self, 'range_tag_selector') and self.range_tag_selector.get_data() is not None,
-                hasattr(self, 'range_lower_selector') and self.range_lower_selector.get_data() is not None,
-                hasattr(self, 'range_upper_selector') and self.range_upper_selector.get_data() is not None,
-            ])
+            operator = self.range_operator_combo.currentText() if hasattr(self, 'range_operator_combo') else ""
+            if operator in ["between", "outside"]:
+                valid = all([
+                    hasattr(self, 'range_tag_selector') and self.range_tag_selector.get_data() is not None,
+                    hasattr(self, 'range_lower_selector') and self.range_lower_selector.get_data() is not None,
+                    hasattr(self, 'range_upper_selector') and self.range_upper_selector.get_data() is not None,
+                ])
+            else:
+                valid = all([
+                    hasattr(self, 'range_tag_selector') and self.range_tag_selector.get_data() is not None,
+                    hasattr(self, 'range_operand_selector') and self.range_operand_selector.get_data() is not None,
+                ])
         ok_btn = None
         if hasattr(self, 'button_box'):
             ok_btn = self.button_box.button(QDialogButtonBox.StandardButton.Ok)
@@ -2055,8 +2143,19 @@ class ConditionalStyleEditorDialog(QDialog):
         elif condition_cfg["mode"] == "Range":
             data = self.range_tag_selector.get_data() if hasattr(self, 'range_tag_selector') else None
             condition_cfg["tag"] = data.get("main_tag") if data else None
-            condition_cfg["lower"] = self.range_lower_selector.get_data() if hasattr(self, 'range_lower_selector') else None
-            condition_cfg["upper"] = self.range_upper_selector.get_data() if hasattr(self, 'range_upper_selector') else None
+            operator = self.range_operator_combo.currentText() if hasattr(self, 'range_operator_combo') else "=="
+            condition_cfg["operator"] = operator
+            if operator in ["between", "outside"]:
+                condition_cfg["lower"] = (
+                    self.range_lower_selector.get_data() if hasattr(self, 'range_lower_selector') else None
+                )
+                condition_cfg["upper"] = (
+                    self.range_upper_selector.get_data() if hasattr(self, 'range_upper_selector') else None
+                )
+            else:
+                condition_cfg["operand"] = (
+                    self.range_operand_selector.get_data() if hasattr(self, 'range_operand_selector') else None
+                )
 
         style = ConditionalStyle(
             style_id=self.style.style_id,
