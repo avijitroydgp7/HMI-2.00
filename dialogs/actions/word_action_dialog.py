@@ -315,7 +315,7 @@ class WordActionDialog(QDialog):
         
         layout.addLayout(op1_layout, 0, 0)
         layout.addLayout(op_layout, 0, 1)
-        layout.addWidget(self.range_rhs_stack, 0, 2)
+        layout.addWidget(self.range_rhs_stack, 0, 2, alignment=Qt.AlignmentFlag.AlignTop)
         layout.setColumnStretch(0, 1)
         layout.setColumnStretch(2, 1)
         
@@ -329,6 +329,7 @@ class WordActionDialog(QDialog):
         self.range_upper_bound_selector = TagSelector(allowed_tag_types=allowed_types)
         between_layout.addWidget(QLabel("Lower Bound"), 0, 0); between_layout.addWidget(self.range_lower_bound_selector, 1, 0)
         between_layout.addWidget(QLabel("Upper Bound"), 0, 1); between_layout.addWidget(self.range_upper_bound_selector, 1, 1)
+        between_layout.setRowStretch(2, 1)
         self.range_rhs_stack.addWidget(between_page)
         
         self.range_operand1_selector.inputChanged.connect(self._validate_form)
