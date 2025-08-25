@@ -1417,6 +1417,8 @@ class ConditionalStyleEditorDialog(QDialog):
         click_bg_color = self._click_bg_color
         border_color = self._border_color
         text_color = self._text_color or self.palette().color(QPalette.ColorRole.ButtonText).name()
+        hover_text_color = self._hover_text_color or text_color
+        click_text_color = self._click_text_color or text_color
         font_size = self.font_size_spin.value()
         font_family = self.base_controls["font_family_combo"].currentText()
         font_weight = "bold" if self.base_controls["bold_btn"].isChecked() else "normal"
@@ -1458,8 +1460,14 @@ class ConditionalStyleEditorDialog(QDialog):
                 f"background-color: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 {light_color}, stop:1 {dark_color});"
             )
             main_qss.append(f"border: 1px solid {border_c};")
-            hover_qss.append(f"background-color: {hover_bg_color.name()};")
-            pressed_qss.append(f"background-color: {click_bg_color.name()};")
+            hover_qss.extend([
+                f"background-color: {hover_bg_color.name()};",
+                f"color: {hover_text_color};",
+            ])
+            pressed_qss.extend([
+                f"background-color: {click_bg_color.name()};",
+                f"color: {click_text_color};",
+            ])
         elif shape_style == "3D":
             main_qss.extend([f"border-width: {border_width}px;", f"border-color: {border_color.name()};", "border-style: outset;"])
             if bg_type == "Solid":
@@ -1469,8 +1477,15 @@ class ConditionalStyleEditorDialog(QDialog):
                 main_qss.append(
                     f"background-color: qlineargradient(x1:{x1}, y1:{y1}, x2:{x2}, y2:{y2}, stop:0 {bg_color.name()}, stop:1 {self._bg_color2.name()});"
                 )
-            hover_qss.append(f"background-color: {hover_bg_color.name()};")
-            pressed_qss.extend(["border-style: inset;", f"background-color: {click_bg_color.name()};"])
+            hover_qss.extend([
+                f"background-color: {hover_bg_color.name()};",
+                f"color: {hover_text_color};",
+            ])
+            pressed_qss.extend([
+                "border-style: inset;",
+                f"background-color: {click_bg_color.name()};",
+                f"color: {click_text_color};",
+            ])
         elif shape_style == "Neumorphic":
             base_color = self.palette().color(QPalette.ColorRole.Window)
             main_qss.extend([f"background-color: {base_color.name()};", f"border: 2px solid {base_color.name()};"])
@@ -1481,15 +1496,15 @@ class ConditionalStyleEditorDialog(QDialog):
             main_qss.extend([
                 "background-color: transparent;",
                 f"border: {border_width}px solid {bg_color.name()};",
-                f"color: {bg_color.name()};",
+                f"color: {text_color};",
             ])
             hover_qss.extend([
                 f"background-color: {hover_bg_color.name()};",
-                f"color: {self.palette().color(QPalette.ColorRole.Window).name()};",
+                f"color: {hover_text_color};",
             ])
             pressed_qss.extend([
                 f"background-color: {click_bg_color.name()};",
-                f"color: {self.palette().color(QPalette.ColorRole.Window).name()};",
+                f"color: {click_text_color};",
             ])
         else:
             main_qss.extend([f"border-width: {border_width}px;",
@@ -1502,8 +1517,14 @@ class ConditionalStyleEditorDialog(QDialog):
                 main_qss.append(
                     f"background-color: qlineargradient(x1:{x1}, y1:{y1}, x2:{x2}, y2:{y2}, stop:0 {bg_color.name()}, stop:1 {self._bg_color2.name()});"
                 )
-            hover_qss.append(f"background-color: {hover_bg_color.name()};")
-            pressed_qss.append(f"background-color: {click_bg_color.name()};")
+            hover_qss.extend([
+                f"background-color: {hover_bg_color.name()};",
+                f"color: {hover_text_color};",
+            ])
+            pressed_qss.extend([
+                f"background-color: {click_bg_color.name()};",
+                f"color: {click_text_color};",
+            ])
 
         main_qss_str = "\n    ".join(main_qss)
         hover_qss_str = "\n    ".join(hover_qss) if hover_qss else ""
