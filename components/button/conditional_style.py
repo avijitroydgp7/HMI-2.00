@@ -203,6 +203,14 @@ _DEFAULT_STYLES = [
             "text_color": "#ffffff",
             "border_radius": 20,
         },
+        "hover_properties": {
+            "background_color": "#6b7383",
+            "text_color": "#ffffff",
+        },
+        "click_properties": {
+            "background_color": "#4a515c",
+            "text_color": "#ffffff",
+        },
     },
     {
         "id": "success_square",
@@ -211,6 +219,14 @@ _DEFAULT_STYLES = [
             "background_color": "#4CAF50",
             "text_color": "#ffffff",
             "border_radius": 5,
+        },
+        "hover_properties": {
+            "background_color": "#45a049",
+            "text_color": "#ffffff",
+        },
+        "click_properties": {
+            "background_color": "#388e3c",
+            "text_color": "#ffffff",
         },
     },
     {
@@ -221,6 +237,14 @@ _DEFAULT_STYLES = [
             "text_color": "#000000",
             "border_radius": 20,  # Height will make it a pill
         },
+        "hover_properties": {
+            "background_color": "#ffb74d",
+            "text_color": "#000000",
+        },
+        "click_properties": {
+            "background_color": "#e68900",
+            "text_color": "#000000",
+        },
     },
     {
         "id": "danger_flat",
@@ -229,6 +253,14 @@ _DEFAULT_STYLES = [
             "background_color": "#f44336",
             "text_color": "#ffffff",
             "border_radius": 0,
+        },
+        "hover_properties": {
+            "background_color": "#e53935",
+            "text_color": "#ffffff",
+        },
+        "click_properties": {
+            "background_color": "#d32f2f",
+            "text_color": "#ffffff",
         },
     },
     {
