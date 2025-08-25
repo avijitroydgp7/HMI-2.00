@@ -34,6 +34,7 @@ from PyQt6.QtWidgets import (
     QButtonGroup,
     QHBoxLayout,
     QCheckBox,
+    QScrollArea,
     QFileDialog,
 )
 from PyQt6.QtGui import (
@@ -743,7 +744,7 @@ class ConditionalStyleEditorDialog(QDialog):
         main_layout = QGridLayout(self)
         main_layout.setColumnStretch(0, 1)
         main_layout.setColumnStretch(1, 1)
-        main_layout.setRowStretch(3, 1)
+        main_layout.setRowStretch(2, 1)
 
         info_layout = QGridLayout()
         self.tooltip_edit = QLineEdit(self.style.tooltip)
@@ -809,6 +810,14 @@ class ConditionalStyleEditorDialog(QDialog):
         style_group.setLayout(style_layout)
         main_layout.addWidget(style_group, 1, 0)
 
+        options_group = QGroupBox("Style Options")
+        options_layout = QGridLayout()
+        options_group.setLayout(options_layout)
+
+        scroll_area = QScrollArea()
+        scroll_area.setWidgetResizable(True)
+        scroll_area.setWidget(options_group)
+
         self.border_group = QGroupBox("Border")
         border_layout = QGridLayout()
 
@@ -833,7 +842,6 @@ class ConditionalStyleEditorDialog(QDialog):
         right_label = QLabel("Right")
         right_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         corner_layout.addWidget(right_label, 1, 2)
-
         top_label = QLabel("Top")
         top_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         corner_layout.addWidget(top_label, 2, 0)
@@ -870,6 +878,7 @@ class ConditionalStyleEditorDialog(QDialog):
 
         border_layout.addWidget(self.corner_frame, 0, 0, 1, 2)
 
+
         border_layout.addWidget(QLabel("Border Width (px):"), 1, 0)
         self.border_width_spin = QSpinBox()
         # Allow border width up to 20px, final limit is adjusted dynamically
@@ -894,7 +903,7 @@ class ConditionalStyleEditorDialog(QDialog):
         border_layout.addWidget(self.border_style_combo, 2, 1)
 
         self.border_group.setLayout(border_layout)
-        main_layout.addWidget(self.border_group, 2, 0)
+        options_layout.addWidget(self.border_group, 0, 0)
 
         # Style tabs
         style_tabs = QTabWidget()
@@ -938,7 +947,7 @@ class ConditionalStyleEditorDialog(QDialog):
         condition_layout.addWidget(self.condition_options_container)
 
         self.condition_group.setLayout(condition_layout)
-        main_layout.addWidget(self.condition_group, 2, 1)
+        options_layout.addWidget(self.condition_group, 0, 1)
 
         self.condition_mode_combo.currentTextChanged.connect(self._on_condition_mode_changed)
 
@@ -971,19 +980,21 @@ class ConditionalStyleEditorDialog(QDialog):
                     self.range_operand_selector.set_data(operand)
         self._validate_condition_section()
 
-        main_layout.addWidget(style_tabs, 3, 0, 1, 2)
+        options_layout.addWidget(style_tabs, 1, 0, 1, 2)
 
         cb_layout = QHBoxLayout()
         cb_layout.addStretch()
         cb_layout.addWidget(self.copy_hover_chk)
         cb_layout.addWidget(self.copy_click_chk)
         cb_layout.addStretch()
-        main_layout.addLayout(cb_layout, 4, 0, 1, 2)
+        options_layout.addLayout(cb_layout, 2, 0, 1, 2)
+
+        main_layout.addWidget(scroll_area, 2, 0, 1, 2)
 
         self.button_box = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
         self.button_box.accepted.connect(self.accept)
         self.button_box.rejected.connect(self.reject)
-        main_layout.addWidget(self.button_box, 5, 0, 1, 2)
+        main_layout.addWidget(self.button_box, 3, 0, 1, 2)
         self._validate_condition_section()
 
         preview_group = QGroupBox("Preview")
@@ -1016,6 +1027,8 @@ class ConditionalStyleEditorDialog(QDialog):
 
         self.update_controls_state()
         self.update_preview()
+
+        self.resize(1000, 500)
 
     def _create_alignment_widget(self, options, current):
         widget = QWidget()
