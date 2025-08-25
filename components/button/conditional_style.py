@@ -194,10 +194,19 @@ _GRADIENT_STYLES = {
 # ---------------------------------------------------------------------------
 # Built-in button styles
 # ---------------------------------------------------------------------------
+# Each style dict may include optional metadata:
+#   tooltip      - short hint shown to the user
+#   icon fields  - ``icon``, ``hover_icon`` and ``click_icon`` for SVG paths
+#   animation    - mapping compatible with :class:`AnimationProperties`
 _DEFAULT_STYLES = [
     {
         "id": "default_rounded",
         "name": "Default Rounded",
+        "tooltip": "Rounded gray button",
+        "icon": "",
+        "hover_icon": "",
+        "click_icon": "",
+        "animation": {"enabled": False, "type": "pulse", "intensity": 1.0},
         "properties": {
             "background_color": "#5a6270",
             "text_color": "#ffffff",
@@ -215,6 +224,11 @@ _DEFAULT_STYLES = [
     {
         "id": "success_square",
         "name": "Success Square",
+        "tooltip": "Green confirmation button",
+        "icon": "",
+        "hover_icon": "",
+        "click_icon": "",
+        "animation": {"enabled": False, "type": "pulse", "intensity": 1.0},
         "properties": {
             "background_color": "#4CAF50",
             "text_color": "#ffffff",
@@ -232,6 +246,11 @@ _DEFAULT_STYLES = [
     {
         "id": "warning_pill",
         "name": "Warning Pill",
+        "tooltip": "Warning orange pill",
+        "icon": "",
+        "hover_icon": "",
+        "click_icon": "",
+        "animation": {"enabled": False, "type": "pulse", "intensity": 1.0},
         "properties": {
             "background_color": "#ff9800",
             "text_color": "#000000",
@@ -249,6 +268,11 @@ _DEFAULT_STYLES = [
     {
         "id": "danger_flat",
         "name": "Danger Flat",
+        "tooltip": "Danger red flat button",
+        "icon": "",
+        "hover_icon": "",
+        "click_icon": "",
+        "animation": {"enabled": False, "type": "pulse", "intensity": 1.0},
         "properties": {
             "background_color": "#f44336",
             "text_color": "#ffffff",
@@ -266,6 +290,11 @@ _DEFAULT_STYLES = [
     {
         "id": "gradient_blue",
         "name": "Gradient Blue",
+        "tooltip": "Blue gradient button",
+        "icon": "",
+        "hover_icon": "",
+        "click_icon": "",
+        "animation": {"enabled": False, "type": "pulse", "intensity": 1.0},
         "properties": {
             "background_type": "Linear Gradient",
             "background_color": "#4facfe",
@@ -289,6 +318,11 @@ _DEFAULT_STYLES = [
     {
         "id": "outline_primary",
         "name": "Outline Primary",
+        "tooltip": "Primary outline button",
+        "icon": "",
+        "hover_icon": "",
+        "click_icon": "",
+        "animation": {"enabled": False, "type": "pulse", "intensity": 1.0},
         "properties": {
             "background_color": "transparent",
             "text_color": "#1976d2",
@@ -309,6 +343,11 @@ _DEFAULT_STYLES = [
     {
         "id": "neumorphic_soft",
         "name": "Neumorphic Soft",
+        "tooltip": "Soft neumorphic style",
+        "icon": "",
+        "hover_icon": "",
+        "click_icon": "",
+        "animation": {"enabled": False, "type": "pulse", "intensity": 1.0},
         "properties": {
             "background_color": "#e0e0e0",
             "text_color": "#333333",
@@ -327,8 +366,11 @@ _DEFAULT_STYLES = [
     {
         "id": "icon_play",
         "name": "Icon Play",
+        "tooltip": "Circular play icon button",
         "icon": "lib/icon/bolt-circle-svgrepo-com.svg",
+        "hover_icon": "lib/icon/bolt-circle-svgrepo-com.svg",
         "click_icon": "lib/icon/bolt-circle-svgrepo-com.svg",
+        "animation": {"enabled": False, "type": "pulse", "intensity": 1.0},
         "properties": {
             "background_color": "#ffffff",
             "text_color": "#333333",
@@ -395,6 +437,12 @@ class ConditionalStyle:
         determine when this style is active.  String expressions are evaluated
         with tag names available as variables, while callables receive the
         ``tag_values`` dictionary.  ``None`` means the style always applies.
+    tooltip:
+        Short descriptive text shown when the user hovers over the button.
+    icon, hover_icon, click_icon:
+        SVG icon paths for the base, hover and click states respectively.
+    animation:
+        Basic animation settings represented by :class:`AnimationProperties`.
     """
     style_id: str = ""
     condition: Optional[Union[str, Callable[[Dict[str, Any]], bool]]] = None
