@@ -6,6 +6,7 @@ from PyQt6.QtWidgets import (
     QVBoxLayout, QGroupBox, QGridLayout, QLabel, QComboBox, QStackedWidget,
     QScrollArea, QHBoxLayout, QDialog
 )
+from PyQt6.QtCore import Qt
 from typing import Dict, Optional
 
 from ..widgets import TagSelector, CollapsibleBox
@@ -20,7 +21,7 @@ class BitActionDialog(QDialog):
         self.setWindowTitle("Bit Action Configuration")
         self.setMinimumWidth(600)
         self.setFixedHeight(650)
-        self.setStyleSheet("QLineEdit, QComboBox { border: none; }")
+        # Use default styling so dropdowns match the Conditional Style window
 
         content_layout = QVBoxLayout(self)
         content_layout.setContentsMargins(0,0,0,0)

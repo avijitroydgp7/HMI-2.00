@@ -46,7 +46,8 @@ class WordActionDialog(QDialog):
         self.setWindowTitle("Word Action Configuration")
         self.setMinimumWidth(800)
         self.setFixedHeight(750)
-        self.setStyleSheet("QLineEdit, QComboBox { border: none; }")
+        # Remove borderless styling so combo boxes use the standard dropdown
+        # appearance consistent with the Conditional Style window
 
         # Main layout for the dialog
         content_layout = QVBoxLayout(self)
