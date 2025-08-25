@@ -1023,10 +1023,31 @@ class ConditionalStyleEditorDialog(QDialog):
     def on_state_bg_color_changed(self, state, color):
         if state == "base":
             self._bg_color = color
+            txt = self.get_contrast_color(self._bg_color)
+            self._text_color = txt.name()
+            self.set_combo_selection(
+                self.base_controls["text_base_combo"],
+                self.base_controls["text_shade_combo"],
+                txt,
+            )
         elif state == "hover":
             self._hover_bg_color = color
+            txt = self.get_contrast_color(self._hover_bg_color)
+            self._hover_text_color = txt.name()
+            self.set_combo_selection(
+                self.hover_controls["text_base_combo"],
+                self.hover_controls["text_shade_combo"],
+                txt,
+            )
         elif state == "click":
             self._click_bg_color = color
+            txt = self.get_contrast_color(self._click_bg_color)
+            self._click_text_color = txt.name()
+            self.set_combo_selection(
+                self.click_controls["text_base_combo"],
+                self.click_controls["text_shade_combo"],
+                txt,
+            )
         self.update_preview()
 
     def on_state_text_color_changed(self, state, color):
@@ -1065,6 +1086,11 @@ class ConditionalStyleEditorDialog(QDialog):
             shades.append(base_color.lighter(int(100 * factor)) if factor > 1.0 else base_color.darker(int(100 / factor)))
 
         return shades
+
+    def get_contrast_color(self, color: QColor) -> QColor:
+        r, g, b, _ = color.getRgb()
+        luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255
+        return QColor("#000000") if luminance > 0.55 else QColor("#ffffff")
 
     def create_color_selection_widgets(self, final_slot, initial_color=None, emit_initial=True):
         base_combo = QComboBox()
@@ -1161,16 +1187,49 @@ class ConditionalStyleEditorDialog(QDialog):
     def on_bg_color_changed(self, color_name, color):
         if not color:
             return
-        scheme = self.color_schemes.get(color_name)
-        if scheme:
-            self._bg_color = color
-            self._hover_bg_color = scheme["hover"]
-            self._border_color = scheme["border"]
-            self._bg_color2 = scheme["gradient2"]
-            self._click_bg_color = self._bg_color.darker(120)
-            self.set_combo_selection(self.base_controls["bg_base_combo"], self.base_controls["bg_shade_combo"], self._bg_color)
-            self.set_combo_selection(self.hover_controls["bg_base_combo"], self.hover_controls["bg_shade_combo"], self._hover_bg_color)
-            self.set_combo_selection(self.click_controls["bg_base_combo"], self.click_controls["bg_shade_combo"], self._click_bg_color)
+        self._bg_color = color
+        self._hover_bg_color = color.lighter(120)
+        self._click_bg_color = color.darker(120)
+        self._border_color = color.darker(150)
+        self._bg_color2 = color.lighter(130)
+
+        base_text = self.get_contrast_color(self._bg_color)
+        hover_text = self.get_contrast_color(self._hover_bg_color)
+        click_text = self.get_contrast_color(self._click_bg_color)
+        self._text_color = base_text.name()
+        self._hover_text_color = hover_text.name()
+        self._click_text_color = click_text.name()
+
+        self.set_combo_selection(
+            self.base_controls["bg_base_combo"],
+            self.base_controls["bg_shade_combo"],
+            self._bg_color,
+        )
+        self.set_combo_selection(
+            self.hover_controls["bg_base_combo"],
+            self.hover_controls["bg_shade_combo"],
+            self._hover_bg_color,
+        )
+        self.set_combo_selection(
+            self.click_controls["bg_base_combo"],
+            self.click_controls["bg_shade_combo"],
+            self._click_bg_color,
+        )
+        self.set_combo_selection(
+            self.base_controls["text_base_combo"],
+            self.base_controls["text_shade_combo"],
+            base_text,
+        )
+        self.set_combo_selection(
+            self.hover_controls["text_base_combo"],
+            self.hover_controls["text_shade_combo"],
+            hover_text,
+        )
+        self.set_combo_selection(
+            self.click_controls["text_base_combo"],
+            self.click_controls["text_shade_combo"],
+            click_text,
+        )
         self.update_preview()
 
     def set_initial_colors(self):
@@ -1178,25 +1237,32 @@ class ConditionalStyleEditorDialog(QDialog):
         self.bg_base_color_combo.setCurrentText("Green")
         self.bg_base_color_combo.blockSignals(False)
         scheme = self.color_schemes.get("Green")
-        if scheme:
-            self._bg_color = scheme["main"]
-            self._hover_bg_color = scheme["hover"]
-            self._border_color = scheme["border"]
-            self._bg_color2 = scheme["gradient2"]
-            self._click_bg_color = self._bg_color.darker(120)
-        else:
-            self._bg_color = QColor("#2ecc71")
-            self._hover_bg_color = QColor("#58d68d")
-            self._border_color = QColor("#27ae60")
-            self._bg_color2 = QColor("#16a085")
-            self._click_bg_color = self._bg_color.darker(120)
+        self._bg_color = scheme["main"] if scheme else QColor("#2ecc71")
+
+        orig_base_text = self._text_color
+        orig_hover_text = self._hover_text_color
+        orig_click_text = self._click_text_color
+
         self.on_bg_color_changed("Green", self._bg_color)
-        base_text = QColor(self._text_color) if self._text_color else self.palette().color(QPalette.ColorRole.ButtonText)
-        hover_text = QColor(self._hover_text_color) if self._hover_text_color else base_text
-        click_text = QColor(self._click_text_color) if self._click_text_color else base_text
-        self.set_combo_selection(self.base_controls["text_base_combo"], self.base_controls["text_shade_combo"], base_text)
-        self.set_combo_selection(self.hover_controls["text_base_combo"], self.hover_controls["text_shade_combo"], hover_text)
-        self.set_combo_selection(self.click_controls["text_base_combo"], self.click_controls["text_shade_combo"], click_text)
+
+        if orig_base_text:
+            self.set_combo_selection(
+                self.base_controls["text_base_combo"],
+                self.base_controls["text_shade_combo"],
+                QColor(orig_base_text),
+            )
+        if orig_hover_text:
+            self.set_combo_selection(
+                self.hover_controls["text_base_combo"],
+                self.hover_controls["text_shade_combo"],
+                QColor(orig_hover_text),
+            )
+        if orig_click_text:
+            self.set_combo_selection(
+                self.click_controls["text_base_combo"],
+                self.click_controls["text_shade_combo"],
+                QColor(orig_click_text),
+            )
 
     def create_coord_spinbox(self, value=0):
         spinbox = QSpinBox()
