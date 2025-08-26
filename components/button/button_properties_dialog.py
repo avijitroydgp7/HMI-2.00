@@ -113,25 +113,38 @@ class ButtonPropertiesDialog(QDialog):
         
         # Buttons at the bottom, outside the splitter
         button_layout = QHBoxLayout()
-        add_btn = QPushButton("Add"); add_btn.clicked.connect(self._add_action)
-        edit_btn = QPushButton("Edit"); edit_btn.clicked.connect(self._edit_action)
-        remove_btn = QPushButton("Remove"); remove_btn.clicked.connect(self._remove_action)
-        duplicate_btn = QPushButton("Duplicate"); duplicate_btn.clicked.connect(self._duplicate_action)
-        move_up_btn = QPushButton("Move Up"); move_up_btn.clicked.connect(self._move_action_up)
-        move_down_btn = QPushButton("Move Down"); move_down_btn.clicked.connect(self._move_action_down)
-        
-        button_layout.addWidget(add_btn)
-        button_layout.addWidget(edit_btn)
-        button_layout.addWidget(remove_btn)
-        button_layout.addWidget(duplicate_btn)
+        self.action_add_btn = QPushButton("Add")
+        self.action_add_btn.clicked.connect(self._add_action)
+        self.action_edit_btn = QPushButton("Edit")
+        self.action_edit_btn.clicked.connect(self._edit_action)
+        self.action_remove_btn = QPushButton("Remove")
+        self.action_remove_btn.clicked.connect(self._remove_action)
+        self.action_duplicate_btn = QPushButton("Duplicate")
+        self.action_duplicate_btn.clicked.connect(self._duplicate_action)
+        self.action_move_up_btn = QPushButton("Move Up")
+        self.action_move_up_btn.clicked.connect(self._move_action_up)
+        self.action_move_down_btn = QPushButton("Move Down")
+        self.action_move_down_btn.clicked.connect(self._move_action_down)
+
+        button_layout.addWidget(self.action_add_btn)
+        button_layout.addWidget(self.action_edit_btn)
+        button_layout.addWidget(self.action_remove_btn)
+        button_layout.addWidget(self.action_duplicate_btn)
         button_layout.addStretch()
-        button_layout.addWidget(move_up_btn)
-        button_layout.addWidget(move_down_btn)
+        button_layout.addWidget(self.action_move_up_btn)
+        button_layout.addWidget(self.action_move_down_btn)
         layout.addLayout(button_layout)
+
+        # Initialize in disabled state; will be enabled when a row is selected
+        self.action_edit_btn.setEnabled(False)
+        self.action_remove_btn.setEnabled(False)
+        self.action_duplicate_btn.setEnabled(False)
+        self.action_move_up_btn.setEnabled(False)
+        self.action_move_down_btn.setEnabled(False)
         
         self.action_table.cellDoubleClicked.connect(self._on_action_double_click)
         self.action_table.itemSelectionChanged.connect(self._on_action_selection_changed)
-        
+
         self._refresh_action_table()
         self._on_action_selection_changed() # Set initial state
 
@@ -173,16 +186,27 @@ class ButtonPropertiesDialog(QDialog):
     def _on_action_selection_changed(self):
         selected_rows = self.action_table.selectionModel().selectedRows()
         if not selected_rows:
+            self.action_edit_btn.setEnabled(False)
+            self.action_remove_btn.setEnabled(False)
+            self.action_duplicate_btn.setEnabled(False)
+            self.action_move_up_btn.setEnabled(False)
+            self.action_move_down_btn.setEnabled(False)
             self.action_properties_stack.setCurrentIndex(0)
             self.action_properties_group.setTitle("Action Properties")
             return
 
         row = selected_rows[0].row()
+        self.action_edit_btn.setEnabled(True)
+        self.action_remove_btn.setEnabled(True)
+        self.action_duplicate_btn.setEnabled(True)
+        self.action_move_up_btn.setEnabled(row > 0)
+        self.action_move_down_btn.setEnabled(row < len(self.properties['actions']) - 1)
+
         if row >= len(self.properties['actions']):
             self.action_properties_stack.setCurrentIndex(0)
             self.action_properties_group.setTitle("Action Properties")
             return
-            
+
         action_data = self.properties['actions'][row]
         action_type = action_data.get('action_type')
 
@@ -372,6 +396,7 @@ class ButtonPropertiesDialog(QDialog):
             if action_data:
                 self.properties['actions'].append(action_data)
                 self._refresh_action_table()
+                self._on_action_selection_changed()
 
     def _edit_action(self):
         selected_rows = self.action_table.selectionModel().selectedRows()
@@ -392,6 +417,8 @@ class ButtonPropertiesDialog(QDialog):
             if new_action_data:
                 self.properties['actions'][row] = new_action_data
                 self._refresh_action_table()
+                self.action_table.selectRow(row)
+                self._on_action_selection_changed()
 
     def _remove_action(self):
         selected_rows = self.action_table.selectionModel().selectedRows()
@@ -399,6 +426,7 @@ class ButtonPropertiesDialog(QDialog):
         row = selected_rows[0].row()
         del self.properties['actions'][row]
         self._refresh_action_table()
+        self._on_action_selection_changed()
 
     def _move_action_up(self):
         selected_rows = self.action_table.selectionModel().selectedRows()
@@ -408,6 +436,7 @@ class ButtonPropertiesDialog(QDialog):
             self.properties['actions'].insert(row - 1, self.properties['actions'].pop(row))
             self._refresh_action_table()
             self.action_table.selectRow(row - 1)
+            self._on_action_selection_changed()
 
     def _move_action_down(self):
         selected_rows = self.action_table.selectionModel().selectedRows()
@@ -417,6 +446,7 @@ class ButtonPropertiesDialog(QDialog):
             self.properties['actions'].insert(row + 1, self.properties['actions'].pop(row))
             self._refresh_action_table()
             self.action_table.selectRow(row + 1)
+            self._on_action_selection_changed()
 
     def _duplicate_action(self):
         """Duplicate the selected action"""
@@ -432,9 +462,10 @@ class ButtonPropertiesDialog(QDialog):
             # Insert the duplicated action after the original
             self.properties['actions'].insert(row + 1, duplicated_action)
             self._refresh_action_table()
-            
+
             # Select the newly duplicated action
             self.action_table.selectRow(row + 1)
+            self._on_action_selection_changed()
 
     def _populate_style_tab(self):
         # Overall layout for the tab
@@ -518,28 +549,35 @@ class ButtonPropertiesDialog(QDialog):
         
         # Buttons at the bottom, outside the splitter
         button_layout = QHBoxLayout()
-        add_btn = QPushButton("Add")
-        edit_btn = QPushButton("Edit")
-        remove_btn = QPushButton("Remove")
-        duplicate_btn = QPushButton("Duplicate")
-        move_up_btn = QPushButton("Move Up")
-        move_down_btn = QPushButton("Move Down")
-        
-        button_layout.addWidget(add_btn)
-        button_layout.addWidget(edit_btn)
-        button_layout.addWidget(remove_btn)
-        button_layout.addWidget(duplicate_btn)
+        self.style_add_btn = QPushButton("Add")
+        self.style_edit_btn = QPushButton("Edit")
+        self.style_remove_btn = QPushButton("Remove")
+        self.style_duplicate_btn = QPushButton("Duplicate")
+        self.style_move_up_btn = QPushButton("Move Up")
+        self.style_move_down_btn = QPushButton("Move Down")
+
+        button_layout.addWidget(self.style_add_btn)
+        button_layout.addWidget(self.style_edit_btn)
+        button_layout.addWidget(self.style_remove_btn)
+        button_layout.addWidget(self.style_duplicate_btn)
         button_layout.addStretch()
-        button_layout.addWidget(move_up_btn)
-        button_layout.addWidget(move_down_btn)
+        button_layout.addWidget(self.style_move_up_btn)
+        button_layout.addWidget(self.style_move_down_btn)
         layout.addLayout(button_layout)
 
-        add_btn.clicked.connect(self._add_style)
-        edit_btn.clicked.connect(self._edit_style)
-        remove_btn.clicked.connect(self._remove_style)
-        duplicate_btn.clicked.connect(self._duplicate_style)
-        move_up_btn.clicked.connect(self._move_style_up)
-        move_down_btn.clicked.connect(self._move_style_down)
+        self.style_add_btn.clicked.connect(self._add_style)
+        self.style_edit_btn.clicked.connect(self._edit_style)
+        self.style_remove_btn.clicked.connect(self._remove_style)
+        self.style_duplicate_btn.clicked.connect(self._duplicate_style)
+        self.style_move_up_btn.clicked.connect(self._move_style_up)
+        self.style_move_down_btn.clicked.connect(self._move_style_down)
+
+        # Initialize in disabled state; will be enabled when a row is selected
+        self.style_edit_btn.setEnabled(False)
+        self.style_remove_btn.setEnabled(False)
+        self.style_duplicate_btn.setEnabled(False)
+        self.style_move_up_btn.setEnabled(False)
+        self.style_move_down_btn.setEnabled(False)
 
         self.style_table.cellDoubleClicked.connect(self._on_style_double_click)
         self.style_table.itemSelectionChanged.connect(self._on_style_selection_changed)
@@ -590,6 +628,7 @@ class ButtonPropertiesDialog(QDialog):
         if 0 <= row < len(self.style_manager.conditional_styles):
             self.style_manager.remove_style(row)
             self._refresh_style_table()
+            self._on_style_selection_changed()
 
     def _duplicate_style(self):
         selected_rows = self.style_table.selectionModel().selectedRows()
@@ -602,6 +641,7 @@ class ButtonPropertiesDialog(QDialog):
             self.style_manager.conditional_styles.insert(row + 1, duplicated)
             self._refresh_style_table()
             self.style_table.selectRow(row + 1)
+            self._on_style_selection_changed()
 
     def _move_style_up(self):
         selected_rows = self.style_table.selectionModel().selectedRows()
@@ -613,6 +653,7 @@ class ButtonPropertiesDialog(QDialog):
             styles.insert(row - 1, styles.pop(row))
             self._refresh_style_table()
             self.style_table.selectRow(row - 1)
+            self._on_style_selection_changed()
 
     def _move_style_down(self):
         selected_rows = self.style_table.selectionModel().selectedRows()
@@ -624,6 +665,7 @@ class ButtonPropertiesDialog(QDialog):
             styles.insert(row + 1, styles.pop(row))
             self._refresh_style_table()
             self.style_table.selectRow(row + 1)
+            self._on_style_selection_changed()
 
     def _on_style_double_click(self, row, column):
         self._edit_style()
@@ -631,6 +673,11 @@ class ButtonPropertiesDialog(QDialog):
     def _on_style_selection_changed(self):
         selected_rows = self.style_table.selectionModel().selectedRows()
         if not selected_rows:
+            self.style_edit_btn.setEnabled(False)
+            self.style_remove_btn.setEnabled(False)
+            self.style_duplicate_btn.setEnabled(False)
+            self.style_move_up_btn.setEnabled(False)
+            self.style_move_down_btn.setEnabled(False)
             self.style_properties_stack.setCurrentIndex(0)
             self.style_properties_group.setTitle("Style Properties")
             self.preview_button.setStyleSheet("")
@@ -645,6 +692,11 @@ class ButtonPropertiesDialog(QDialog):
             return
 
         row = selected_rows[0].row()
+        self.style_edit_btn.setEnabled(True)
+        self.style_remove_btn.setEnabled(True)
+        self.style_duplicate_btn.setEnabled(True)
+        self.style_move_up_btn.setEnabled(row > 0)
+        self.style_move_down_btn.setEnabled(row < len(self.style_manager.conditional_styles) - 1)
         if row >= len(self.style_manager.conditional_styles):
             self.style_properties_stack.setCurrentIndex(0)
             return
