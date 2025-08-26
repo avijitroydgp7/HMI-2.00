@@ -703,12 +703,52 @@ class ButtonPropertiesDialog(QDialog):
         self.style_properties_stack.setCurrentIndex(1)
         self.style_properties_group.setTitle(f"Style Properties - {style.style_id}")
 
-        # Apply style to preview button using manager helper
-        temp_manager = ConditionalStyleManager()
-        temp_manager.add_style(copy.deepcopy(style))
-        base_props = temp_manager.get_active_style()
-        hover_props = temp_manager.get_active_style(state='hover')
-        click_props = temp_manager.get_active_style(state='click')
+        # Apply style to preview button using the style's own properties
+        # rather than running it through ``get_active_style`` which depends on
+        # condition evaluation.  This ensures the user sees the newly added or
+        # edited style immediately regardless of its condition configuration.
+
+        # ``ConditionalStyle._normalize_state`` guarantees all expected keys
+        # are present (font family, size, bold/italic, etc.).
+        base_props = ConditionalStyle._normalize_state(style.properties)
+        hover_props = ConditionalStyle._normalize_state(style.hover_properties)
+        click_props = ConditionalStyle._normalize_state(style.click_properties)
+
+        # Placeholder tag values that would satisfy the style's condition.  The
+        # values are not currently used because the preview bypasses condition
+        # checks, but they are provided for completeness should future preview
+        # logic require condition evaluation.
+        cond_cfg = getattr(style, "condition_data", {"mode": "Ordinary"})
+        _tag_values = {}
+        tag_def = cond_cfg.get("tag") or {}
+        tag_name = (
+            tag_def.get("tag_name")
+            or (tag_def.get("value") or {}).get("tag_name")
+        )
+        if tag_name:
+            mode = cond_cfg.get("mode")
+            if mode == "On":
+                _tag_values[tag_name] = 1
+            elif mode == "Off":
+                _tag_values[tag_name] = 0
+            elif mode == "Range":
+                op = cond_cfg.get("operator", "==")
+                if op in ("between", "outside"):
+                    lower = cond_cfg.get("lower", {}).get("value")
+                    upper = cond_cfg.get("upper", {}).get("value")
+                    try:
+                        lower_val = float(lower)
+                        upper_val = float(upper)
+                        _tag_values[tag_name] = (lower_val + upper_val) / 2
+                    except Exception:
+                        _tag_values[tag_name] = 0
+                else:
+                    operand = cond_cfg.get("operand", {}).get("value")
+                    try:
+                        _tag_values[tag_name] = float(operand)
+                    except Exception:
+                        _tag_values[tag_name] = 0
+
 
         # Build QSS for preview including font properties
         base_font_family_name = base_props.get('font_family', '')
@@ -767,6 +807,7 @@ class ButtonPropertiesDialog(QDialog):
             "QPushButton {\n"
             f"    background-color: {base_props.get('background_color', 'transparent')};\n"
             f"    color: {base_props.get('text_color', '#000000')};\n"
+
             f"    border-radius: {base_props.get('border_radius', 0)}px;\n"
             f"    font-family: {base_font_family};\n"
             f"    font-size: {base_font_size}pt;\n"
@@ -792,10 +833,10 @@ class ButtonPropertiesDialog(QDialog):
             "}\n"
         )
         self.preview_button.setStyleSheet(qss)
-        self.preview_button.set_icon(base_props.get('icon', ''))
-        self.preview_button.set_hover_icon(hover_props.get('icon', ''))
-        self.preview_button.set_click_icon(click_props.get('icon', ''))
-        icon_sz = base_props.get('icon_size', 48)
+        self.preview_button.set_icon(style.icon)
+        self.preview_button.set_hover_icon(style.hover_icon)
+        self.preview_button.set_click_icon(style.click_icon)
+        icon_sz = style.properties.get('icon_size', 48)
         self.preview_button.set_icon_size(icon_sz)
 
         text = style.text_value if style.text_type == "Text" else ""
