@@ -10,6 +10,7 @@ from PyQt6.QtCore import Qt
 from typing import Dict, Optional
 
 from ..widgets import TagSelector, CollapsibleBox
+from .range_helpers import DataTypeMapper, validate_range_section
 
 class BitActionDialog(QDialog):
     """
@@ -158,7 +159,9 @@ class BitActionDialog(QDialog):
         layout = QGridLayout(range_group)
         layout.setSpacing(10)
         
-        allowed_types = ["INT16", "INT32", "REAL"]
+        allowed_types = [
+            DataTypeMapper.normalize_type(t) for t in ["INT", "DINT", "REAL"]
+        ]
         
         op1_layout = QVBoxLayout()
         self.range_operand1_selector = TagSelector(allowed_tag_types=allowed_types)
@@ -269,7 +272,7 @@ class BitActionDialog(QDialog):
                 trigger_is_valid = False
         elif trigger_mode == "Range":
             if hasattr(self, 'range_operand1_selector'):
-                trigger_is_valid, range_error = self._validate_range_section(
+                trigger_is_valid, range_error = validate_range_section(
                     self.range_operand1_selector,
                     self.range_operator_combo.currentText(),
                     self.range_operand2_selector,
@@ -290,45 +293,6 @@ class BitActionDialog(QDialog):
             ok_button.setEnabled(is_valid)
 
         self.error_label.setText(error_msg or "")
-
-    def _validate_range_section(self, op1_selector, operator, op2_selector, lower_selector, upper_selector, prefix="Range Trigger"):
-        error_msg = None
-        if not op1_selector.get_data():
-            error_msg = f"{prefix}: Operand 1 must be specified."
-        elif operator in ["between", "outside"]:
-            if not lower_selector.get_data():
-                error_msg = f"{prefix}: Lower Bound must be specified."
-            elif not upper_selector.get_data():
-                error_msg = f"{prefix}: Upper Bound must be specified."
-        else:
-            if not op2_selector.get_data():
-                error_msg = f"{prefix}: Operand 2 must be specified."
-
-        if error_msg:
-            return False, error_msg
-
-        op1_type = op1_selector.current_tag_data.get('data_type') if op1_selector.current_tag_data else None
-        if op1_type:
-            op1_type = {"INT": "INT16", "DINT": "INT32"}.get(op1_type, op1_type)
-            if operator in ["between", "outside"]:
-                lower_type = lower_selector.current_tag_data.get('data_type') if lower_selector.current_tag_data else None
-                if lower_type:
-                    lower_type = {"INT": "INT16", "DINT": "INT32"}.get(lower_type, lower_type)
-                    if lower_type != op1_type:
-                        return False, "Data type must match Operand 1."
-                upper_type = upper_selector.current_tag_data.get('data_type') if upper_selector.current_tag_data else None
-                if upper_type:
-                    upper_type = {"INT": "INT16", "DINT": "INT32"}.get(upper_type, upper_type)
-                    if upper_type != op1_type:
-                        return False, "Data type must match Operand 1."
-            else:
-                op2_type = op2_selector.current_tag_data.get('data_type') if op2_selector.current_tag_data else None
-                if op2_type:
-                    op2_type = {"INT": "INT16", "DINT": "INT32"}.get(op2_type, op2_type)
-                    if op2_type != op1_type:
-                        return False, "Data type must match Operand 1."
-
-        return True, None
 
     def get_data(self) -> Optional[Dict]:
         target_tag_data = self.target_tag_selector.get_data()

@@ -1,0 +1,425 @@
+{
+    "project_info": {
+        "author": "",
+        "company": "",
+        "description": "",
+        "creation_date": "2025-08-26 17:51:48",
+        "modification_date": "2025-08-26 17:55:07",
+        "save_history": [
+            "Project Created on 2025-08-26 17:51:48",
+            "Saved on 2025-08-26 17:54:13",
+            "Saved on 2025-08-26 17:55:07"
+        ]
+    },
+    "screens": {
+        "2cbe6eaa-2353-45de-b37e-80f549201f40": {
+            "number": 1,
+            "name": "1",
+            "description": "",
+            "size": {
+                "width": 1920,
+                "height": 1080
+            },
+            "style": {
+                "transparent": false
+            },
+            "type": "base",
+            "id": "2cbe6eaa-2353-45de-b37e-80f549201f40",
+            "children": [
+                {
+                    "instance_id": "d803d1c6-77d3-4bc6-88a1-e4e11fc4ffb8",
+                    "tool_type": "button",
+                    "properties": {
+                        "label": "Button",
+                        "size": {
+                            "width": 100,
+                            "height": 40
+                        },
+                        "style_id": "default_rounded",
+                        "background_color": "#5a6270",
+                        "text_color": "#ffffff",
+                        "border_radius": 20,
+                        "hover_properties": {
+                            "background_color": "#6b7383",
+                            "text_color": "#ffffff"
+                        },
+                        "click_properties": {
+                            "background_color": "#4a515c",
+                            "text_color": "#ffffff"
+                        },
+                        "position": {
+                            "x": 217,
+                            "y": 149
+                        }
+                    }
+                }
+            ]
+        }
+    },
+    "tag_databases": {
+        "7ac5de69-7a29-41ac-a3e5-49063243b05d": {
+            "name": "1",
+            "tags": [
+                {
+                    "name": "bb",
+                    "data_type": "BOOL",
+                    "comment": "",
+                    "length": 0,
+                    "array_dims": [],
+                    "value": false
+                },
+                {
+                    "name": "ii",
+                    "data_type": "INT",
+                    "comment": "",
+                    "length": 0,
+                    "array_dims": [],
+                    "value": 0
+                },
+                {
+                    "name": "dddd",
+                    "data_type": "DINT",
+                    "comment": "",
+                    "length": 0,
+                    "array_dims": [],
+                    "value": 0
+                },
+                {
+                    "name": "rrr",
+                    "data_type": "REAL",
+                    "comment": "",
+                    "length": 0,
+                    "array_dims": [],
+                    "value": 0
+                },
+                {
+                    "name": "ssss",
+                    "data_type": "STRING",
+                    "comment": "",
+                    "length": 1,
+                    "array_dims": [],
+                    "value": ""
+                },
+                {
+                    "name": "bb_a",
+                    "data_type": "BOOL",
+                    "comment": "",
+                    "length": 0,
+                    "array_dims": [
+                        5,
+                        5
+                    ],
+                    "value": [
+                        [
+                            false,
+                            false,
+                            false,
+                            false,
+                            false
+                        ],
+                        [
+                            false,
+                            false,
+                            false,
+                            false,
+                            false
+                        ],
+                        [
+                            false,
+                            false,
+                            false,
+                            false,
+                            false
+                        ],
+                        [
+                            false,
+                            false,
+                            false,
+                            false,
+                            false
+                        ],
+                        [
+                            false,
+                            false,
+                            false,
+                            false,
+                            false
+                        ]
+                    ]
+                },
+                {
+                    "name": "ii_a",
+                    "data_type": "INT",
+                    "comment": "",
+                    "length": 0,
+                    "array_dims": [
+                        5,
+                        5
+                    ],
+                    "value": [
+                        [
+                            0,
+                            0,
+                            0,
+                            0,
+                            0
+                        ],
+                        [
+                            0,
+                            0,
+                            0,
+                            0,
+                            0
+                        ],
+                        [
+                            0,
+                            0,
+                            0,
+                            0,
+                            0
+                        ],
+                        [
+                            0,
+                            0,
+                            0,
+                            0,
+                            0
+                        ],
+                        [
+                            0,
+                            0,
+                            0,
+                            0,
+                            0
+                        ]
+                    ]
+                },
+                {
+                    "name": "dd_a",
+                    "data_type": "DINT",
+                    "comment": "",
+                    "length": 0,
+                    "array_dims": [
+                        7,
+                        7
+                    ],
+                    "value": [
+                        [
+                            0,
+                            0,
+                            0,
+                            0,
+                            0,
+                            0,
+                            0
+                        ],
+                        [
+                            0,
+                            0,
+                            0,
+                            0,
+                            0,
+                            0,
+                            0
+                        ],
+                        [
+                            0,
+                            0,
+                            0,
+                            0,
+                            0,
+                            0,
+                            0
+                        ],
+                        [
+                            0,
+                            0,
+                            0,
+                            0,
+                            0,
+                            0,
+                            0
+                        ],
+                        [
+                            0,
+                            0,
+                            0,
+                            0,
+                            0,
+                            0,
+                            0
+                        ],
+                        [
+                            0,
+                            0,
+                            0,
+                            0,
+                            0,
+                            0,
+                            0
+                        ],
+                        [
+                            0,
+                            0,
+                            0,
+                            0,
+                            0,
+                            0,
+                            0
+                        ]
+                    ]
+                },
+                {
+                    "name": "rrr_a",
+                    "data_type": "REAL",
+                    "comment": "",
+                    "length": 0,
+                    "array_dims": [
+                        6,
+                        7
+                    ],
+                    "value": [
+                        [
+                            0,
+                            0,
+                            0,
+                            0,
+                            0,
+                            0,
+                            0
+                        ],
+                        [
+                            0,
+                            0,
+                            0,
+                            0,
+                            0,
+                            0,
+                            0
+                        ],
+                        [
+                            0,
+                            0,
+                            0,
+                            0,
+                            0,
+                            0,
+                            0
+                        ],
+                        [
+                            0,
+                            0,
+                            0,
+                            0,
+                            0,
+                            0,
+                            0
+                        ],
+                        [
+                            0,
+                            0,
+                            0,
+                            0,
+                            0,
+                            0,
+                            0
+                        ],
+                        [
+                            0,
+                            0,
+                            0,
+                            0,
+                            0,
+                            0,
+                            0
+                        ]
+                    ]
+                },
+                {
+                    "name": "sssss",
+                    "data_type": "STRING",
+                    "comment": "",
+                    "length": 10,
+                    "array_dims": [
+                        7,
+                        8
+                    ],
+                    "value": [
+                        [
+                            "",
+                            "",
+                            "",
+                            "",
+                            "",
+                            "",
+                            "",
+                            ""
+                        ],
+                        [
+                            "",
+                            "",
+                            "",
+                            "",
+                            "",
+                            "",
+                            "",
+                            ""
+                        ],
+                        [
+                            "",
+                            "",
+                            "",
+                            "",
+                            "",
+                            "",
+                            "",
+                            ""
+                        ],
+                        [
+                            "",
+                            "",
+                            "",
+                            "",
+                            "",
+                            "",
+                            "",
+                            ""
+                        ],
+                        [
+                            "",
+                            "",
+                            "",
+                            "",
+                            "",
+                            "",
+                            "",
+                            ""
+                        ],
+                        [
+                            "",
+                            "",
+                            "",
+                            "",
+                            "",
+                            "",
+                            "",
+                            ""
+                        ],
+                        [
+                            "",
+                            "",
+                            "",
+                            "",
+                            "",
+                            "",
+                            "",
+                            ""
+                        ]
+                    ]
+                }
+            ],
+            "id": "7ac5de69-7a29-41ac-a3e5-49063243b05d"
+        }
+    },
+    "comment_groups": {}
+}

@@ -10,30 +10,7 @@ from PyQt6.QtCore import Qt
 from typing import Dict, Optional
 
 from ..widgets import TagSelector, CollapsibleBox
-
-
-class DataTypeMapper:
-    """Centralized data type mapping to ensure consistency."""
-    
-    # Mapping from internal types to standardized types
-    TYPE_MAPPING = {
-        "INT": "INT16",
-        "DINT": "INT32",
-        "REAL": "REAL",
-        "BOOL": "BOOL"
-    }
-    
-    @classmethod
-    def normalize_type(cls, data_type: str) -> str:
-        """Convert internal data type to standardized type."""
-        return cls.TYPE_MAPPING.get(data_type, data_type)
-    
-    @classmethod
-    def are_types_compatible(cls, type1: str, type2: str) -> bool:
-        """Check if two data types are compatible."""
-        normalized_type1 = cls.normalize_type(type1)
-        normalized_type2 = cls.normalize_type(type2)
-        return normalized_type1 == normalized_type2
+from .range_helpers import DataTypeMapper, validate_range_section
 
 class WordActionDialog(QDialog):
     """
@@ -113,7 +90,9 @@ class WordActionDialog(QDialog):
 
         self.target_tag_selector = TagSelector()
         self.target_tag_selector.main_tag_selector.set_mode_fixed("Tag")
-        self.target_tag_selector.set_allowed_tag_types(["INT16", "INT32", "REAL"])
+        self.target_tag_selector.set_allowed_tag_types(
+            [DataTypeMapper.normalize_type(t) for t in ["INT", "DINT", "REAL"]]
+        )
         target_layout.addWidget(QLabel("<b>Target Tag</b>"))
         target_layout.addWidget(self.target_tag_selector)
         target_layout.addStretch(1)
@@ -295,7 +274,9 @@ class WordActionDialog(QDialog):
         layout = QGridLayout(range_group)
         layout.setSpacing(10)
         
-        allowed_types = ["INT16", "INT32", "REAL"]
+        allowed_types = [
+            DataTypeMapper.normalize_type(t) for t in ["INT", "DINT", "REAL"]
+        ]
         
         op1_layout = QVBoxLayout()
         self.range_operand1_selector = TagSelector(allowed_tag_types=allowed_types)
@@ -382,7 +363,9 @@ class WordActionDialog(QDialog):
         self.else_selector.set_allowed_tag_types(allowed_types)
 
     def _on_range_operand1_selected(self, tag_data: Optional[Dict]):
-        allowed_types = ["INT16", "INT32", "REAL"]
+        allowed_types = [
+            DataTypeMapper.normalize_type(t) for t in ["INT", "DINT", "REAL"]
+        ]
         if tag_data and tag_data.get('data_type'):
             normalized_type = DataTypeMapper.normalize_type(tag_data.get('data_type'))
             allowed_types = [normalized_type]
@@ -475,7 +458,7 @@ class WordActionDialog(QDialog):
         if not hasattr(self, 'range_operand1_selector'):
             return True, None
 
-        return self._validate_range_section(
+        return validate_range_section(
             self.range_operand1_selector,
             self.range_operator_combo.currentText(),
             self.range_operand2_selector,
@@ -489,7 +472,7 @@ class WordActionDialog(QDialog):
         if not self.conditional_reset_group.isChecked():
             return True, None
 
-        valid, error = self._validate_range_section(
+        valid, error = validate_range_section(
             self.operand1_selector,
             self.operator_combo.currentText(),
             self.cond_operand2_selector,
@@ -522,40 +505,6 @@ class WordActionDialog(QDialog):
         else:
             self.conditional_reset_group.setStatus(CollapsibleBox.Status.NEUTRAL)
 
-    def _validate_range_section(self, op1_selector, operator, op2_selector, lower_selector, upper_selector, prefix="Range Trigger"):
-        error_msg = None
-        if not op1_selector.get_data():
-            error_msg = f"{prefix}: Operand 1 must be specified."
-        elif operator in ["between", "outside"]:
-            if not lower_selector.get_data():
-                error_msg = f"{prefix}: Lower Bound must be specified."
-            elif not upper_selector.get_data():
-                error_msg = f"{prefix}: Upper Bound must be specified."
-        else:
-            if not op2_selector.get_data():
-                error_msg = f"{prefix}: Operand 2 must be specified."
-
-        if error_msg:
-            return False, error_msg
-
-        # Validate data type compatibility using centralized mapper
-        op1_type = op1_selector.current_tag_data.get('data_type') if op1_selector.current_tag_data else None
-        if op1_type:
-            op1_type = DataTypeMapper.normalize_type(op1_type)
-            if operator in ["between", "outside"]:
-                lower_type = lower_selector.current_tag_data.get('data_type') if lower_selector.current_tag_data else None
-                if lower_type and not DataTypeMapper.are_types_compatible(lower_type, op1_type):
-                    return False, "Data type must match Operand 1."
-
-                upper_type = upper_selector.current_tag_data.get('data_type') if upper_selector.current_tag_data else None
-                if upper_type and not DataTypeMapper.are_types_compatible(upper_type, op1_type):
-                    return False, "Data type must match Operand 1."
-            else:
-                op2_type = op2_selector.current_tag_data.get('data_type') if op2_selector.current_tag_data else None
-                if op2_type and not DataTypeMapper.are_types_compatible(op2_type, op1_type):
-                    return False, "Data type must match Operand 1."
-
-        return True, None
 
     # -------------------------------------------------------------------------
     # Data Load/Save
