@@ -564,8 +564,20 @@ class ConditionalStyleManager(QObject):
     def __post_init__(self):
         super().__init__(self.parent)
     
+    def _generate_unique_style_id(self, base_id: str) -> str:
+        existing = {s.style_id for s in self.conditional_styles}
+        if base_id not in existing:
+            return base_id
+        suffix = 1
+        new_id = f"{base_id}_{suffix}"
+        while new_id in existing:
+            suffix += 1
+            new_id = f"{base_id}_{suffix}"
+        return new_id
+
     def add_style(self, style: ConditionalStyle):
         """Add a new conditional style"""
+        style.style_id = self._generate_unique_style_id(style.style_id)
         self.conditional_styles.append(style)
         self.styles_changed.emit()
     
