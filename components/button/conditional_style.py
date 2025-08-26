@@ -194,19 +194,10 @@ _GRADIENT_STYLES = {
 # ---------------------------------------------------------------------------
 # Built-in button styles
 # ---------------------------------------------------------------------------
-# Each style dict may include optional metadata:
-#   tooltip      - short hint shown to the user
-#   icon fields  - ``icon``, ``hover_icon`` and ``click_icon`` for SVG paths
-#   animation    - mapping compatible with :class:`AnimationProperties`
 _DEFAULT_STYLES = [
     {
         "id": "default_rounded",
         "name": "Default Rounded",
-        "tooltip": "Rounded gray button",
-        "icon": "",
-        "hover_icon": "",
-        "click_icon": "",
-        "animation": {"enabled": False, "type": "pulse", "intensity": 1.0},
         "properties": {
             "background_color": "#5a6270",
             "text_color": "#ffffff",
@@ -224,11 +215,6 @@ _DEFAULT_STYLES = [
     {
         "id": "success_square",
         "name": "Success Square",
-        "tooltip": "Green confirmation button",
-        "icon": "",
-        "hover_icon": "",
-        "click_icon": "",
-        "animation": {"enabled": False, "type": "pulse", "intensity": 1.0},
         "properties": {
             "background_color": "#4CAF50",
             "text_color": "#ffffff",
@@ -246,11 +232,6 @@ _DEFAULT_STYLES = [
     {
         "id": "warning_pill",
         "name": "Warning Pill",
-        "tooltip": "Warning orange pill",
-        "icon": "",
-        "hover_icon": "",
-        "click_icon": "",
-        "animation": {"enabled": False, "type": "pulse", "intensity": 1.0},
         "properties": {
             "background_color": "#ff9800",
             "text_color": "#000000",
@@ -268,11 +249,6 @@ _DEFAULT_STYLES = [
     {
         "id": "danger_flat",
         "name": "Danger Flat",
-        "tooltip": "Danger red flat button",
-        "icon": "",
-        "hover_icon": "",
-        "click_icon": "",
-        "animation": {"enabled": False, "type": "pulse", "intensity": 1.0},
         "properties": {
             "background_color": "#f44336",
             "text_color": "#ffffff",
@@ -290,11 +266,6 @@ _DEFAULT_STYLES = [
     {
         "id": "gradient_blue",
         "name": "Gradient Blue",
-        "tooltip": "Blue gradient button",
-        "icon": "",
-        "hover_icon": "",
-        "click_icon": "",
-        "animation": {"enabled": False, "type": "pulse", "intensity": 1.0},
         "properties": {
             "background_type": "Linear Gradient",
             "background_color": "#4facfe",
@@ -318,11 +289,6 @@ _DEFAULT_STYLES = [
     {
         "id": "outline_primary",
         "name": "Outline Primary",
-        "tooltip": "Primary outline button",
-        "icon": "",
-        "hover_icon": "",
-        "click_icon": "",
-        "animation": {"enabled": False, "type": "pulse", "intensity": 1.0},
         "properties": {
             "background_color": "transparent",
             "text_color": "#1976d2",
@@ -343,11 +309,6 @@ _DEFAULT_STYLES = [
     {
         "id": "neumorphic_soft",
         "name": "Neumorphic Soft",
-        "tooltip": "Soft neumorphic style",
-        "icon": "",
-        "hover_icon": "",
-        "click_icon": "",
-        "animation": {"enabled": False, "type": "pulse", "intensity": 1.0},
         "properties": {
             "background_color": "#e0e0e0",
             "text_color": "#333333",
@@ -366,11 +327,8 @@ _DEFAULT_STYLES = [
     {
         "id": "icon_play",
         "name": "Icon Play",
-        "tooltip": "Circular play icon button",
         "icon": "lib/icon/bolt-circle-svgrepo-com.svg",
-        "hover_icon": "lib/icon/bolt-circle-svgrepo-com.svg",
         "click_icon": "lib/icon/bolt-circle-svgrepo-com.svg",
-        "animation": {"enabled": False, "type": "pulse", "intensity": 1.0},
         "properties": {
             "background_color": "#ffffff",
             "text_color": "#333333",
@@ -437,12 +395,6 @@ class ConditionalStyle:
         determine when this style is active.  String expressions are evaluated
         with tag names available as variables, while callables receive the
         ``tag_values`` dictionary.  ``None`` means the style always applies.
-    tooltip:
-        Short descriptive text shown when the user hovers over the button.
-    icon, hover_icon, click_icon:
-        SVG icon paths for the base, hover and click states respectively.
-    animation:
-        Basic animation settings represented by :class:`AnimationProperties`.
     """
     style_id: str = ""
     condition: Optional[Union[str, Callable[[Dict[str, Any]], bool]]] = None
@@ -609,21 +561,8 @@ class ConditionalStyleManager(QObject):
     def __post_init__(self):
         super().__init__(self.parent)
     
-    def generate_style_id(self) -> str:
-        """Return a unique style identifier of the form ``style_N``."""
-        existing = {s.style_id for s in self.conditional_styles if s.style_id}
-        idx = 1
-        while f"style_{idx}" in existing:
-            idx += 1
-        return f"style_{idx}"
-
-    def _ensure_style_id(self, style: ConditionalStyle):
-        if not style.style_id:
-            style.style_id = self.generate_style_id()
-
     def add_style(self, style: ConditionalStyle):
         """Add a new conditional style"""
-        self._ensure_style_id(style)
         self.conditional_styles.append(style)
         self.styles_changed.emit()
     
@@ -636,7 +575,6 @@ class ConditionalStyleManager(QObject):
     def update_style(self, index: int, style: ConditionalStyle):
         """Update an existing conditional style"""
         if 0 <= index < len(self.conditional_styles):
-            self._ensure_style_id(style)
             self.conditional_styles[index] = style
             self.styles_changed.emit()
     
@@ -826,16 +764,6 @@ class ConditionalStyleEditorDialog(QDialog):
         self._hover_text_color = self.style.hover_properties.get("text_color", "")
         self._click_text_color = self.style.click_properties.get("text_color", "")
 
-        # Ensure a style ID is always present so it can be edited by the user
-        # and shown in the properties dialog.  When creating a new style the
-        # parent ``ButtonPropertiesDialog`` provides a ``style_manager`` from
-        # which we request the next available identifier.
-        if not self.style.style_id and parent is not None and hasattr(parent, "style_manager"):
-            try:
-                self.style.style_id = parent.style_manager.generate_style_id()
-            except Exception:
-                self.style.style_id = "style_1"
-
         # Initialize background-related colors so early update/preview calls
         # have default values to work with.  These will be overwritten once
         # the proper colour scheme is applied via ``set_initial_colors``.
@@ -851,12 +779,9 @@ class ConditionalStyleEditorDialog(QDialog):
         main_layout.setRowStretch(2, 1)
 
         info_layout = QGridLayout()
-        self.style_id_edit = QLineEdit(self.style.style_id)
-        info_layout.addWidget(QLabel("Style ID:"), 0, 0)
-        info_layout.addWidget(self.style_id_edit, 0, 1)
         self.tooltip_edit = QLineEdit(self.style.tooltip)
-        info_layout.addWidget(QLabel("Tooltip:"), 1, 0)
-        info_layout.addWidget(self.tooltip_edit, 1, 1)
+        info_layout.addWidget(QLabel("Tooltip:"), 0, 0)
+        info_layout.addWidget(self.tooltip_edit, 0, 1)
         main_layout.addLayout(info_layout, 0, 0, 1, 2)
 
         self.init_colors()
@@ -2277,9 +2202,8 @@ class ConditionalStyleEditorDialog(QDialog):
                     self.range_operand_selector.get_data() if hasattr(self, 'range_operand_selector') else None
                 )
 
-        style_id = self.style_id_edit.text().strip()
         style = ConditionalStyle(
-            style_id=style_id,
+            style_id=self.style.style_id,
             tooltip=self.tooltip_edit.text(),
             icon=self.base_controls["icon_edit"].text(),
             hover_icon=self.hover_controls["icon_edit"].text(),

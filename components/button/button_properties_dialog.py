@@ -6,7 +6,6 @@ from PyQt6.QtWidgets import (
     QSplitter, QGroupBox, QStackedWidget, QDialog
 )
 from PyQt6.QtCore import Qt
-from PyQt6.QtGui import QIcon, QColor
 from typing import Dict, Any, Optional
 import copy
 
@@ -444,18 +443,15 @@ class ButtonPropertiesDialog(QDialog):
         
         # Left panel: Style table
         self.style_table = QTableWidget()
-        self.style_table.setColumnCount(4)
-        self.style_table.setHorizontalHeaderLabels(["#", "Condition", "Preview", "Style ID"])
+        self.style_table.setColumnCount(3)
+        self.style_table.setHorizontalHeaderLabels(["#", "Style ID"])
         self.style_table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         self.style_table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
         self.style_table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
         self.style_table.verticalHeader().setVisible(False)
         header = self.style_table.horizontalHeader()
         header.setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
-        header.setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
-        header.setSectionResizeMode(2, QHeaderView.ResizeMode.Fixed)
-        header.setSectionResizeMode(3, QHeaderView.ResizeMode.ResizeToContents)
-        self.style_table.setColumnWidth(2, 120)
+        header.setSectionResizeMode(1, QHeaderView.ResizeMode.ResizeToContents)
         splitter.addWidget(self.style_table)
 
         # Right panel: Style properties and preview
@@ -547,52 +543,7 @@ class ButtonPropertiesDialog(QDialog):
         for i, style in enumerate(self.style_manager.conditional_styles):
             self.style_table.insertRow(i)
             self.style_table.setItem(i, 0, QTableWidgetItem(str(i + 1)))
-            self.style_table.setItem(i, 1, QTableWidgetItem(self._describe_condition(style)))
-
-            preview_item = QTableWidgetItem()
-            bg = style.properties.get("background_color")
-            if bg:
-                preview_item.setBackground(QColor(bg))
-            fg = style.properties.get("text_color")
-            if fg:
-                preview_item.setForeground(QColor(fg))
-            text = style.text_value if getattr(style, "text_type", "") == "Text" else ""
-            preview_item.setText(text)
-            icon_path = style.properties.get("icon")
-            if icon_path:
-                preview_item.setIcon(QIcon(icon_path))
-            self.style_table.setItem(i, 2, preview_item)
-            self.style_table.setItem(i, 3, QTableWidgetItem(style.style_id))
-
-    def _describe_condition(self, style: ConditionalStyle) -> str:
-        condition = getattr(style, 'condition', None)
-        if condition:
-            return str(condition)
-        cfg = getattr(style, 'condition_data', {}) or {}
-        mode = cfg.get('mode', 'Ordinary')
-        if mode == 'Ordinary':
-            return 'Always'
-        tag = self._format_value(cfg.get('tag'))
-        if mode in ('On', 'Off'):
-            return f"{tag} is {mode}"
-        if mode == 'Range':
-            op = cfg.get('operator', '==')
-            if op in ('between', 'outside'):
-                lower = self._format_value(cfg.get('lower'))
-                upper = self._format_value(cfg.get('upper'))
-                word = 'between' if op == 'between' else 'outside'
-                return f"{tag} {word} {lower} and {upper}"
-            operand = self._format_value(cfg.get('operand'))
-            return f"{tag} {op} {operand}"
-        return ''
-
-    def _format_value(self, data: Optional[Dict[str, Any]]) -> str:
-        if not data:
-            return '?' 
-        value = data.get('value')
-        if data.get('source') == 'tag' and isinstance(value, dict):
-            return value.get('tag_name', '')
-        return str(value)
+            self.style_table.setItem(i, 1, QTableWidgetItem(style.style_id))
 
     def _add_style(self):
         dialog = ConditionalStyleEditorDialog(self)
@@ -601,9 +552,6 @@ class ButtonPropertiesDialog(QDialog):
             if new_style:
                 self.style_manager.add_style(new_style)
                 self._refresh_style_table()
-                row = len(self.style_manager.conditional_styles) - 1
-                self.style_table.selectRow(row)
-                self._on_style_selection_changed()
 
     def _edit_style(self):
         selected_rows = self.style_table.selectionModel().selectedRows()
@@ -620,9 +568,6 @@ class ButtonPropertiesDialog(QDialog):
                 # Use manager helper to ensure internal structures stay consistent
                 self.style_manager.update_style(row, updated_style)
                 self._refresh_style_table()
-                self.style_table.selectRow(row)
-                self._on_style_selection_changed()
-
 
     def _remove_style(self):
         selected_rows = self.style_table.selectionModel().selectedRows()
@@ -644,7 +589,6 @@ class ButtonPropertiesDialog(QDialog):
             self.style_manager.conditional_styles.insert(row + 1, duplicated)
             self._refresh_style_table()
             self.style_table.selectRow(row + 1)
-            self._on_style_selection_changed()
 
     def _move_style_up(self):
         selected_rows = self.style_table.selectionModel().selectedRows()
@@ -703,140 +647,33 @@ class ButtonPropertiesDialog(QDialog):
         self.style_properties_stack.setCurrentIndex(1)
         self.style_properties_group.setTitle(f"Style Properties - {style.style_id}")
 
-        # Apply style to preview button using the style's own properties
-        # rather than running it through ``get_active_style`` which depends on
-        # condition evaluation.  This ensures the user sees the newly added or
-        # edited style immediately regardless of its condition configuration.
-
-        # ``ConditionalStyle._normalize_state`` guarantees all expected keys
-        # are present (font family, size, bold/italic, etc.).
-        base_props = ConditionalStyle._normalize_state(style.properties)
-        hover_props = ConditionalStyle._normalize_state(style.hover_properties)
-        click_props = ConditionalStyle._normalize_state(style.click_properties)
-
-        # Placeholder tag values that would satisfy the style's condition.  The
-        # values are not currently used because the preview bypasses condition
-        # checks, but they are provided for completeness should future preview
-        # logic require condition evaluation.
-        cond_cfg = getattr(style, "condition_data", {"mode": "Ordinary"})
-        _tag_values = {}
-        tag_def = cond_cfg.get("tag") or {}
-        tag_name = (
-            tag_def.get("tag_name")
-            or (tag_def.get("value") or {}).get("tag_name")
-        )
-        if tag_name:
-            mode = cond_cfg.get("mode")
-            if mode == "On":
-                _tag_values[tag_name] = 1
-            elif mode == "Off":
-                _tag_values[tag_name] = 0
-            elif mode == "Range":
-                op = cond_cfg.get("operator", "==")
-                if op in ("between", "outside"):
-                    lower = cond_cfg.get("lower", {}).get("value")
-                    upper = cond_cfg.get("upper", {}).get("value")
-                    try:
-                        lower_val = float(lower)
-                        upper_val = float(upper)
-                        _tag_values[tag_name] = (lower_val + upper_val) / 2
-                    except Exception:
-                        _tag_values[tag_name] = 0
-                else:
-                    operand = cond_cfg.get("operand", {}).get("value")
-                    try:
-                        _tag_values[tag_name] = float(operand)
-                    except Exception:
-                        _tag_values[tag_name] = 0
-
-
-        # Build QSS for preview including font properties
-        base_font_family_name = base_props.get('font_family', '')
-        base_font_family = f"'{base_font_family_name}'" if base_font_family_name else 'inherit'
-        base_font_size = base_props.get('font_size', 10)
-        base_font_weight = 'bold' if base_props.get('bold', False) else 'normal'
-        base_font_style = 'italic' if base_props.get('italic', False) else 'normal'
-
-        hover_font_family_name = hover_props.get('font_family', base_font_family_name)
-        hover_font_family = (
-            f"'{hover_font_family_name}'" if hover_font_family_name else base_font_family
-        )
-        hover_font_size = hover_props.get('font_size', base_font_size)
-        hover_font_weight = 'bold' if hover_props.get('bold', base_props.get('bold', False)) else 'normal'
-        hover_font_style = 'italic' if hover_props.get('italic', base_props.get('italic', False)) else 'normal'
-
-        click_font_family_name = click_props.get('font_family', hover_font_family_name)
-        click_font_family = (
-            f"'{click_font_family_name}'" if click_font_family_name else hover_font_family
-        )
-        click_font_size = click_props.get('font_size', hover_font_size)
-        click_font_weight = (
-            'bold'
-            if click_props.get(
-                'bold', hover_props.get('bold', base_props.get('bold', False))
-            )
-            else 'normal'
-        )
-        click_font_style = (
-            'italic'
-            if click_props.get(
-                'italic', hover_props.get('italic', base_props.get('italic', False))
-            )
-            else 'normal'
-        )
-
-        h_align = base_props.get('h_align')
-        v_align = base_props.get('v_align')
-        alignment_css = ""
-        if h_align:
-            alignment_css += f"    text-align: {h_align};\n"
-        if h_align or v_align:
-            h_flag = {
-                'left': 'AlignLeft',
-                'center': 'AlignHCenter',
-                'right': 'AlignRight',
-            }.get(h_align, 'AlignHCenter')
-            v_flag = {
-                'top': 'AlignTop',
-                'middle': 'AlignVCenter',
-                'bottom': 'AlignBottom',
-            }.get(v_align, 'AlignVCenter')
-            alignment_css += f"    qproperty-alignment: {v_flag}|{h_flag};\n"
+        # Apply style to preview button using manager helper
+        temp_manager = ConditionalStyleManager()
+        temp_manager.add_style(copy.deepcopy(style))
+        base_props = temp_manager.get_active_style()
+        hover_props = temp_manager.get_active_style(state='hover')
+        click_props = temp_manager.get_active_style(state='click')
 
         qss = (
             "QPushButton {\n"
             f"    background-color: {base_props.get('background_color', 'transparent')};\n"
             f"    color: {base_props.get('text_color', '#000000')};\n"
-
             f"    border-radius: {base_props.get('border_radius', 0)}px;\n"
-            f"    font-family: {base_font_family};\n"
-            f"    font-size: {base_font_size}pt;\n"
-            f"    font-weight: {base_font_weight};\n"
-            f"    font-style: {base_font_style};\n"
-            f"{alignment_css}"
             "}\n"
             "QPushButton:hover {\n"
             f"    background-color: {hover_props.get('background_color', base_props.get('background_color', 'transparent'))};\n"
             f"    color: {hover_props.get('text_color', base_props.get('text_color', '#000000'))};\n"
-            f"    font-family: {hover_font_family};\n"
-            f"    font-size: {hover_font_size}pt;\n"
-            f"    font-weight: {hover_font_weight};\n"
-            f"    font-style: {hover_font_style};\n"
             "}\n"
             "QPushButton:pressed {\n"
             f"    background-color: {click_props.get('background_color', hover_props.get('background_color', base_props.get('background_color', 'transparent')))};\n"
             f"    color: {click_props.get('text_color', hover_props.get('text_color', base_props.get('text_color', '#000000')))};\n"
-            f"    font-family: {click_font_family};\n"
-            f"    font-size: {click_font_size}pt;\n"
-            f"    font-weight: {click_font_weight};\n"
-            f"    font-style: {click_font_style};\n"
             "}\n"
         )
         self.preview_button.setStyleSheet(qss)
-        self.preview_button.set_icon(style.icon)
-        self.preview_button.set_hover_icon(style.hover_icon)
-        self.preview_button.set_click_icon(style.click_icon)
-        icon_sz = style.properties.get('icon_size', 48)
+        self.preview_button.set_icon(base_props.get('icon', ''))
+        self.preview_button.set_hover_icon(hover_props.get('icon', ''))
+        self.preview_button.set_click_icon(click_props.get('icon', ''))
+        icon_sz = base_props.get('icon_size', 48)
         self.preview_button.set_icon_size(icon_sz)
 
         text = style.text_value if style.text_type == "Text" else ""
@@ -854,7 +691,6 @@ class ButtonPropertiesDialog(QDialog):
 
     def _on_svg_style_selected(self, style: dict):
         pass
-
 
     def _populate_text_tab(self):
         pass
