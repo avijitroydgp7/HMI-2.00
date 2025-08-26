@@ -18,6 +18,8 @@ from .conditional_style import (
     ConditionalStyle,
     ConditionalStyleEditorDialog,
     PreviewButton,
+    SwitchButton,
+    LedIndicator,
 )
 
 
@@ -494,10 +496,16 @@ class ButtonPropertiesDialog(QDialog):
 
         right_layout.addWidget(self.style_properties_group)
 
-        # Preview widget
+        # Preview widgets
         self.preview_button = PreviewButton("Preview")
         self.preview_button.setMinimumSize(200, 100)
-        right_layout.addWidget(self.preview_button, alignment=Qt.AlignmentFlag.AlignCenter)
+        self.preview_switch = SwitchButton()
+        self.preview_led = LedIndicator()
+        self.preview_stack = QStackedWidget()
+        self.preview_stack.addWidget(self.preview_button)
+        self.preview_stack.addWidget(self.preview_switch)
+        self.preview_stack.addWidget(self.preview_led)
+        right_layout.addWidget(self.preview_stack, alignment=Qt.AlignmentFlag.AlignCenter)
         right_layout.addStretch()
 
         splitter.addWidget(right_panel)
@@ -552,6 +560,9 @@ class ButtonPropertiesDialog(QDialog):
             if new_style:
                 self.style_manager.add_style(new_style)
                 self._refresh_style_table()
+                row = len(self.style_manager.conditional_styles) - 1
+                self.style_table.selectRow(row)
+                self._on_style_selection_changed()
 
     def _edit_style(self):
         selected_rows = self.style_table.selectionModel().selectedRows()
@@ -568,6 +579,8 @@ class ButtonPropertiesDialog(QDialog):
                 # Use manager helper to ensure internal structures stay consistent
                 self.style_manager.update_style(row, updated_style)
                 self._refresh_style_table()
+                self.style_table.selectRow(row)
+                self._on_style_selection_changed()
 
     def _remove_style(self):
         selected_rows = self.style_table.selectionModel().selectedRows()
@@ -625,6 +638,10 @@ class ButtonPropertiesDialog(QDialog):
             self.preview_button.set_icon("")
             self.preview_button.set_hover_icon("")
             self.preview_button.set_click_icon("")
+            self.preview_button.setFixedSize(200, 100)
+            self.preview_switch.setStyleSheet("")
+            self.preview_led.setStyleSheet("")
+            self.preview_stack.setCurrentWidget(self.preview_button)
             return
 
         row = selected_rows[0].row()
@@ -654,31 +671,61 @@ class ButtonPropertiesDialog(QDialog):
         hover_props = temp_manager.get_active_style(state='hover')
         click_props = temp_manager.get_active_style(state='click')
 
-        qss = (
-            "QPushButton {\n"
-            f"    background-color: {base_props.get('background_color', 'transparent')};\n"
-            f"    color: {base_props.get('text_color', '#000000')};\n"
-            f"    border-radius: {base_props.get('border_radius', 0)}px;\n"
-            "}\n"
-            "QPushButton:hover {\n"
-            f"    background-color: {hover_props.get('background_color', base_props.get('background_color', 'transparent'))};\n"
-            f"    color: {hover_props.get('text_color', base_props.get('text_color', '#000000'))};\n"
-            "}\n"
-            "QPushButton:pressed {\n"
-            f"    background-color: {click_props.get('background_color', hover_props.get('background_color', base_props.get('background_color', 'transparent')))};\n"
-            f"    color: {click_props.get('text_color', hover_props.get('text_color', base_props.get('text_color', '#000000')))};\n"
-            "}\n"
-        )
-        self.preview_button.setStyleSheet(qss)
-        self.preview_button.set_icon(base_props.get('icon', ''))
-        self.preview_button.set_hover_icon(hover_props.get('icon', ''))
-        self.preview_button.set_click_icon(click_props.get('icon', ''))
-        icon_sz = base_props.get('icon_size', 48)
-        self.preview_button.set_icon_size(icon_sz)
+        component_type = style.properties.get("component_type", "Standard Button")
 
-        text = style.text_value if style.text_type == "Text" else ""
-        self.preview_button.setText(text or "Preview")
-        self.preview_button.setToolTip(style.tooltip)
+        if component_type == "Toggle Switch":
+            self.preview_stack.setCurrentWidget(self.preview_switch)
+            if style.style_sheet:
+                self.preview_switch.setStyleSheet(style.style_sheet)
+            else:
+                self.preview_switch.setStyleSheet("")
+            self.preview_switch.setToolTip(style.tooltip)
+        elif component_type == "LED Indicator":
+            self.preview_stack.setCurrentWidget(self.preview_led)
+            if style.style_sheet:
+                self.preview_led.setStyleSheet(style.style_sheet)
+            else:
+                self.preview_led.setStyleSheet("")
+            self.preview_led.setToolTip(style.tooltip)
+        else:
+            self.preview_stack.setCurrentWidget(self.preview_button)
+            if component_type in {"Circle Button", "Square Button"}:
+                self.preview_button.setFixedSize(200, 200)
+            else:
+                self.preview_button.setFixedSize(200, 100)
+
+            if style.style_sheet:
+                self.preview_button.setStyleSheet(style.style_sheet)
+            else:
+                qss = (
+                    "QPushButton {\n"
+                    f"    background-color: {base_props.get('background_color', 'transparent')};\n"
+                    f"    color: {base_props.get('text_color', '#000000')};\n"
+                    f"    border-radius: {base_props.get('border_radius', 0)}px;\n"
+                    "}\n"
+                    "QPushButton:hover {\n"
+                    f"    background-color: {hover_props.get('background_color', base_props.get('background_color', 'transparent'))};\n"
+                    f"    color: {hover_props.get('text_color', base_props.get('text_color', '#000000'))};\n"
+                    "}\n"
+                    "QPushButton:pressed {\n"
+                    f"    background-color: {click_props.get('background_color', hover_props.get('background_color', base_props.get('background_color', 'transparent')))};\n"
+                    f"    color: {click_props.get('text_color', hover_props.get('text_color', base_props.get('text_color', '#000000')))};\n"
+                    "}\n"
+                )
+                self.preview_button.setStyleSheet(qss)
+
+            self.preview_button.set_icon(base_props.get('icon', ''))
+            self.preview_button.set_hover_icon(hover_props.get('icon', ''))
+            self.preview_button.set_click_icon(click_props.get('icon', ''))
+            icon_sz = base_props.get('icon_size', 48)
+            self.preview_button.set_icon_size(icon_sz)
+
+            text = style.text_value if style.text_type == "Text" else ""
+            if component_type in {"Icon-Only Button", "Image Button"}:
+                self.preview_button.setText("")
+            else:
+                self.preview_button.setText(text or "Preview")
+            self.preview_button.setToolTip(style.tooltip)
 
     def _populate_extended_style_tab(self):
         pass

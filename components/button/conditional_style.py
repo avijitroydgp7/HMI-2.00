@@ -422,6 +422,7 @@ class ConditionalStyle:
     hover_properties: Dict[str, Any] = field(default_factory=dict)
     click_properties: Dict[str, Any] = field(default_factory=dict)
     animation: AnimationProperties = field(default_factory=AnimationProperties)
+    style_sheet: str = ""
 
     @staticmethod
     def _normalize_state(props: Dict[str, Any]) -> Dict[str, Any]:
@@ -499,6 +500,7 @@ class ConditionalStyle:
             'hover_properties': self._normalize_state(self.hover_properties),
             'click_properties': self._normalize_state(self.click_properties),
             'animation': self.animation.to_dict(),
+            'style_sheet': self.style_sheet,
         }
     
     @classmethod
@@ -536,6 +538,7 @@ class ConditionalStyle:
             properties=props,
             hover_properties=hover,
             click_properties=click,
+            style_sheet=data.get('style_sheet', ''),
         )
         cond = data.get('condition_data', {"mode": "Ordinary"})
         if cond.get('mode') == 'Range' and 'operator' not in cond:
@@ -2202,6 +2205,7 @@ class ConditionalStyleEditorDialog(QDialog):
                     self.range_operand_selector.get_data() if hasattr(self, 'range_operand_selector') else None
                 )
 
+        component_type = properties.get("component_type")
         style = ConditionalStyle(
             style_id=self.style.style_id,
             tooltip=self.tooltip_edit.text(),
@@ -2233,4 +2237,5 @@ class ConditionalStyleEditorDialog(QDialog):
             click_properties=click_properties,
             condition_data=condition_cfg,
         )
+        style.style_sheet = self.generate_qss(component_type)
         return style
