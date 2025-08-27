@@ -476,7 +476,7 @@ class ButtonPropertiesDialog(QDialog):
         
         # Left panel: Style table
         self.style_table = QTableWidget()
-        self.style_table.setColumnCount(3)
+        self.style_table.setColumnCount(2)
         self.style_table.setHorizontalHeaderLabels(["#", "Style ID"])
         self.style_table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         self.style_table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
