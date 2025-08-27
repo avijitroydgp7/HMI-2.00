@@ -626,11 +626,28 @@ class ConditionalStyle:
             style_sheet=data.get('style_sheet', ''),
         )
         cond = data.get('condition_data', {"mode": "Ordinary"})
-        if cond.get('mode') == 'Range' and 'operator' not in cond:
-            if 'lower' in cond or 'upper' in cond:
-                cond['operator'] = 'between'
-            else:
-                cond['operator'] = '=='
+        if cond.get('mode') in ('On', 'Off'):
+            if 'operand1' not in cond and 'tag' in cond:
+                cond['operand1'] = cond.pop('tag')
+        if cond.get('mode') == 'Range':
+            if 'operand1' not in cond and 'tag' in cond:
+                cond['operand1'] = cond.pop('tag')
+            if 'operand2' not in cond and 'operand' in cond:
+                cond['operand2'] = cond.pop('operand')
+            if 'lower_bound' not in cond and 'lower' in cond:
+                cond['lower_bound'] = cond.pop('lower')
+            if 'upper_bound' not in cond and 'upper' in cond:
+                cond['upper_bound'] = cond.pop('upper')
+            if 'operator' not in cond:
+                if cond.get('lower_bound') is not None or cond.get('upper_bound') is not None:
+                    cond['operator'] = 'between'
+                else:
+                    cond['operator'] = '=='
+
+        if cond.get('mode') in ('On', 'Off', 'Range'):
+            op1 = cond.get('operand1')
+            if op1 and 'main_tag' not in op1 and 'source' in op1:
+                cond['operand1'] = {'main_tag': op1, 'indices': []}
         style.condition_data = cond
         if 'animation' in data:
             style.animation = AnimationProperties.from_dict(data['animation'])
@@ -716,6 +733,7 @@ class ConditionalStyleManager(QObject):
                     if state == 'click' and style.click_icon:
                         props['icon'] = style.click_icon
                 if style.tooltip:
+
                     props['tooltip'] = style.tooltip
                 return props
 
@@ -741,18 +759,20 @@ class ConditionalStyleManager(QObject):
             if mode == 'Ordinary':
                 return True
             if mode in ('On', 'Off'):
-                tag_val = self._extract_value(cfg.get('tag'), tag_values)
+                op1 = cfg.get('operand1', cfg.get('tag'))
+                tag_val = self._extract_value(op1, tag_values)
                 if tag_val is None:
                     return False
                 return bool(tag_val) if mode == 'On' else not bool(tag_val)
             if mode == 'Range':
-                tag_val = self._extract_value(cfg.get('tag'), tag_values)
+                op1 = cfg.get('operand1', cfg.get('tag'))
+                tag_val = self._extract_value(op1, tag_values)
                 if tag_val is None:
                     return False
                 operator = cfg.get('operator', '==')
                 if operator in ['between', 'outside']:
-                    lower = self._extract_value(cfg.get('lower'), tag_values)
-                    upper = self._extract_value(cfg.get('upper'), tag_values)
+                    lower = self._extract_value(cfg.get('lower_bound', cfg.get('lower')), tag_values)
+                    upper = self._extract_value(cfg.get('upper_bound', cfg.get('upper')), tag_values)
                     try:
                         if operator == 'between':
                             return lower <= tag_val <= upper
@@ -761,7 +781,7 @@ class ConditionalStyleManager(QObject):
                     except Exception:
                         return False
                 else:
-                    operand = self._extract_value(cfg.get('operand'), tag_values)
+                    operand = self._extract_value(cfg.get('operand2', cfg.get('operand')), tag_values)
                     if operand is None:
                         return False
                     try:
@@ -1105,28 +1125,31 @@ class ConditionalStyleEditorDialog(QDialog):
         initial_mode = self.style.condition_data.get("mode", "Ordinary")
         self.condition_mode_combo.setCurrentText(initial_mode)
         self._on_condition_mode_changed(initial_mode)
-        tag_cfg = self.style.condition_data.get("tag")
-        if initial_mode in ("On", "Off") and tag_cfg:
-            self.condition_tag_selector.set_data({'main_tag': tag_cfg, 'indices': []})
+        op1_cfg = self.style.condition_data.get("operand1")
+        if initial_mode in ("On", "Off") and op1_cfg:
+            self.condition_tag_selector.set_data(op1_cfg)
         elif initial_mode == "Range":
-            if tag_cfg:
-                self.range_tag_selector.set_data({'main_tag': tag_cfg, 'indices': []})
+            if op1_cfg:
+                self.range_tag_selector.set_data(op1_cfg)
             operator = self.style.condition_data.get("operator")
             if not operator:
-                if self.style.condition_data.get("lower") is not None or self.style.condition_data.get("upper") is not None:
+                if (
+                    self.style.condition_data.get("lower_bound") is not None
+                    or self.style.condition_data.get("upper_bound") is not None
+                ):
                     operator = "between"
                 else:
                     operator = "=="
             self.range_operator_combo.setCurrentText(operator)
             if operator in ["between", "outside"]:
-                lower = self.style.condition_data.get("lower")
-                upper = self.style.condition_data.get("upper")
+                lower = self.style.condition_data.get("lower_bound")
+                upper = self.style.condition_data.get("upper_bound")
                 if lower:
                     self.range_lower_selector.set_data(lower)
                 if upper:
                     self.range_upper_selector.set_data(upper)
             else:
-                operand = self.style.condition_data.get("operand")
+                operand = self.style.condition_data.get("operand2")
                 if operand:
                     self.range_operand_selector.set_data(operand)
         self._validate_condition_section()
@@ -2303,21 +2326,21 @@ class ConditionalStyleEditorDialog(QDialog):
         condition_cfg = {"mode": self.condition_mode_combo.currentText()}
         if condition_cfg["mode"] in ("On", "Off"):
             data = self.condition_tag_selector.get_data() if hasattr(self, 'condition_tag_selector') else None
-            condition_cfg["tag"] = data.get("main_tag") if data else None
+            condition_cfg["operand1"] = data if data else None
         elif condition_cfg["mode"] == "Range":
             data = self.range_tag_selector.get_data() if hasattr(self, 'range_tag_selector') else None
-            condition_cfg["tag"] = data.get("main_tag") if data else None
+            condition_cfg["operand1"] = data if data else None
             operator = self.range_operator_combo.currentText() if hasattr(self, 'range_operator_combo') else "=="
             condition_cfg["operator"] = operator
             if operator in ["between", "outside"]:
-                condition_cfg["lower"] = (
+                condition_cfg["lower_bound"] = (
                     self.range_lower_selector.get_data() if hasattr(self, 'range_lower_selector') else None
                 )
-                condition_cfg["upper"] = (
+                condition_cfg["upper_bound"] = (
                     self.range_upper_selector.get_data() if hasattr(self, 'range_upper_selector') else None
                 )
             else:
-                condition_cfg["operand"] = (
+                condition_cfg["operand2"] = (
                     self.range_operand_selector.get_data() if hasattr(self, 'range_operand_selector') else None
                 )
 
