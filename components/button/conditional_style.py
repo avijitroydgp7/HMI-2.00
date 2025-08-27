@@ -1,6 +1,7 @@
 from typing import Dict, Any, List, Optional, ClassVar, Callable, Union
 from dataclasses import dataclass, field
 import copy
+import ast
 
 from PyQt6.QtCore import (
     QObject,
@@ -52,6 +53,90 @@ from PyQt6.QtGui import (
 from PyQt6.QtSvg import QSvgRenderer
 from utils.icon_manager import IconManager
 from dialogs.widgets import TagSelector
+
+
+def _safe_eval(expr: str, variables: Dict[str, Any]) -> Any:
+    """Safely evaluate a small Python expression.
+
+    Only a restricted subset of Python expressions is supported consisting of
+    literals, variable names, boolean operations, arithmetic operators and
+    comparisons. Any use of function calls, attribute access or other Python
+    constructs will raise a ``ValueError``.
+    """
+
+    try:
+        tree = ast.parse(expr, mode="eval")
+    except SyntaxError as exc:  # pragma: no cover - syntax error path
+        raise ValueError("Invalid expression") from exc
+
+    def _eval(node: ast.AST):
+        if isinstance(node, ast.Expression):
+            return _eval(node.body)
+        if isinstance(node, ast.BoolOp):
+            values = [_eval(v) for v in node.values]
+            if isinstance(node.op, ast.And):
+                return all(values)
+            if isinstance(node.op, ast.Or):
+                return any(values)
+            raise ValueError("Unsupported boolean operator")
+        if isinstance(node, ast.BinOp):
+            left = _eval(node.left)
+            right = _eval(node.right)
+            if isinstance(node.op, ast.Add):
+                return left + right
+            if isinstance(node.op, ast.Sub):
+                return left - right
+            if isinstance(node.op, ast.Mult):
+                return left * right
+            if isinstance(node.op, ast.Div):
+                return left / right
+            if isinstance(node.op, ast.Mod):
+                return left % right
+            raise ValueError("Unsupported binary operator")
+        if isinstance(node, ast.UnaryOp):
+            operand = _eval(node.operand)
+            if isinstance(node.op, ast.Not):
+                return not operand
+            if isinstance(node.op, ast.UAdd):
+                return +operand
+            if isinstance(node.op, ast.USub):
+                return -operand
+            raise ValueError("Unsupported unary operator")
+        if isinstance(node, ast.Compare):
+            left = _eval(node.left)
+            for op, comparator in zip(node.ops, node.comparators):
+                right = _eval(comparator)
+                if isinstance(op, ast.Eq):
+                    if not (left == right):
+                        return False
+                elif isinstance(op, ast.NotEq):
+                    if not (left != right):
+                        return False
+                elif isinstance(op, ast.Lt):
+                    if not (left < right):
+                        return False
+                elif isinstance(op, ast.LtE):
+                    if not (left <= right):
+                        return False
+                elif isinstance(op, ast.Gt):
+                    if not (left > right):
+                        return False
+                elif isinstance(op, ast.GtE):
+                    if not (left >= right):
+                        return False
+                else:  # pragma: no cover - unsupported comparisons
+                    raise ValueError("Unsupported comparison operator")
+                left = right
+            return True
+        if isinstance(node, ast.Name):
+            if node.id in variables:
+                return variables[node.id]
+            raise ValueError(f"Unknown variable '{node.id}'")
+        if isinstance(node, ast.Constant):
+            return node.value
+        raise ValueError(f"Unsupported expression: {ast.dump(node)}")
+
+    return _eval(tree)
 
 # ---------------------------------------------------------------------------
 # Helper widgets previously provided by button_creator
@@ -616,21 +701,8 @@ class ConditionalStyleManager(QObject):
         for style in self.conditional_styles:
             cond_cfg = getattr(style, 'condition_data', {"mode": "Ordinary"})
             cond = style.condition
-            match = False
-            if cond_cfg.get('mode', 'Ordinary') != 'Ordinary':
-                match = self._evaluate_condition(cond_cfg, tag_values)
-            elif cond is None:
-                match = True
-            elif callable(cond):
-                try:
-                    match = bool(cond(tag_values))
-                except Exception:
-                    match = False
-            else:
-                try:
-                    match = bool(eval(str(cond), {}, tag_values))
-                except Exception:
-                    match = False
+            condition = cond_cfg if cond_cfg.get('mode', 'Ordinary') != 'Ordinary' else cond
+            match = self._evaluate_condition(condition, tag_values)
 
             if match:
                 props = dict(style.properties)
@@ -649,51 +721,83 @@ class ConditionalStyleManager(QObject):
 
         return dict(self.default_style)
 
-    def _evaluate_condition(self, cfg: Dict[str, Any], tag_values: Dict[str, Any]) -> bool:
-        mode = cfg.get('mode', 'Ordinary')
-        if mode == 'Ordinary':
+    def _evaluate_condition(self, condition: Any, tag_values: Dict[str, Any]) -> bool:
+        """Evaluate a condition using tag values.
+
+        ``condition`` may be one of the following:
+
+        * ``None`` – always ``True``
+        * ``dict`` – a configuration dictionary as produced by the editor
+        * ``str`` – a Python expression evaluated by :func:`_safe_eval`
+        * ``callable`` – a function receiving ``tag_values``
+        """
+
+        if condition is None:
             return True
-        if mode in ('On', 'Off'):
-            tag_val = self._extract_value(cfg.get('tag'), tag_values)
-            if tag_val is None:
-                return False
-            return bool(tag_val) if mode == 'On' else not bool(tag_val)
-        if mode == 'Range':
-            tag_val = self._extract_value(cfg.get('tag'), tag_values)
-            if tag_val is None:
-                return False
-            operator = cfg.get('operator', '==')
-            if operator in ['between', 'outside']:
-                lower = self._extract_value(cfg.get('lower'), tag_values)
-                upper = self._extract_value(cfg.get('upper'), tag_values)
-                try:
-                    if operator == 'between':
-                        return lower <= tag_val <= upper
-                    else:
-                        return tag_val < lower or tag_val > upper
-                except Exception:
+
+        if isinstance(condition, dict):
+            cfg = condition
+            mode = cfg.get('mode', 'Ordinary')
+            if mode == 'Ordinary':
+                return True
+            if mode in ('On', 'Off'):
+                tag_val = self._extract_value(cfg.get('tag'), tag_values)
+                if tag_val is None:
                     return False
-            else:
-                operand = self._extract_value(cfg.get('operand'), tag_values)
-                if operand is None:
+                return bool(tag_val) if mode == 'On' else not bool(tag_val)
+            if mode == 'Range':
+                tag_val = self._extract_value(cfg.get('tag'), tag_values)
+                if tag_val is None:
                     return False
-                try:
-                    if operator == '==':
-                        return tag_val == operand
-                    if operator == '!=':
-                        return tag_val != operand
-                    if operator == '>':
-                        return tag_val > operand
-                    if operator == '>=':
-                        return tag_val >= operand
-                    if operator == '<':
-                        return tag_val < operand
-                    if operator == '<=':
-                        return tag_val <= operand
-                except Exception:
+                operator = cfg.get('operator', '==')
+                if operator in ['between', 'outside']:
+                    lower = self._extract_value(cfg.get('lower'), tag_values)
+                    upper = self._extract_value(cfg.get('upper'), tag_values)
+                    try:
+                        if operator == 'between':
+                            return lower <= tag_val <= upper
+                        else:
+                            return tag_val < lower or tag_val > upper
+                    except Exception:
+                        return False
+                else:
+                    operand = self._extract_value(cfg.get('operand'), tag_values)
+                    if operand is None:
+                        return False
+                    try:
+                        if operator == '==':
+                            return tag_val == operand
+                        if operator == '!=':
+                            return tag_val != operand
+                        if operator == '>':
+                            return tag_val > operand
+                        if operator == '>=':
+                            return tag_val >= operand
+                        if operator == '<':
+                            return tag_val < operand
+                        if operator == '<=':
+                            return tag_val <= operand
+                    except Exception:
+                        return False
                     return False
+            return False
+
+        if callable(condition):
+            try:
+                return bool(condition(tag_values))
+            except Exception:
                 return False
-        return False
+
+        if isinstance(condition, str):
+            try:
+                return bool(_safe_eval(condition, tag_values))
+            except Exception:
+                return False
+
+        try:
+            return bool(condition)
+        except Exception:
+            return False
 
     def _extract_value(self, data: Optional[Dict[str, Any]], tag_values: Dict[str, Any]):
         if not data:

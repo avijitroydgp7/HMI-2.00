@@ -141,6 +141,19 @@ class BitActionDialog(QDialog):
             self.trigger_options_container.setLayout(layout)
         layout.setContentsMargins(0, 10, 0, 0)
 
+        # Reset any existing selector attributes
+        for attr in [
+            "on_off_tag_selector",
+            "range_operand1_selector",
+            "range_operand2_selector",
+            "range_lower_bound_selector",
+            "range_upper_bound_selector",
+            "range_operator_combo",
+            "range_rhs_stack",
+        ]:
+            if hasattr(self, attr):
+                setattr(self, attr, None)
+
         if mode in ["On", "Off"]:
             self.on_off_tag_selector = TagSelector()
             self.on_off_tag_selector.set_allowed_tag_types(["BOOL"])
@@ -216,7 +229,7 @@ class BitActionDialog(QDialog):
         parent_layout.addWidget(range_group)
 
     def _on_range_operator_changed(self, operator: str):
-        if hasattr(self, 'range_rhs_stack'):
+        if self.range_rhs_stack:
             self.range_rhs_stack.setCurrentIndex(1 if operator in ["between", "outside"] else 0)
         self._validate_form()
 
@@ -231,16 +244,19 @@ class BitActionDialog(QDialog):
         self.trigger_mode_combo.blockSignals(False)
         self._on_trigger_mode_changed(trigger_mode)
 
-        if trigger_mode in ["On", "Off"]:
+        if trigger_mode in ["On", "Off"] and self.on_off_tag_selector:
             self._set_tag_selector_data(self.on_off_tag_selector, trigger_data.get("tag"))
-        elif trigger_mode == "Range":
-            if hasattr(self, 'range_operator_combo'):
-                self.range_operator_combo.setCurrentText(trigger_data.get("operator"))
+        elif trigger_mode == "Range" and self.range_operator_combo:
+            self.range_operator_combo.setCurrentText(trigger_data.get("operator"))
+            if self.range_operand1_selector:
                 self._set_tag_selector_data(self.range_operand1_selector, trigger_data.get("operand1"))
-                if trigger_data.get("operator") in ["between", "outside"]:
+            if trigger_data.get("operator") in ["between", "outside"]:
+                if self.range_lower_bound_selector:
                     self._set_tag_selector_data(self.range_lower_bound_selector, trigger_data.get("lower_bound"))
+                if self.range_upper_bound_selector:
                     self._set_tag_selector_data(self.range_upper_bound_selector, trigger_data.get("upper_bound"))
-                else:
+            else:
+                if self.range_operand2_selector:
                     self._set_tag_selector_data(self.range_operand2_selector, trigger_data.get("operand2"))
         
         mode = data.get("mode", "Momentary")
@@ -266,12 +282,12 @@ class BitActionDialog(QDialog):
         trigger_mode = self.trigger_mode_combo.currentText()
         trigger_is_valid = True
         if trigger_mode in ["On", "Off"]:
-            if hasattr(self, 'on_off_tag_selector') and not self.on_off_tag_selector.get_data():
+            if not (self.on_off_tag_selector and self.on_off_tag_selector.get_data()):
                 if error_msg is None:
                     error_msg = f"A tag must be selected for '{trigger_mode}' trigger."
                 trigger_is_valid = False
         elif trigger_mode == "Range":
-            if hasattr(self, 'range_operand1_selector'):
+            if self.range_operand1_selector and self.range_operator_combo:
                 trigger_is_valid, range_error = validate_range_section(
                     self.range_operand1_selector,
                     self.range_operator_combo.currentText(),

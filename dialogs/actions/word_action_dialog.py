@@ -248,11 +248,18 @@ class WordActionDialog(QDialog):
             layout = QVBoxLayout(self.trigger_options_container)
             self.trigger_options_container.setLayout(layout)
         layout.setContentsMargins(0, 10, 0, 0)
-
-        # Remove any existing on_off_tag_selector widget to avoid duplicates
-        if hasattr(self, 'on_off_tag_selector'):
-            self.on_off_tag_selector.deleteLater()
-            del self.on_off_tag_selector
+        # Reset selector attributes
+        for attr in [
+            "on_off_tag_selector",
+            "range_operand1_selector",
+            "range_operand2_selector",
+            "range_lower_bound_selector",
+            "range_upper_bound_selector",
+            "range_operator_combo",
+            "range_rhs_stack",
+        ]:
+            if hasattr(self, attr):
+                setattr(self, attr, None)
 
         if mode in ["On", "Off"]:
             self.on_off_tag_selector = TagSelector()
@@ -265,7 +272,7 @@ class WordActionDialog(QDialog):
 
         # Show container after widgets are updated
         self.trigger_options_container.setVisible(True)
-        
+
         self._validate_form()
 
     def _build_range_trigger_options(self, parent_layout):
@@ -332,7 +339,7 @@ class WordActionDialog(QDialog):
         self._validate_form()
 
     def _on_range_operator_changed(self, operator: str):
-        if hasattr(self, 'range_rhs_stack'):
+        if self.range_rhs_stack:
             self.range_rhs_stack.setCurrentIndex(1 if operator in ["between", "outside"] else 0)
         self._validate_form()
 
@@ -344,7 +351,7 @@ class WordActionDialog(QDialog):
         sender = self.sender()
         if sender == self.target_tag_selector:
             self._on_target_tag_selected(tag_data)
-        elif hasattr(self, 'range_operand1_selector') and sender == self.range_operand1_selector:
+        elif self.range_operand1_selector and sender == self.range_operand1_selector:
             self._on_range_operand1_selected(tag_data)
         self._validate_form()
 
@@ -448,14 +455,14 @@ class WordActionDialog(QDialog):
 
     def _validate_on_off_trigger(self):
         """Validate On/Off trigger configuration."""
-        if hasattr(self, 'on_off_tag_selector') and not self.on_off_tag_selector.get_data():
+        if not (self.on_off_tag_selector and self.on_off_tag_selector.get_data()):
             trigger_mode = self.trigger_mode_combo.currentText()
             return False, f"A tag must be selected for '{trigger_mode}' trigger."
         return True, None
 
     def _validate_range_trigger(self):
         """Validate Range trigger configuration."""
-        if not hasattr(self, 'range_operand1_selector'):
+        if not (self.range_operand1_selector and self.range_operator_combo):
             return True, None
 
         return validate_range_section(
@@ -570,17 +577,21 @@ class WordActionDialog(QDialog):
         # Trigger data
         trigger_data = data.get("trigger", {})
         trigger_mode = trigger_data.get("mode")
-        if trigger_mode in ["On", "Off"] and hasattr(self, 'on_off_tag_selector'):
+        if trigger_mode in ["On", "Off"] and self.on_off_tag_selector:
             self._set_tag_selector_data(self.on_off_tag_selector, trigger_data.get("tag"))
-        elif trigger_mode == "Range" and hasattr(self, 'range_operator_combo'):
+        elif trigger_mode == "Range" and self.range_operator_combo:
             self.range_operator_combo.setCurrentText(trigger_data.get("operator", "=="))
             self._on_range_operator_changed(self.range_operator_combo.currentText())
-            self._set_tag_selector_data(self.range_operand1_selector, trigger_data.get("operand1"))
+            if self.range_operand1_selector:
+                self._set_tag_selector_data(self.range_operand1_selector, trigger_data.get("operand1"))
             if trigger_data.get("operator") in ["between", "outside"]:
-                self._set_tag_selector_data(self.range_lower_bound_selector, trigger_data.get("lower_bound"))
-                self._set_tag_selector_data(self.range_upper_bound_selector, trigger_data.get("upper_bound"))
+                if self.range_lower_bound_selector:
+                    self._set_tag_selector_data(self.range_lower_bound_selector, trigger_data.get("lower_bound"))
+                if self.range_upper_bound_selector:
+                    self._set_tag_selector_data(self.range_upper_bound_selector, trigger_data.get("upper_bound"))
             else:
-                self._set_tag_selector_data(self.range_operand2_selector, trigger_data.get("operand2"))
+                if self.range_operand2_selector:
+                    self._set_tag_selector_data(self.range_operand2_selector, trigger_data.get("operand2"))
         
         # Conditional reset data
         cond_data = data.get("conditional_reset")
@@ -611,16 +622,19 @@ class WordActionDialog(QDialog):
         trigger_mode = self.trigger_mode_combo.currentText()
         if trigger_mode != "Ordinary":
             trigger_dict = {"mode": trigger_mode}
-            if trigger_mode in ["On", "Off"]:
+            if trigger_mode in ["On", "Off"] and self.on_off_tag_selector:
                 trigger_dict["tag"] = self.on_off_tag_selector.get_data()
-            elif trigger_mode == "Range":
+            elif trigger_mode == "Range" and self.range_operator_combo and self.range_operand1_selector:
                 trigger_dict["operator"] = self.range_operator_combo.currentText()
                 trigger_dict["operand1"] = self.range_operand1_selector.get_data()
                 if trigger_dict["operator"] in ["between", "outside"]:
-                    trigger_dict["lower_bound"] = self.range_lower_bound_selector.get_data()
-                    trigger_dict["upper_bound"] = self.range_upper_bound_selector.get_data()
+                    if self.range_lower_bound_selector:
+                        trigger_dict["lower_bound"] = self.range_lower_bound_selector.get_data()
+                    if self.range_upper_bound_selector:
+                        trigger_dict["upper_bound"] = self.range_upper_bound_selector.get_data()
                 else:
-                    trigger_dict["operand2"] = self.range_operand2_selector.get_data()
+                    if self.range_operand2_selector:
+                        trigger_dict["operand2"] = self.range_operand2_selector.get_data()
             action_data["trigger"] = trigger_dict
 
         if self.conditional_reset_group.isChecked():
