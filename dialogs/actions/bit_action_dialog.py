@@ -139,8 +139,10 @@ class BitActionDialog(QDialog):
         self.target_tag_selector.inputChanged.connect(self._validate_form)
 
     def _on_trigger_mode_changed(self, mode: str):
-        # Ensure initial mode selection reflects current UI
-        self._on_trigger_mode_changed(self.trigger_mode_combo.currentText())
+        # Delegate to helper and revalidate the form
+        if hasattr(self, "_trigger_helper") and self._trigger_helper:
+            self._trigger_helper.on_mode_changed(mode)
+        self._validate_form()
 
     def _on_range_operator_changed(self, operator: str):
         # Delegate to helper so behavior stays consistent
@@ -209,6 +211,7 @@ class BitActionDialog(QDialog):
         
         target_str = self._format_operand_for_display(target_tag_data)
         mode_str = action_data.get("mode", "N/A")
+        trigger_mode = self.trigger_mode_combo.currentText()
         if trigger_mode != TriggerMode.ORDINARY.value:
             mode_str = f"Triggered ({trigger_mode})"
             
