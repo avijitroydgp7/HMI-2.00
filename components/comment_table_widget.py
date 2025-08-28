@@ -14,7 +14,7 @@ from PyQt6.QtWidgets import (
     QInputDialog,
 )
 from PyQt6.QtGui import QKeySequence, QAction
-from PyQt6.QtCore import Qt
+from PyQt6.QtCore import Qt, pyqtSignal
 from services.comment_data_service import comment_data_service
 from services.command_history_service import command_history_service
 from services.commands import (
@@ -289,7 +289,8 @@ class CommentTableView(QTableView):
             if indexes:
                 rows = {}
                 for idx in indexes:
-                    rows.setdefault(idx.row(), {})[idx.column()] = idx.data() or ""
+                    value = model.data(idx, Qt.ItemDataRole.EditRole)
+                    rows.setdefault(idx.row(), {})[idx.column()] = "" if value is None else str(value)
                 lines = []
                 for row in sorted(rows.keys()):
                     cols = rows[row]
@@ -302,7 +303,8 @@ class CommentTableView(QTableView):
             if indexes:
                 rows = {}
                 for idx in indexes:
-                    rows.setdefault(idx.row(), {})[idx.column()] = idx.data() or ""
+                    value = model.data(idx, Qt.ItemDataRole.EditRole)
+                    rows.setdefault(idx.row(), {})[idx.column()] = "" if value is None else str(value)
                 lines = []
                 for row in sorted(rows.keys()):
                     cols = rows[row]
@@ -310,7 +312,7 @@ class CommentTableView(QTableView):
                     lines.append(line)
                 clipboard.setText("\n".join(lines))
                 for idx in indexes:
-                    model.setData(idx, "")
+                    model.setData(idx, "", Qt.ItemDataRole.EditRole)
             event.accept()
             return
         if event.matches(QKeySequence.StandardKey.Paste):
@@ -441,11 +443,12 @@ class CommentTableView(QTableView):
         model = self.model()
         selection_model = self.selectionModel()
         indexes = sorted(selection_model.selectedIndexes(), key=lambda i: (i.row(), i.column()))
-        
+
         if indexes:
             rows = {}
             for idx in indexes:
-                rows.setdefault(idx.row(), {})[idx.column()] = idx.data() or ""
+                value = model.data(idx, Qt.ItemDataRole.EditRole)
+                rows.setdefault(idx.row(), {})[idx.column()] = "" if value is None else str(value)
             lines = []
             for row in sorted(rows.keys()):
                 cols = rows[row]
@@ -453,7 +456,7 @@ class CommentTableView(QTableView):
                 lines.append(line)
             clipboard.setText("\n".join(lines))
             for idx in indexes:
-                model.setData(idx, "")
+                model.setData(idx, "", Qt.ItemDataRole.EditRole)
 
     def _copy_selected(self):
         """Copy selected cells to clipboard."""
@@ -461,11 +464,12 @@ class CommentTableView(QTableView):
         model = self.model()
         selection_model = self.selectionModel()
         indexes = sorted(selection_model.selectedIndexes(), key=lambda i: (i.row(), i.column()))
-        
+
         if indexes:
             rows = {}
             for idx in indexes:
-                rows.setdefault(idx.row(), {})[idx.column()] = idx.data() or ""
+                value = model.data(idx, Qt.ItemDataRole.EditRole)
+                rows.setdefault(idx.row(), {})[idx.column()] = "" if value is None else str(value)
             lines = []
             for row in sorted(rows.keys()):
                 cols = rows[row]
@@ -510,6 +514,9 @@ class CommentTableView(QTableView):
 
 class CommentTableWidget(QWidget):
     """Table for managing comments within a comment group."""
+
+    # Emitted when a formula/syntax error occurs in the table
+    formula_error_occurred = pyqtSignal(str)
 
     def __init__(self, group_id: str, parent=None):
         super().__init__(parent)
@@ -575,6 +582,9 @@ class CommentTableWidget(QWidget):
 
         self._model = CommentTableModel(self.columns, self)
         self._model.history_sync_cb = self._sync_to_service
+        # Relay model errors up to the main window via this widget's signal
+        if hasattr(self._model, 'error_occurred'):
+            self._model.error_occurred.connect(self.formula_error_occurred.emit)
         self.proxy_model = CommentFilterProxyModel(self)
         self.proxy_model.setSourceModel(self._model)
         self.table.setModel(self.proxy_model)

@@ -11,7 +11,7 @@ from typing import Any, List
 import re
 from datetime import datetime, date
 
-from PyQt6.QtCore import QAbstractTableModel, QModelIndex, Qt
+from PyQt6.QtCore import QAbstractTableModel, QModelIndex, Qt, pyqtSignal
 from PyQt6.QtGui import QFont, QColor
 from services.command_history_service import command_history_service
 from services.commands import (
@@ -28,13 +28,39 @@ except Exception:  # pragma: no cover - runtime import
 class CommentTableModel(QAbstractTableModel):
     """Table model that stores raw cell input and evaluated values."""
 
+    # Emitted when a formula/syntax error occurs during evaluation
+    error_occurred = pyqtSignal(str)
+
     def __init__(self, columns: List[str], parent=None):
         super().__init__(parent)
         self.columns = columns
         # each cell stores {'raw': Any, 'value': Any, 'format': {}, 'type': str}
         self._data: List[List[dict[str, Any]]] = []
         self._headers = ["Serial No."] + columns
-        self._asteval = Interpreter() if Interpreter else None
+        # Configure asteval to avoid printing errors to terminal and let us
+        # surface them in the UI via error_occurred.
+        self._asteval = None
+        if Interpreter:
+            try:
+                # err_writer expects a file-like object with write(str)
+                class _ErrWriter:
+                    def __init__(self, emit_cb):
+                        self._buf = ""
+                        self._emit = emit_cb
+
+                    def write(self, s):
+                        # Buffer and emit on newlines to avoid partial messages
+                        self._buf += s
+                        if "\n" in self._buf:
+                            msg = self._buf.strip()
+                            if msg:
+                                self._emit(msg)
+                            self._buf = ""
+
+                self._asteval = Interpreter(err_writer=_ErrWriter(lambda m: self.error_occurred.emit(m)))
+            except Exception:
+                # Fallback if Interpreter signature differs; use default but no error redirection
+                self._asteval = Interpreter()
         self._suspend_history = False
         self.history_sync_cb = lambda: None
 
@@ -287,6 +313,8 @@ class CommentTableModel(QAbstractTableModel):
         changed = True
         iterations = 0
         max_iter = self.rowCount() * self.columnCount() + 1
+        # Emit at most one error message per full evaluation pass to avoid spam
+        notified_error = False
         while changed and iterations < max_iter:
             changed = False
             iterations += 1
@@ -299,7 +327,32 @@ class CommentTableModel(QAbstractTableModel):
                         self._asteval.symtable.update(env)
                         try:
                             val = self._asteval(expr)
-                        except Exception:
+                            # Some versions of asteval collect errors instead of raising
+                            errs = getattr(self._asteval, 'error', [])
+                            if errs:
+                                # Create a concise message from the last error
+                                last_err = errs[-1]
+                                try:
+                                    err_msg = getattr(last_err, 'get_error', None) or getattr(last_err, 'msg', None)
+                                    if callable(err_msg):
+                                        err_msg = err_msg()
+                                except Exception:
+                                    err_msg = None
+                                if not err_msg:
+                                    err_msg = str(last_err)
+                                if not notified_error:
+                                    self.error_occurred.emit(f"Comment formula error: {err_msg}")
+                                    notified_error = True
+                                # Clear error list if possible
+                                try:
+                                    self._asteval.error = []
+                                except Exception:
+                                    pass
+                                val = 'ERR'
+                        except Exception as exc:
+                            if not notified_error:
+                                self.error_occurred.emit(f"Comment formula error: {exc}")
+                                notified_error = True
                             val = 'ERR'
                     else:
                         val = raw

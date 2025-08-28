@@ -144,11 +144,15 @@ def open_tag_editor_in_tab(win, db_id: str):
 
 def open_comment_table_in_tab(win, group_id: str):
     from services.comment_data_service import comment_data_service
+    from . import handlers
     if group_id in win.open_comment_tabs:
         win.tab_widget.setCurrentWidget(win.open_comment_tabs[group_id])
         return
 
     widget = CommentTableWidget(group_id, win)
+    # Show formula/syntax errors in the status bar (bottom-left)
+    if hasattr(widget, 'formula_error_occurred'):
+        widget.formula_error_occurred.connect(lambda msg: handlers.show_status_bar_message(win, msg))
     group = comment_data_service.get_group(group_id)
     label = f"Comments: [{group.get('number','')}] - {group.get('name','')}" if group else "Comment Table"
     tab_index = win.tab_widget.addTab(widget, label)

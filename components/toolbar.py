@@ -21,20 +21,21 @@ class QuickAccessToolBar(QToolBar):
         self.new_action = QAction(self.new_icon.icon, "New", self)
         self.new_icon.add_target(self.new_action)
         self.new_action._animated_icon = self.new_icon
-        self.new_action.setShortcut(QKeySequence.StandardKey.New)
-        self.new_action.setToolTip(f"New ({self.new_action.shortcut().toString()})")
+        # Do not set shortcuts here to avoid duplicates with Ribbon actions
+        new_sc_text = QKeySequence(QKeySequence.StandardKey.New).toString()
+        self.new_action.setToolTip(f"New ({new_sc_text})")
         self.open_icon = IconManager.create_animated_icon('fa5s.folder-open', size=icon_sz)
         self.open_action = QAction(self.open_icon.icon, "Open", self)
         self.open_icon.add_target(self.open_action)
         self.open_action._animated_icon = self.open_icon
-        self.open_action.setShortcut(QKeySequence.StandardKey.Open)
-        self.open_action.setToolTip(f"Open ({self.open_action.shortcut().toString()})")
+        open_sc_text = QKeySequence(QKeySequence.StandardKey.Open).toString()
+        self.open_action.setToolTip(f"Open ({open_sc_text})")
         self.save_icon = IconManager.create_animated_icon('fa5s.save', size=icon_sz)
         self.save_action = QAction(self.save_icon.icon, "Save", self)
         self.save_icon.add_target(self.save_action)
         self.save_action._animated_icon = self.save_icon
-        self.save_action.setShortcut(QKeySequence.StandardKey.Save)
-        self.save_action.setToolTip(f"Save ({self.save_action.shortcut().toString()})")
+        save_sc_text = QKeySequence(QKeySequence.StandardKey.Save).toString()
+        self.save_action.setToolTip(f"Save ({save_sc_text})")
 
         self.addAction(self.new_action)
         self.addAction(self.open_action)
