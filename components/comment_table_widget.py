@@ -25,7 +25,7 @@ from services.commands import (
     BulkUpdateCellsCommand,
 )
 import re
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, date
 from .comment_table_model import CommentTableModel
 from .comment_filter_model import CommentFilterProxyModel
 
@@ -200,6 +200,8 @@ class CommentTableView(QTableView):
 
     @staticmethod
     def _parse_date(value):
+        if isinstance(value, (datetime, date)):
+            return value
         for fmt in ("%Y-%m-%d", "%d/%m/%Y", "%m/%d/%Y"):
             try:
                 return datetime.strptime(value, fmt)
@@ -598,7 +600,7 @@ class CommentTableWidget(QWidget):
     def add_comment(self, values=None, record_history=True) -> None:
         """Append a new comment row."""
         if values is None:
-            values = [dict(raw="", format={}) for _ in self.columns]
+            values = [dict(raw="", format={}, type="str") for _ in self.columns]
         if record_history:
             row = self._model.rowCount()
             cmd = InsertCommentRowCommand(self._model, row, values, self._sync_to_service)
@@ -619,7 +621,11 @@ class CommentTableWidget(QWidget):
         for r in rows:
             data = []
             for c in range(1, self._model.columnCount()):
-                data.append({"raw": self._model.get_raw(r, c), "format": self._model.get_format(r, c)})
+                data.append({
+                    "raw": self._model.get_raw(r, c),
+                    "format": self._model.get_format(r, c),
+                    "type": self._model.get_type(r, c),
+                })
             rows_data.append(data)
         cmd = RemoveCommentRowsCommand(self._model, rows, rows_data, self._sync_to_service)
         command_history_service.add_command(cmd)
@@ -638,7 +644,11 @@ class CommentTableWidget(QWidget):
         col_index = self._model.columnCount() - 1
         header = self.columns[col_index - 1]
         column_data = [
-            {"raw": self._model.get_raw(r, col_index), "format": self._model.get_format(r, col_index)}
+            {
+                "raw": self._model.get_raw(r, col_index),
+                "format": self._model.get_format(r, col_index),
+                "type": self._model.get_type(r, col_index),
+            }
             for r in range(self._model.rowCount())
         ]
         cmd = RemoveCommentColumnCommand(self._model, col_index, header, column_data, self.columns, self._sync_to_service)
@@ -663,8 +673,9 @@ class CommentTableWidget(QWidget):
             row_data = []
             for col in range(1, model.columnCount()):
                 cell = {
-                    "raw": model.get_raw(row, col) or "",
+                    "raw": model.get_raw(row, col),
                     "format": model.get_format(row, col),
+                    "type": model.get_type(row, col),
                 }
                 row_data.append(cell)
             comments.append(row_data)

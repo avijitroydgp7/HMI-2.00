@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from typing import Any, List
 import re
+from datetime import datetime, date
 
 from PyQt6.QtCore import QAbstractTableModel, QModelIndex, Qt
 from PyQt6.QtGui import QFont, QColor
@@ -30,7 +31,7 @@ class CommentTableModel(QAbstractTableModel):
     def __init__(self, columns: List[str], parent=None):
         super().__init__(parent)
         self.columns = columns
-        # each cell stores {'raw': str, 'value': str, 'format': {}}
+        # each cell stores {'raw': Any, 'value': Any, 'format': {}, 'type': str}
         self._data: List[List[dict[str, Any]]] = []
         self._headers = ["Serial No."] + columns
         self._asteval = Interpreter() if Interpreter else None
@@ -73,12 +74,21 @@ class CommentTableModel(QAbstractTableModel):
             return fmt
         return None
 
+    @staticmethod
+    def _infer_type(value: Any) -> str:
+        if isinstance(value, (int, float)):
+            return "number"
+        if isinstance(value, (datetime, date)):
+            return "date"
+        return "str"
+
     def setData(self, index: QModelIndex, value: Any, role: int = Qt.ItemDataRole.EditRole):  # noqa: D401
         if not index.isValid() or role != Qt.ItemDataRole.EditRole:
             return False
         row, col = index.row(), index.column()
         if self._suspend_history:
             self._data[row][col]["raw"] = value
+            self._data[row][col]["type"] = self._infer_type(value)
             self._evaluate_all()
             self.dataChanged.emit(
                 index,
@@ -109,7 +119,7 @@ class CommentTableModel(QAbstractTableModel):
     def insertRow(self, row: int, parent: QModelIndex = QModelIndex()):  # noqa: D401
         self.beginInsertRows(parent, row, row)
         cols = self.columnCount()
-        new_row = [dict(raw="", value="", format={}) for _ in range(cols)]
+        new_row = [dict(raw="", value="", format={}, type="str") for _ in range(cols)]
         self._data.insert(row, new_row)
         self.endInsertRows()
         self._reindex_serials()
@@ -128,7 +138,7 @@ class CommentTableModel(QAbstractTableModel):
         self.beginInsertColumns(parent, column, column)
         self._headers.insert(column, f"Column {column}")
         for row in self._data:
-            row.insert(column, dict(raw="", value="", format={}))
+            row.insert(column, dict(raw="", value="", format={}, type="str"))
         self.endInsertColumns()
         return True
 
@@ -154,6 +164,9 @@ class CommentTableModel(QAbstractTableModel):
 
     def get_format(self, row: int, col: int) -> dict[str, Any]:
         return self._data[row][col].get("format", {}).copy()
+
+    def get_type(self, row: int, col: int) -> str:
+        return self._data[row][col].get("type", "str")
 
     def set_cell_format(self, row: int, col: int, fmt: dict[str, Any]):
         if not self._suspend_history:
@@ -182,6 +195,7 @@ class CommentTableModel(QAbstractTableModel):
             idx = self.index(row, col)
             if isinstance(cell, dict):
                 self.setData(idx, cell.get("raw", ""))
+                self._data[row][col]["type"] = cell.get("type", self._infer_type(cell.get("raw", "")))
                 fmt = cell.get("format")
                 if fmt:
                     self.set_cell_format(row, col, fmt)
@@ -192,6 +206,7 @@ class CommentTableModel(QAbstractTableModel):
         for i, row in enumerate(self._data, start=1):
             row[0]["raw"] = str(i)
             row[0]["value"] = str(i)
+            row[0]["type"] = "str"
         self._evaluate_all()
 
     def _evaluate_all(self):

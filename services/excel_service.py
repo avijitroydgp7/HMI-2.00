@@ -4,6 +4,7 @@ from typing import Dict, Any, List
 
 from openpyxl import Workbook, load_workbook
 from openpyxl.styles import Font, PatternFill
+from datetime import datetime, date
 
 from services.comment_data_service import comment_data_service
 
@@ -18,7 +19,19 @@ class ExcelService:
         for row in ws.iter_rows(min_row=2, max_col=len(columns)):
             row_data: List[Dict[str, Any]] = []
             for cell in row:
-                raw = "" if cell.value is None else str(cell.value)
+                cell_value = cell.value
+                if cell_value is None:
+                    raw: Any = ""
+                    cell_type = "str"
+                elif isinstance(cell_value, (int, float)):
+                    raw = cell_value
+                    cell_type = "number"
+                elif isinstance(cell_value, (datetime, date)):
+                    raw = cell_value
+                    cell_type = "date"
+                else:
+                    raw = str(cell_value)
+                    cell_type = "str"
                 fmt: Dict[str, Any] = {}
                 if cell.font:
                     if cell.font.bold:
@@ -32,7 +45,7 @@ class ExcelService:
                     if rgb and rgb != "00000000":
                         fmt["bg_color"] = f"#{rgb[-6:]}"
                 # Alignment and border styles are ignored
-                row_data.append({"raw": raw, "format": fmt})
+                row_data.append({"raw": raw, "format": fmt, "type": cell_type})
             comments.append(row_data)
         return {
             "columns": columns,
@@ -62,7 +75,24 @@ class ExcelService:
         comments = group.get("comments", [])
         for r, row in enumerate(comments, start=2):
             for c, cell_data in enumerate(row, start=1):
-                cell = ws.cell(row=r, column=c, value=cell_data.get("raw", ""))
+                raw = cell_data.get("raw", "")
+                cell_type = cell_data.get("type")
+                value = raw
+                if cell_type == "number" and not isinstance(raw, (int, float)):
+                    try:
+                        value = float(raw)
+                        if isinstance(raw, str) and raw.isdigit():
+                            value = int(raw)
+                    except (TypeError, ValueError):
+                        value = raw
+                elif cell_type == "date" and isinstance(raw, str):
+                    try:
+                        value = datetime.fromisoformat(raw)
+                    except ValueError:
+                        value = raw
+                elif raw == "":
+                    value = ""
+                cell = ws.cell(row=r, column=c, value=value)
                 fmt = cell_data.get("format", {})
                 if fmt:
                     cell.font = Font(
