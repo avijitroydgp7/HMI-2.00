@@ -7,6 +7,7 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtCore import Qt
 from typing import Dict, Any, Optional
+import logging
 import copy
 
 from dialogs.actions.select_action_type_dialog import SelectActionTypeDialog
@@ -33,12 +34,24 @@ class ButtonPropertiesDialog(QDialog):
         # Initialize conditional style manager
         self.style_manager = ConditionalStyleManager()
         for style_data in self.properties.get('conditional_styles', []):
+            # Typical failure reasons when importing styles from dict:
+            # - Missing or misspelled keys like 'properties', 'hover_properties', 'click_properties'
+            # - Wrong data types (e.g., strings where dicts are expected)
+            # - Invalid color formats or icon paths in the properties
+            # - Malformed 'condition' or 'condition_data' structures
+            # - Legacy schema fields not compatible with current loader
             try:
                 # ConditionalStyle.from_dict already understands the separated
                 # base/hover/click property dictionaries and tooltip field.
-                self.style_manager.add_style(ConditionalStyle.from_dict(style_data))
-            except Exception:
-                pass
+                style = ConditionalStyle.from_dict(style_data)
+                self.style_manager.add_style(style)
+            except Exception as e:
+                logging.getLogger(__name__).warning(
+                    "Failed to load conditional style (style_id=%r). "
+                    "Typical causes: missing keys, wrong types, invalid color/icon values, or malformed condition data. "
+                    "Error: %s. Data: %r",
+                    style_data.get('style_id', '<unknown>'), e, style_data
+                )
         
         self.setWindowTitle("Button Properties")
         self.setMinimumWidth(1000)  # Increased width for better layout
@@ -396,6 +409,8 @@ class ButtonPropertiesDialog(QDialog):
             if action_data:
                 self.properties['actions'].append(action_data)
                 self._refresh_action_table()
+                new_row = len(self.properties['actions']) - 1
+                self.action_table.selectRow(new_row)
                 self._on_action_selection_changed()
 
     def _edit_action(self):
@@ -460,11 +475,10 @@ class ButtonPropertiesDialog(QDialog):
             duplicated_action = copy.deepcopy(original_action)
             
             # Insert the duplicated action after the original
-            self.properties['actions'].insert(row + 1, duplicated_action)
+            new_row = row + 1
+            self.properties['actions'].insert(new_row, duplicated_action)
             self._refresh_action_table()
-
-            # Select the newly duplicated action
-            self.action_table.selectRow(row + 1)
+            self.action_table.selectRow(new_row)
             self._on_action_selection_changed()
 
     def _populate_style_tab(self):
