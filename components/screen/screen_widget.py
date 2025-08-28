@@ -127,5 +127,6 @@ class ScreenWidget(QWidget):
             delta = scene_pos - new_scene_pos
             self.design_canvas.translate(delta.x(), delta.y())
         self.design_canvas.current_zoom = new_zoom
+        self.design_canvas._update_shadow_for_zoom()
         self.design_canvas.update_visible_items()
         self.zoom_changed.emit(self.get_zoom_percentage())
