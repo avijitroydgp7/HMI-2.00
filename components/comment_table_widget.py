@@ -22,7 +22,10 @@ from services.commands import (
     RemoveCommentRowsCommand,
     InsertCommentColumnCommand,
     RemoveCommentColumnCommand,
+    BulkUpdateCellsCommand,
 )
+import re
+from datetime import datetime, timedelta
 from .comment_table_model import CommentTableModel
 from .comment_filter_model import CommentFilterProxyModel
 
@@ -45,8 +48,195 @@ class CommentItemDelegate(QStyledItemDelegate):
         return editor
 
 
+class _FillHandle(QWidget):
+    """Small square shown at selection corner to start fill operations."""
+
+    def __init__(self, parent):
+        super().__init__(parent)
+        self.setFixedSize(6, 6)
+        self.setCursor(Qt.CursorShape.CrossCursor)
+        self.setStyleSheet("background-color: black")
+        self.hide()
+
+    def mousePressEvent(self, event):  # noqa: N802
+        self.parent()._start_fill_drag()
+
+    def mouseReleaseEvent(self, event):  # noqa: N802
+        self.parent()._end_fill_drag(self.mapToParent(event.pos()))
+
+    def mouseDoubleClickEvent(self, event):  # noqa: N802
+        self.parent()._auto_fill_down()
+
+
 class CommentTableView(QTableView):
     """Table view with basic clipboard support for comment cells."""
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._fill_handle = _FillHandle(self)
+        self._dragging_fill = False
+
+    def selectionChanged(self, selected, deselected):  # noqa: N802
+        super().selectionChanged(selected, deselected)
+        self._update_fill_handle()
+
+    def _update_fill_handle(self):
+        indexes = self.selectionModel().selectedIndexes()
+        if not indexes:
+            self._fill_handle.hide()
+            return
+        rows = [i.row() for i in indexes]
+        cols = [i.column() for i in indexes]
+        bottom, right = max(rows), max(cols)
+        rect = self.visualRect(self.model().index(bottom, right))
+        size = self._fill_handle.size()
+        self._fill_handle.move(rect.right() - size.width(), rect.bottom() - size.height())
+        self._fill_handle.show()
+
+    def _start_fill_drag(self):
+        self._dragging_fill = True
+
+    def _end_fill_drag(self, pos):
+        if not self._dragging_fill:
+            return
+        self._dragging_fill = False
+        idx = self.indexAt(pos)
+        if idx.isValid():
+            self._apply_fill(idx)
+        self._update_fill_handle()
+
+    def _auto_fill_down(self):
+        model = self.model()
+        source_model = model.sourceModel() if hasattr(model, "sourceModel") else model
+        sel_indexes = self.selectionModel().selectedIndexes()
+        if not sel_indexes:
+            return
+        mapped_sel = [model.mapToSource(i) if hasattr(model, "mapToSource") else i for i in sel_indexes]
+        rows = [i.row() for i in mapped_sel]
+        cols = [i.column() for i in mapped_sel]
+        bottom, right = max(rows), max(cols)
+        last_row = source_model.rowCount() - 1
+        if bottom >= last_row:
+            return
+        target_source = source_model.index(last_row, right)
+        target = model.mapFromSource(target_source) if hasattr(model, "mapFromSource") else target_source
+        self._apply_fill(target)
+        self._update_fill_handle()
+
+    def _apply_fill(self, target_index):
+        model = self.model()
+        source_model = model.sourceModel() if hasattr(model, "sourceModel") else model
+        sel_indexes = self.selectionModel().selectedIndexes()
+        if not sel_indexes:
+            return
+        mapped_sel = [model.mapToSource(i) if hasattr(model, "mapToSource") else i for i in sel_indexes]
+        rows = [i.row() for i in mapped_sel]
+        cols = [i.column() for i in mapped_sel]
+        top, left, bottom, right = min(rows), min(cols), max(rows), max(cols)
+
+        target = model.mapToSource(target_index) if hasattr(model, "mapToSource") else target_index
+        tr, tc = target.row(), target.column()
+        if top <= tr <= bottom and left <= tc <= right:
+            return
+        tr = min(max(tr, 0), source_model.rowCount() - 1)
+        tc = min(max(tc, 0), source_model.columnCount() - 1)
+        up_rows = max(0, top - tr)
+        down_rows = max(0, tr - bottom)
+        left_cols = max(0, left - tc)
+        right_cols = max(0, tc - right)
+        if up_rows == down_rows == left_cols == right_cols == 0:
+            return
+        start_row = top - up_rows
+        end_row = bottom + down_rows
+        start_col = left - left_cols
+        end_col = right + right_cols
+        updates = []
+        for r in range(start_row, end_row + 1):
+            if r < 0 or r >= source_model.rowCount():
+                continue
+            for c in range(start_col, end_col + 1):
+                if c < 0 or c >= source_model.columnCount():
+                    continue
+                if top <= r <= bottom and left <= c <= right:
+                    continue
+                src_r = top + ((r - top) % (bottom - top + 1))
+                src_c = left + ((c - left) % (right - left + 1))
+                base = source_model.get_raw(src_r, src_c)
+                dr = r - src_r
+                dc = c - src_c
+                if isinstance(base, str) and base.startswith("="):
+                    new_val = self._shift_formula(base, dr, dc, source_model._cell_name)
+                else:
+                    if left_cols == right_cols == 0 and left <= c <= right:
+                        seq = [source_model.get_raw(row, c) for row in range(top, bottom + 1)]
+                        step = r - bottom if r > bottom else r - top
+                        new_val = self._sequence_value(seq, step)
+                    elif up_rows == down_rows == 0 and top <= r <= bottom:
+                        seq = [source_model.get_raw(r, col) for col in range(left, right + 1)]
+                        step = c - right if c > right else c - left
+                        new_val = self._sequence_value(seq, step)
+                    else:
+                        new_val = base
+                old_val = source_model.get_raw(r, c)
+                updates.append((r, c, new_val, old_val))
+        if updates:
+            cmd = BulkUpdateCellsCommand(source_model, updates, getattr(source_model, "history_sync_cb", None))
+            command_history_service.add_command(cmd)
+
+    @staticmethod
+    def _parse_date(value):
+        for fmt in ("%Y-%m-%d", "%d/%m/%Y", "%m/%d/%Y"):
+            try:
+                return datetime.strptime(value, fmt)
+            except Exception:
+                continue
+        return None
+
+    def _sequence_value(self, values, step):
+        if len(values) == 1:
+            return values[0]
+        nums = []
+        all_nums = True
+        for v in values:
+            try:
+                nums.append(float(v))
+            except Exception:
+                all_nums = False
+                break
+        if all_nums:
+            delta = nums[1] - nums[0] if len(nums) >= 2 else 1
+            start = nums[-1] if step >= 0 else nums[0]
+            return str(start + delta * step)
+        dates = []
+        all_dates = True
+        for v in values:
+            d = self._parse_date(v)
+            if d is None:
+                all_dates = False
+                break
+            dates.append(d)
+        if all_dates:
+            delta = dates[1] - dates[0] if len(dates) >= 2 else timedelta(days=1)
+            start = dates[-1] if step >= 0 else dates[0]
+            return (start + delta * step).strftime("%Y-%m-%d")
+        return values[step % len(values)]
+
+    def _shift_formula(self, formula, dr, dc, cell_name_func):
+        ref_re = re.compile(r"([A-Z]+)([0-9]+)")
+
+        def col_to_num(col):
+            n = 0
+            for ch in col:
+                n = n * 26 + (ord(ch) - ord('A') + 1)
+            return n
+
+        def repl(match):
+            letters, row_str = match.groups()
+            col = col_to_num(letters) + dc
+            row = int(row_str) + dr
+            return cell_name_func(row - 1, col)
+
+        return "=" + ref_re.sub(repl, formula[1:])
 
     def keyPressEvent(self, event):  # noqa: N802 - Qt naming convention
         clipboard = QApplication.clipboard()

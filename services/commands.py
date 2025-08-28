@@ -489,3 +489,17 @@ class RemoveCommentColumnCommand(Command):
         self.model._suspend_history = False; self.columns_list.insert(self.column - 1, self.header)
     def _notify(self):
         if self.notify: self.notify()
+
+class BulkUpdateCellsCommand(Command):
+    def __init__(self, model, updates, notify):
+        super().__init__(); self.model = model; self.updates = updates; self.notify = notify
+    def redo(self):
+        self.model._suspend_history = True
+        for row, col, new_val, _ in self.updates: self.model.setData(self.model.index(row, col), new_val)
+        self.model._suspend_history = False
+    def undo(self):
+        self.model._suspend_history = True
+        for row, col, _, old_val in self.updates: self.model.setData(self.model.index(row, col), old_val)
+        self.model._suspend_history = False
+    def _notify(self):
+        if self.notify: self.notify()
