@@ -47,7 +47,98 @@ source .venv/bin/activate
 pip install -r requirements.txt
 
 # 3) Run
-python run.py
+python main.py
+```
+
+## Project Structure (Current)
+
+```
+HMI-2.00/
+├─ main.py
+├─ app_settings.json
+├─ requirements.txt
+├─ modern_gui v12.hmi
+├─ readme.md
+├─ components/
+│  ├─ array_tree_handler.py
+│  ├─ comment_filter_model.py
+│  ├─ comment_table_model.py
+│  ├─ comment_table_widget.py
+│  ├─ docks.py
+│  ├─ property_editor.py
+│  ├─ ribbon.py
+│  ├─ selection_overlay.py
+│  ├─ tag_editor_widget.py
+│  ├─ toolbar.py
+│  ├─ tree_widget.py
+│  ├─ welcome_widget.py
+│  ├─ button/
+│  │  ├─ button_properties_dialog.py
+│  │  └─  conditional_style.py
+│  ├─ screen/
+│  │  ├─ design_canvas.py
+│  │  ├─ graphics_items.py
+│  │  ├─ screen_manager_widget.py
+│  │  ├─ screen_tree.py
+│  │  └─  screen_widget.py
+├─ dialogs/
+│  ├─ actions/
+│  │  ├─ bit_action_dialog.py
+│  │  ├─ constants.py
+│  │  ├─ range_helpers.py
+│  │  ├─ select_action_type_dialog.py
+│  │  ├─ trigger_utils.py
+│  │  └─  word_action_dialog.py
+│  ├─ add_tag_dialog.py
+│  ├─ base_dialog.py
+│  ├─ comment_table_dialog.py
+│  ├─ info_dialog.py
+│  ├─ project_info_dialog.py
+│  ├─ question_dialog.py
+│  ├─ screen_properties_dialog.py
+│  ├─ tag_browser_dialog.py
+│  ├─ tag_database_dialog.py
+│  └─  widgets.py
+├─ lib/
+│  └─  icon/        # SVG icon assets
+├─ main_window/
+│  ├─ actions.py
+│  ├─ clipboard.py
+│  ├─ events.py
+│  ├─ handlers.py
+│  ├─ project_actions.py
+│  ├─ tabs.py
+│  ├─ ui_setup.py
+│  └─  window.py
+├─ scripts/
+├─ services/
+│  ├─ clipboard_service.py
+│  ├─ commands.py
+│  ├─ command_history_service.py
+│  ├─ comment_data_service.py
+│  ├─ csv_service.py
+│  ├─ excel_service.py
+│  ├─ project_service.py
+│  ├─ screen_data_service.py
+│  ├─ settings_service.py
+│  ├─ tag_data_service.py
+│  └─  tag_service.py
+├─ theme/
+│  ├─ dark_theme/
+│  ├─ default_theme/
+│  └─  light_theme/
+├─ tools/
+│  ├─ button.py
+│  ├─ dxf.py
+│  ├─ image.py
+│  ├─ line.py
+│  ├─ path_edit.py
+│  ├─ polygon.py
+│  ├─ scale.py
+│  └─  text.py
+└─ utils/
+   ├─ constants.py
+   └─  icon_manager.py
 ```
 
 > If PyQt6 wheels fail on your OS/Python combo, try a matching Python version (3.10–3.12) or use PySide6 as fallback (requires minor code tweaks).
@@ -57,7 +148,7 @@ python run.py
 ## 🗂 Project Structure
 
 ```
-pyhmi-designer/
+HMI-2.00/
 ├─ run.py
 ├─ README.md
 ├─ requirements.txt

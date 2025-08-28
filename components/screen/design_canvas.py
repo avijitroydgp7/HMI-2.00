@@ -1372,7 +1372,12 @@ class DesignCanvas(QGraphicsView):
         selection_data = []
         for item in self.scene.selectedItems():
             if isinstance(item, BaseGraphicsItem):
-                selection_data.append(dict(item.instance_data))
+                instance_id = item.get_instance_id()
+                if instance_id is None:
+                    continue
+                data = dict(item.instance_data)
+                data['instance_id'] = instance_id
+                selection_data.append(data)
         self.selection_changed.emit(self.screen_id, selection_data)
         if self.active_tool == constants.TOOL_PATH_EDIT:
             self._update_path_edit_target()

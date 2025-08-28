@@ -98,10 +98,8 @@ class PropertyEditor(QStackedWidget):
                 self.set_current_object(None, None)
                 return
         
-        # Preserve the existing current_object_id if the instance still exists
-        instance_id = selection_data.get('instance_id')
-        if instance_id is not None:
-            self.current_object_id = instance_id
+        # Update the current object tracking based on the selection
+        self.current_object_id = selection_data.get('instance_id')
         self.current_parent_id = parent_id
         
         if 'screen_id' in selection_data:
@@ -244,10 +242,10 @@ class PropertyEditor(QStackedWidget):
                     button.set_default_properties(new_props)
                 self.current_properties = new_props
         
-        label_edit.editingFinished.connect(on_property_changed)
+        label_edit.textChanged.connect(on_property_changed)
         style_combo.currentIndexChanged.connect(on_property_changed)
-        bg_color_edit.editingFinished.connect(on_property_changed)
-        text_color_edit.editingFinished.connect(on_property_changed)
+        bg_color_edit.textChanged.connect(on_property_changed)
+        text_color_edit.textChanged.connect(on_property_changed)
 
         return editor_widget
 
@@ -303,7 +301,7 @@ class PropertyEditor(QStackedWidget):
                 self.current_properties = new_props
 
         for widget in (start_x, start_y, end_x, end_y, color_edit, width_edit, style_edit):
-            widget.editingFinished.connect(on_property_changed)
+            widget.textChanged.connect(on_property_changed)
 
         return editor_widget
 
@@ -357,12 +355,12 @@ class PropertyEditor(QStackedWidget):
                     text_tool.set_default_properties(new_props)
                 self.current_properties = new_props
 
-        content_edit.editingFinished.connect(on_property_changed)
-        font_family.editingFinished.connect(on_property_changed)
-        font_size.editingFinished.connect(on_property_changed)
+        content_edit.textChanged.connect(on_property_changed)
+        font_family.textChanged.connect(on_property_changed)
+        font_size.textChanged.connect(on_property_changed)
         bold_combo.currentIndexChanged.connect(on_property_changed)
         italic_combo.currentIndexChanged.connect(on_property_changed)
-        color_edit.editingFinished.connect(on_property_changed)
+        color_edit.textChanged.connect(on_property_changed)
 
         return editor_widget
 
@@ -405,7 +403,7 @@ class PropertyEditor(QStackedWidget):
                 self.current_properties = new_props
 
         for widget in (fill_color, stroke_color, stroke_width, stroke_style):
-            widget.editingFinished.connect(on_property_changed)
+            widget.textChanged.connect(on_property_changed)
 
         return editor_widget
 
@@ -447,7 +445,7 @@ class PropertyEditor(QStackedWidget):
                 self.current_properties = new_props
 
         for widget in (path_edit, width_edit, height_edit):
-            widget.editingFinished.connect(on_property_changed)
+            widget.textChanged.connect(on_property_changed)
 
         return editor_widget
 
@@ -513,6 +511,6 @@ class PropertyEditor(QStackedWidget):
             units_edit,
             color_edit,
         ):
-            widget.editingFinished.connect(on_property_changed)
+            widget.textChanged.connect(on_property_changed)
 
         return editor_widget
