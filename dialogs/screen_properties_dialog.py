@@ -56,7 +56,7 @@ class ScreenPropertiesDialog(QDialog):
         self.desc_input = QTextEdit()
         self.desc_input.setFixedHeight(60)
         
-        self.error_label = QLabel("Error message here")
+        self.error_label = QLabel("")
         self.error_label.setObjectName("ErrorLabel")
         self.error_label.setVisible(False)
         

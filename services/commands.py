@@ -57,6 +57,7 @@ class RemoveScreenCommand(Command):
             for parent_id, instance_data in self.child_references:
                 parent_screen = screen_service.get_screen(parent_id)
                 if parent_screen: parent_screen['children'].append(instance_data)
+            screen_service.rebuild_reverse_index()
     def _notify(self):
         from services.screen_data_service import screen_service
         screen_service.screen_list_changed.emit()

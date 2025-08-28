@@ -16,9 +16,34 @@ class ScreenDataService(QObject):
     def __init__(self):
         super().__init__()
         self._screens = {}
+        self._child_to_parents = {}
+
+    def _index_add_child(self, parent_id, child_screen_id):
+        if not child_screen_id:
+            return
+        parents = self._child_to_parents.get(child_screen_id)
+        if parents is None:
+            self._child_to_parents[child_screen_id] = {parent_id}
+        else:
+            parents.add(parent_id)
+
+    def _index_remove_child(self, parent_id, child_screen_id):
+        parents = self._child_to_parents.get(child_screen_id)
+        if not parents:
+            return
+        parents.discard(parent_id)
+        if not parents:
+            self._child_to_parents.pop(child_screen_id, None)
+
+    def rebuild_reverse_index(self):
+        self._child_to_parents = {}
+        for parent_id, screen_data in self._screens.items():
+            for child in screen_data.get('children', []):
+                self._index_add_child(parent_id, child.get('screen_id'))
 
     def clear_all(self):
         self._screens.clear()
+        self._child_to_parents.clear()
         self.screen_list_changed.emit()
         
     def get_default_style(self):
@@ -83,15 +108,7 @@ class ScreenDataService(QObject):
         self.screen_modified.emit(parent_id)
         
     def get_parent_screens(self, child_screen_id):
-        """Finds all screens that contain an instance of the given child_screen_id."""
-        parents = []
-        for parent_id, screen_data in self._screens.items():
-            if parent_id == child_screen_id: continue
-            for child in screen_data.get('children', []):
-                if child.get('screen_id') == child_screen_id:
-                    parents.append(parent_id)
-                    break 
-        return parents
+        return list(self._child_to_parents.get(child_screen_id, set()))
 
     def notify_screen_update(self, screen_id):
         """
@@ -99,9 +116,7 @@ class ScreenDataService(QObject):
         any parent screens that embed it.
         """
         self.screen_modified.emit(screen_id)
-        
-        parent_ids = self.get_parent_screens(screen_id)
-        for parent_id in parent_ids:
+        for parent_id in self._child_to_parents.get(screen_id, set()):
             self.screen_modified.emit(parent_id)
 
     def _perform_add_screen(self, screen_data, screen_id=None):
@@ -110,13 +125,22 @@ class ScreenDataService(QObject):
         if 'style' not in screen_data: screen_data['style'] = self.get_default_style()
         if 'children' not in screen_data: screen_data['children'] = []
         self._screens[new_id] = screen_data
+        for child in screen_data.get('children', []):
+            self._index_add_child(new_id, child.get('screen_id'))
         return new_id
 
     def _perform_remove_screen(self, screen_id):
         if screen_id in self._screens:
+            for child in self._screens[screen_id].get('children', []):
+                self._index_remove_child(screen_id, child.get('screen_id'))
+
             del self._screens[screen_id]
+
             for pid in self._screens:
-                self._screens[pid]['children'] = [c for c in self._screens[pid].get('children', []) if c.get('screen_id') != screen_id]
+                before = self._screens[pid].get('children', [])
+                self._screens[pid]['children'] = [c for c in before if c.get('screen_id') != screen_id]
+
+            self._child_to_parents.pop(screen_id, None)
         return True
         
     def _perform_update_screen(self, screen_id, new_data):
@@ -125,6 +149,19 @@ class ScreenDataService(QObject):
         Notification is handled by the command via notify_screen_update.
         """
         if screen_id in self._screens:
+            # Keep reverse index consistent if children changed via a full screen update
+            old_children = self._screens[screen_id].get('children', [])
+            new_children = new_data.get('children', [])
+            old_set = {c.get('screen_id') for c in old_children if c.get('screen_id')}
+            new_set = {c.get('screen_id') for c in new_children if c.get('screen_id')}
+
+            # Remove parent link for children no longer present
+            for cid in old_set - new_set:
+                self._index_remove_child(screen_id, cid)
+            # Add parent link for newly added children
+            for cid in new_set - old_set:
+                self._index_add_child(screen_id, cid)
+
             self._screens[screen_id] = new_data
             return True
         return False
@@ -137,12 +174,20 @@ class ScreenDataService(QObject):
             if 'children' not in self._screens[parent_id]:
                 self._screens[parent_id]['children'] = []
             self._screens[parent_id]['children'].append(child_data)
+            self._index_add_child(parent_id, child_data.get('screen_id'))
             return True
         return False
 
     def _perform_remove_child(self, parent_id, instance_id):
         if parent_id in self._screens:
-            self._screens[parent_id]['children'] = [i for i in self._screens[parent_id].get('children', []) if i['instance_id'] != instance_id]
+            children = self._screens[parent_id].get('children', [])
+            removed_child_ids = [i.get('screen_id') for i in children if i.get('instance_id') == instance_id]
+            new_children = [i for i in children if i.get('instance_id') != instance_id]
+            self._screens[parent_id]['children'] = new_children
+            for cid in removed_child_ids:
+                # Only remove parent mapping if no other instance of this child remains in this parent
+                if not any(i.get('screen_id') == cid for i in new_children):
+                    self._index_remove_child(parent_id, cid)
             return True
         return False
 
@@ -169,6 +214,8 @@ class ScreenDataService(QObject):
     def load_from_project(self, project_data):
         self.clear_all()
         self._screens = project_data.get("screens", {})
+        # Rebuild reverse index from loaded data
+        self.rebuild_reverse_index()
         self.screen_list_changed.emit()
 
 screen_service = ScreenDataService()
