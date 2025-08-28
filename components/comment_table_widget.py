@@ -66,21 +66,24 @@ class CommentItemDelegate(QStyledItemDelegate):
 class _FillHandle(QWidget):
     """Small square shown at selection corner to start fill operations."""
 
-    def __init__(self, parent):
-        super().__init__(parent)
+    def __init__(self, table_view):
+        # Parent the handle to the table's viewport so it overlays cells,
+        # but keep a reference to the table view to call its helpers.
+        super().__init__(table_view.viewport())
+        self._table_view = table_view
         self.setFixedSize(6, 6)
         self.setCursor(Qt.CursorShape.CrossCursor)
         self.setStyleSheet("background-color: black")
         self.hide()
 
     def mousePressEvent(self, event):  # noqa: N802
-        self.parent()._start_fill_drag()
+        self._table_view._start_fill_drag()
 
     def mouseReleaseEvent(self, event):  # noqa: N802
-        self.parent()._end_fill_drag(self.mapToParent(event.pos()))
+        self._table_view._end_fill_drag(self.mapToParent(event.pos()))
 
     def mouseDoubleClickEvent(self, event):  # noqa: N802
-        self.parent()._auto_fill_down()
+        self._table_view._auto_fill_down()
 
 
 class CommentTableView(QTableView):
@@ -88,8 +91,12 @@ class CommentTableView(QTableView):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        # Pass the table view itself; the handle will parent to viewport
+        # and retain a reference to the table for helper calls.
         self._fill_handle = _FillHandle(self)
         self._dragging_fill = False
+        self.verticalScrollBar().valueChanged.connect(lambda _: self._update_fill_handle())
+        self.horizontalScrollBar().valueChanged.connect(lambda _: self._update_fill_handle())
 
     def selectionChanged(self, selected, deselected):  # noqa: N802
         super().selectionChanged(selected, deselected)
@@ -107,6 +114,7 @@ class CommentTableView(QTableView):
         size = self._fill_handle.size()
         self._fill_handle.move(rect.right() - size.width(), rect.bottom() - size.height())
         self._fill_handle.show()
+        self._fill_handle.raise_()
 
     def _start_fill_drag(self):
         self._dragging_fill = True

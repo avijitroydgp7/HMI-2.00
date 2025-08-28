@@ -170,6 +170,27 @@ class DesignCanvas(QGraphicsView):
         """Draw the scene background without grid lines."""
         super().drawBackground(painter, rect)
 
+    # --- Utilities ---------------------------------------------------------
+    def _remove_item_safely(self, item: QGraphicsItem | None):
+        """Remove a QGraphicsItem from whichever scene owns it, if any.
+
+        This prevents Qt warnings when attempting to remove an item from a
+        different scene, or when the item has already been detached (scene is
+        None).
+        """
+        if not item:
+            return
+        try:
+            s = item.scene()
+        except Exception:
+            s = None
+        if s is not None:
+            try:
+                s.removeItem(item)
+            except Exception:
+                # Swallow removal errors; item may be mid-destruction
+                pass
+
 
     def eventFilter(self, source, event):
         if event.type() == QEvent.Type.HoverMove:
@@ -394,10 +415,10 @@ class DesignCanvas(QGraphicsView):
                 scene_pos = self._snap_position(self.mapToScene(event.pos()))
 
                 if not self._drawing and self._preview_item:
-                    self.scene.removeItem(self._preview_item)
+                    self._remove_item_safely(self._preview_item)
                     self._preview_item = None
                     if self._dimension_item:
-                        self.scene.removeItem(self._dimension_item)
+                        self._remove_item_safely(self._dimension_item)
                         self._dimension_item = None
 
                 if self.active_tool == constants.TOOL_BUTTON:
@@ -602,7 +623,7 @@ class DesignCanvas(QGraphicsView):
     def _update_dimension_label(self, current_scene_pos: QPointF):
         if not self._drawing or not self._preview_item:
             if self._dimension_item:
-                self.scene.removeItem(self._dimension_item)
+                self._remove_item_safely(self._dimension_item)
                 self._dimension_item = None
             return
         if self._dimension_item is None:
@@ -1016,10 +1037,10 @@ class DesignCanvas(QGraphicsView):
                     self._start_pos = None
                     self._draw_points = []
                     if self._preview_item:
-                        self.scene.removeItem(self._preview_item)
+                        self._remove_item_safely(self._preview_item)
                         self._preview_item = None
                     if self._dimension_item:
-                        self.scene.removeItem(self._dimension_item)
+                        self._remove_item_safely(self._dimension_item)
                         self._dimension_item = None
             return
         if event.button() == Qt.MouseButton.LeftButton:
@@ -1117,6 +1138,18 @@ class DesignCanvas(QGraphicsView):
         self.screen_data = screen_service.get_screen(self.screen_id)
         if not self.screen_data:
             self.scene.clear()
+            # Remove transient preview/dimension items and any path-edit handles
+            self._remove_item_safely(self._preview_item)
+            self._remove_item_safely(self._dimension_item)
+            self._preview_item = None
+            self._dimension_item = None
+            # Ensure path edit tool is fully deactivated
+            try:
+                self.path_edit_tool.deactivate()
+            except Exception:
+                pass
+            # Clear item map; items have been destroyed by scene.clear()
+            self._item_map.clear()
             return
 
         size = self.screen_data.get('size', {'width': 1920, 'height': 1080})
@@ -1157,7 +1190,7 @@ class DesignCanvas(QGraphicsView):
         current_instance_ids = {item_data['instance_id'] for item_data in children_list}
         for instance_id, item in list(self._item_map.items()):
             if instance_id not in current_instance_ids:
-                self.scene.removeItem(item)
+                self._remove_item_safely(item)
                 del self._item_map[instance_id]
         for child_data in children_list:
             instance_id = child_data['instance_id']
@@ -1258,10 +1291,10 @@ class DesignCanvas(QGraphicsView):
             self.path_edit_tool.deactivate()
         self.active_tool = tool_name
         if self._preview_item:
-            self.scene.removeItem(self._preview_item)
+            self._remove_item_safely(self._preview_item)
             self._preview_item = None
         if self._dimension_item:
-            self.scene.removeItem(self._dimension_item)
+            self._remove_item_safely(self._dimension_item)
             self._dimension_item = None
         self._drawing = False
         self._draw_points = []
@@ -1299,10 +1332,10 @@ class DesignCanvas(QGraphicsView):
             self._drawing = False
             self._draw_points = []
             if self._preview_item:
-                self.scene.removeItem(self._preview_item)
+                self._remove_item_safely(self._preview_item)
                 self._preview_item = None
             if self._dimension_item:
-                self.scene.removeItem(self._dimension_item)
+                self._remove_item_safely(self._dimension_item)
                 self._dimension_item = None
             return
         item = self.itemAt(event.pos())

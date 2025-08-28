@@ -70,7 +70,15 @@ class PathEditTool:
 
     def deactivate(self):
         for h in self.handles:
-            self.canvas.scene.removeItem(h)
+            try:
+                s = h.scene()
+            except Exception:
+                s = None
+            if s is not None:
+                try:
+                    s.removeItem(h)
+                except Exception:
+                    pass
         self.handles.clear()
         self.item = None
 

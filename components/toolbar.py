@@ -83,6 +83,7 @@ class ToolsToolbar(QToolBar):
 
         tools = [
             {"id": constants.TOOL_SELECT, "name": "Select Tool", "icon": "fa5s.mouse-pointer", "shortcut": "V", "checked": True},
+            {"id": constants.TOOL_PATH_EDIT, "name": "Path Edit Tool", "icon": "fa5s.edit", "shortcut": "E", "checked": False},
             {"id": constants.TOOL_BUTTON, "name": "Button Tool", "icon": "mdi.gesture-tap-box", "shortcut": "B", "checked": False},
         ]
 
