@@ -23,6 +23,7 @@ from services.commands import (
     RemoveCommentColumnCommand,
 )
 from .comment_table_model import CommentTableModel
+from .comment_filter_model import CommentFilterProxyModel
 
 
 class CommentItemDelegate(QStyledItemDelegate):
@@ -31,6 +32,8 @@ class CommentItemDelegate(QStyledItemDelegate):
     def createEditor(self, parent, option, index):  # noqa: N802 - Qt naming convention
         editor = QLineEdit(parent)
         model = index.model()
+        if hasattr(model, "sourceModel"):
+            model = model.sourceModel()
         refs = []
         for r in range(model.rowCount()):
             for c in range(1, model.columnCount()):
@@ -352,16 +355,23 @@ class CommentTableWidget(QWidget):
         self.fill_action.triggered.connect(self._choose_fill_color)
         self.format_toolbar.addAction(self.fill_action)
 
+        self.filter_input = QLineEdit()
+        self.filter_input.setPlaceholderText("Filter...")
+        main_layout.addWidget(self.filter_input)
+
         self.table = CommentTableView(self)
         self.table.setSelectionBehavior(QTableView.SelectionBehavior.SelectItems)
         self.table.setSelectionMode(QTableView.SelectionMode.ExtendedSelection)
         main_layout.addWidget(self.table)
         self.table.setItemDelegate(CommentItemDelegate(self.table))
-        
+
         self._model = CommentTableModel(self.columns, self)
         self._model.history_sync_cb = self._sync_to_service
-        self.table.setModel(self._model)
+        self.proxy_model = CommentFilterProxyModel(self)
+        self.proxy_model.setSourceModel(self._model)
+        self.table.setModel(self.proxy_model)
         self.table.setSortingEnabled(True)
+        self.filter_input.textChanged.connect(self.proxy_model.set_filter_text)
 
         self.table.horizontalHeader().setStretchLastSection(True)
         self.table.verticalHeader().setVisible(False)
@@ -394,7 +404,7 @@ class CommentTableWidget(QWidget):
     def remove_selected_rows(self) -> None:
         """Remove all currently selected rows."""
         selection = self.table.selectionModel().selectedRows()
-        rows = sorted({index.row() for index in selection})
+        rows = sorted({self.proxy_model.mapToSource(index).row() for index in selection})
         if not rows:
             return
         rows_data = []
@@ -427,7 +437,7 @@ class CommentTableWidget(QWidget):
         command_history_service.add_command(cmd)
 
     def _sync_to_service(self) -> None:
-        model = self.table.model()
+        model = self._model
         comments = []
         for row in range(model.rowCount()):
             row_data = []
@@ -449,6 +459,7 @@ class CommentTableWidget(QWidget):
     def _apply_format_to_selection(self, **fmt):
         indexes = self.table.selectionModel().selectedIndexes()
         for idx in indexes:
-            if idx.column() == 0:
+            source_idx = self.proxy_model.mapToSource(idx)
+            if source_idx.column() == 0:
                 continue
-            self._model.set_cell_format(idx.row(), idx.column(), fmt)
+            self._model.set_cell_format(source_idx.row(), source_idx.column(), fmt)
