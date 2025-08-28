@@ -12,6 +12,7 @@ from typing import Dict, Optional
 from ..widgets import TagSelector, CollapsibleBox
 from .range_helpers import DataTypeMapper, validate_range_section
 from .constants import ActionType, TriggerMode
+from .trigger_utils import TriggerUI
 
 class BitActionDialog(QDialog):
     """
@@ -104,161 +105,55 @@ class BitActionDialog(QDialog):
         parent_layout.addWidget(main_group)
 
     def _build_trigger_ui(self, parent_layout):
-        self.trigger_box = CollapsibleBox("Trigger")
-        
-        trigger_content_widget = QWidget()
-        trigger_main_layout = QVBoxLayout(trigger_content_widget)
-        trigger_main_layout.setContentsMargins(5, 10, 5, 5)
-        
-        self.trigger_mode_combo = QComboBox()
-        self.trigger_mode_combo.addItems(TriggerMode.values())
-        trigger_main_layout.addWidget(self.trigger_mode_combo)
-        
-        self.trigger_options_container = QWidget()
-        trigger_main_layout.addWidget(self.trigger_options_container)
-        
-        self.trigger_box.setContent(trigger_content_widget)
+        # Build trigger UI via shared helper and expose fields on self to keep
+        # compatibility with existing code paths and signal hookups.
+        self._trigger_helper = TriggerUI(parent=self, on_change=self._validate_form)
+
+        # Expose helper widgets/attributes to instance to preserve names
+        self.trigger_box = self._trigger_helper.box
+        self.trigger_mode_combo = self._trigger_helper.mode_combo
+        self.trigger_stack = self._trigger_helper.stack
+        self.trigger_empty_page = self._trigger_helper.trigger_empty_page
+        self.trigger_onoff_page = self._trigger_helper.trigger_onoff_page
+        self.trigger_range_page = self._trigger_helper.trigger_range_page
+
+        # On/Off
+        self.on_off_tag_selector = self._trigger_helper.on_off_tag_selector
+
+        # Range
+        self.range_operand1_selector = self._trigger_helper.range_operand1_selector
+        self.range_operator_combo = self._trigger_helper.range_operator_combo
+        self.range_rhs_stack = self._trigger_helper.range_rhs_stack
+        self.range_operand2_selector = self._trigger_helper.range_operand2_selector
+        self.range_lower_bound_selector = self._trigger_helper.range_lower_bound_selector
+        self.range_upper_bound_selector = self._trigger_helper.range_upper_bound_selector
+
+        # Keep operator change behavior consistent with prior implementation
+        if self.range_operator_combo is not None:
+            self.range_operator_combo.currentTextChanged.connect(self._on_range_operator_changed)
+
         parent_layout.addWidget(self.trigger_box)
 
     def _connect_signals(self):
         self.trigger_mode_combo.currentTextChanged.connect(self._on_trigger_mode_changed)
         self.target_tag_selector.inputChanged.connect(self._validate_form)
 
-    def _clear_layout(self, layout):
-        if layout is not None:
-            while layout.count():
-                item = layout.takeAt(0)
-                widget = item.widget()
-                if widget is not None:
-                    widget.deleteLater()
-
     def _on_trigger_mode_changed(self, mode: str):
-        # MODIFIED: Removed logic to hide action_mode_container
-        layout = self.trigger_options_container.layout()
-        if layout is not None:
-            self._clear_layout(layout)
-        else:
-            layout = QVBoxLayout(self.trigger_options_container)
-            self.trigger_options_container.setLayout(layout)
-        layout.setContentsMargins(0, 10, 0, 0)
-
-        # Reset any existing selector attributes
-        for attr in [
-            "on_off_tag_selector",
-            "range_operand1_selector",
-            "range_operand2_selector",
-            "range_lower_bound_selector",
-            "range_upper_bound_selector",
-            "range_operator_combo",
-            "range_rhs_stack",
-        ]:
-            if hasattr(self, attr):
-                setattr(self, attr, None)
-
-        if mode in [TriggerMode.ON.value, TriggerMode.OFF.value]:
-            self.on_off_tag_selector = TagSelector()
-            self.on_off_tag_selector.set_allowed_tag_types(["BOOL"])
-            self.on_off_tag_selector.main_tag_selector.set_mode_fixed("Tag")
-            self.on_off_tag_selector.inputChanged.connect(self._validate_form)
-            layout.addWidget(self.on_off_tag_selector)
-        elif mode == TriggerMode.RANGE.value:
-            self._build_range_trigger_options(layout)
-        
-        self._validate_form()
-
-    def _build_range_trigger_options(self, parent_layout):
-
-        range_group = QGroupBox("Range Configuration")
-        range_group.setObjectName("CardGroup")
-        layout = QGridLayout(range_group)
-        layout.setSpacing(10)
-        
-        allowed_types = [
-            DataTypeMapper.normalize_type(t) for t in ["INT", "DINT", "REAL"]
-        ]
-        
-        op1_layout = QVBoxLayout()
-        self.range_operand1_selector = TagSelector(allowed_tag_types=allowed_types)
-        self.range_operand1_selector.main_tag_selector.set_mode_fixed("Tag")
-        op1_layout.addWidget(QLabel("Operand 1"))
-        op1_layout.addWidget(self.range_operand1_selector)
-        op1_layout.addStretch(1)
-
-        op_layout = QVBoxLayout()
-        self.range_operator_combo = QComboBox()
-        self.range_operator_combo.addItems(["==", "!=", ">", ">=", "<", "<=", "between", "outside"])
-        op_layout.addWidget(QLabel("Operator"))
-        op_layout.addWidget(self.range_operator_combo)
-        op_layout.addStretch(1)
-        
-        self.range_rhs_stack = QStackedWidget()
-        
-        layout.addLayout(op1_layout, 0, 0)
-        layout.addLayout(op_layout, 0, 1)
-        layout.addWidget(self.range_rhs_stack, 0, 2, alignment=Qt.AlignmentFlag.AlignTop)
-        layout.setColumnStretch(0, 1)
-        layout.setColumnStretch(2, 1)
-        
-        op2_page = QWidget()
-        op2_page_layout = QVBoxLayout(op2_page)
-        op2_page_layout.setContentsMargins(0,0,0,0)
-        self.range_operand2_selector = TagSelector(allowed_tag_types=allowed_types)
-        op2_page_layout.addWidget(QLabel("Operand 2"))
-        op2_page_layout.addWidget(self.range_operand2_selector)
-        op2_page_layout.addStretch(1)
-        self.range_rhs_stack.addWidget(op2_page)
-        
-        between_page = QWidget()
-        between_layout = QGridLayout(between_page)
-        between_layout.setContentsMargins(0,0,0,0)
-        self.range_lower_bound_selector = TagSelector(allowed_tag_types=allowed_types)
-        self.range_upper_bound_selector = TagSelector(allowed_tag_types=allowed_types)
-        between_layout.addWidget(QLabel("Lower Bound"), 0, 0)
-        between_layout.addWidget(self.range_lower_bound_selector, 1, 0)
-        between_layout.addWidget(QLabel("Upper Bound"), 0, 1)
-        between_layout.addWidget(self.range_upper_bound_selector, 1, 1)
-        between_layout.setRowStretch(2, 1)
-        self.range_rhs_stack.addWidget(between_page)
-        
-        self.range_operand1_selector.inputChanged.connect(self._validate_form)
-        self.range_operator_combo.currentTextChanged.connect(self._on_range_operator_changed)
-        self.range_operand2_selector.inputChanged.connect(self._validate_form)
-        self.range_lower_bound_selector.inputChanged.connect(self._validate_form)
-        self.range_upper_bound_selector.inputChanged.connect(self._validate_form)
-        
-        self._on_range_operator_changed(self.range_operator_combo.currentText())
-        parent_layout.addWidget(range_group)
+        # Ensure initial mode selection reflects current UI
+        self._on_trigger_mode_changed(self.trigger_mode_combo.currentText())
 
     def _on_range_operator_changed(self, operator: str):
-        if self.range_rhs_stack:
-            self.range_rhs_stack.setCurrentIndex(1 if operator in ["between", "outside"] else 0)
+        # Delegate to helper so behavior stays consistent
+        if hasattr(self, "_trigger_helper") and self._trigger_helper:
+            self._trigger_helper.on_range_operator_changed(operator)
         self._validate_form()
 
     def _load_data(self, data):
         self._set_tag_selector_data(self.target_tag_selector, data.get("target_tag"))
         
         trigger_data = data.get("trigger", {})
-        trigger_mode = trigger_data.get("mode", TriggerMode.ORDINARY.value)
-        
-        self.trigger_mode_combo.blockSignals(True)
-        self.trigger_mode_combo.setCurrentText(trigger_mode)
-        self.trigger_mode_combo.blockSignals(False)
-        self._on_trigger_mode_changed(trigger_mode)
-
-        if trigger_mode in [TriggerMode.ON.value, TriggerMode.OFF.value] and self.on_off_tag_selector:
-            self._set_tag_selector_data(self.on_off_tag_selector, trigger_data.get("tag"))
-        elif trigger_mode == TriggerMode.RANGE.value and self.range_operator_combo:
-            self.range_operator_combo.setCurrentText(trigger_data.get("operator"))
-            if self.range_operand1_selector:
-                self._set_tag_selector_data(self.range_operand1_selector, trigger_data.get("operand1"))
-            if trigger_data.get("operator") in ["between", "outside"]:
-                if self.range_lower_bound_selector:
-                    self._set_tag_selector_data(self.range_lower_bound_selector, trigger_data.get("lower_bound"))
-                if self.range_upper_bound_selector:
-                    self._set_tag_selector_data(self.range_upper_bound_selector, trigger_data.get("upper_bound"))
-            else:
-                if self.range_operand2_selector:
-                    self._set_tag_selector_data(self.range_operand2_selector, trigger_data.get("operand2"))
+        # Load trigger via shared helper
+        self._trigger_helper.load_data(trigger_data)
         
         mode = data.get("mode", "Momentary")
         for button in self.mode_group.buttons():
@@ -281,23 +176,9 @@ class BitActionDialog(QDialog):
             is_valid = False
 
         trigger_mode = self.trigger_mode_combo.currentText()
-        trigger_is_valid = True
-        if trigger_mode in [TriggerMode.ON.value, TriggerMode.OFF.value]:
-            if not (self.on_off_tag_selector and self.on_off_tag_selector.get_data()):
-                if error_msg is None:
-                    error_msg = f"A tag must be selected for '{trigger_mode}' trigger."
-                trigger_is_valid = False
-        elif trigger_mode == TriggerMode.RANGE.value:
-            if self.range_operand1_selector and self.range_operator_combo:
-                trigger_is_valid, range_error = validate_range_section(
-                    self.range_operand1_selector,
-                    self.range_operator_combo.currentText(),
-                    self.range_operand2_selector,
-                    self.range_lower_bound_selector,
-                    self.range_upper_bound_selector,
-                )
-                if not trigger_is_valid and error_msg is None:
-                    error_msg = range_error
+        trigger_is_valid, trigger_error = self._trigger_helper.validate()
+        if not trigger_is_valid and error_msg is None:
+            error_msg = trigger_error
 
         is_valid &= trigger_is_valid
         if trigger_mode == TriggerMode.ORDINARY.value:
@@ -322,19 +203,8 @@ class BitActionDialog(QDialog):
             "mode": self.mode_group.checkedButton().text()
         }
 
-        trigger_mode = self.trigger_mode_combo.currentText()
-        if trigger_mode != TriggerMode.ORDINARY.value:
-            trigger_dict = {"mode": trigger_mode}
-            if trigger_mode in [TriggerMode.ON.value, TriggerMode.OFF.value]:
-                trigger_dict["tag"] = self.on_off_tag_selector.get_data()
-            elif trigger_mode == TriggerMode.RANGE.value:
-                trigger_dict["operator"] = self.range_operator_combo.currentText()
-                trigger_dict["operand1"] = self.range_operand1_selector.get_data()
-                if trigger_dict["operator"] in ["between", "outside"]:
-                    trigger_dict["lower_bound"] = self.range_lower_bound_selector.get_data()
-                    trigger_dict["upper_bound"] = self.range_upper_bound_selector.get_data()
-                else:
-                    trigger_dict["operand2"] = self.range_operand2_selector.get_data()
+        trigger_dict = self._trigger_helper.get_data()
+        if trigger_dict is not None:
             action_data["trigger"] = trigger_dict
         
         target_str = self._format_operand_for_display(target_tag_data)

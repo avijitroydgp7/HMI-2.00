@@ -12,6 +12,7 @@ from typing import Dict, Optional
 from ..widgets import TagSelector, CollapsibleBox
 from .range_helpers import DataTypeMapper, validate_range_section
 from .constants import ActionType, TriggerMode
+from .trigger_utils import TriggerUI
 
 class WordActionDialog(QDialog):
     """
@@ -129,41 +130,26 @@ class WordActionDialog(QDialog):
         parent_layout.addWidget(main_action_group)
 
     def _build_trigger_ui(self, parent_layout):
-        self.trigger_box = CollapsibleBox("Trigger")
+        # Build trigger UI via shared helper and expose fields on self to keep
+        # existing signal hookups and method references intact.
+        self._trigger_helper = TriggerUI(parent=self, on_change=self._validate_form)
 
-        trigger_content_widget = QWidget()
-        trigger_main_layout = QVBoxLayout(trigger_content_widget)
-        trigger_main_layout.setContentsMargins(5, 10, 5, 5)
+        self.trigger_box = self._trigger_helper.box
+        self.trigger_mode_combo = self._trigger_helper.mode_combo
+        self.trigger_stack = self._trigger_helper.stack
+        self.trigger_empty_page = self._trigger_helper.trigger_empty_page
+        self.trigger_onoff_page = self._trigger_helper.trigger_onoff_page
+        self.trigger_range_page = self._trigger_helper.trigger_range_page
 
-        self.trigger_mode_combo = QComboBox()
-        self.trigger_mode_combo.addItems(TriggerMode.values())
-        trigger_main_layout.addWidget(self.trigger_mode_combo)
+        # Expose selectors
+        self.on_off_tag_selector = self._trigger_helper.on_off_tag_selector
+        self.range_operand1_selector = self._trigger_helper.range_operand1_selector
+        self.range_operator_combo = self._trigger_helper.range_operator_combo
+        self.range_rhs_stack = self._trigger_helper.range_rhs_stack
+        self.range_operand2_selector = self._trigger_helper.range_operand2_selector
+        self.range_lower_bound_selector = self._trigger_helper.range_lower_bound_selector
+        self.range_upper_bound_selector = self._trigger_helper.range_upper_bound_selector
 
-        # Use a stacked widget to avoid creating/destroying child widgets
-        self.trigger_stack = QStackedWidget()
-
-        # 1) ORDINARY: empty page
-        self.trigger_empty_page = QWidget()
-        self.trigger_stack.addWidget(self.trigger_empty_page)
-
-        # 2) ON/OFF: single TagSelector page
-        self.trigger_onoff_page = QWidget()
-        onoff_layout = QVBoxLayout(self.trigger_onoff_page)
-        onoff_layout.setContentsMargins(0, 10, 0, 0)
-        self.on_off_tag_selector = TagSelector()
-        self.on_off_tag_selector.set_allowed_tag_types(["BOOL"])
-        self.on_off_tag_selector.main_tag_selector.set_mode_fixed("Tag")
-        onoff_layout.addWidget(self.on_off_tag_selector)
-        onoff_layout.addStretch(1)
-        self.trigger_stack.addWidget(self.trigger_onoff_page)
-
-        # 3) RANGE: full range config page
-        self.trigger_range_page = self._create_range_trigger_page()
-        self.trigger_stack.addWidget(self.trigger_range_page)
-
-        trigger_main_layout.addWidget(self.trigger_stack)
-
-        self.trigger_box.setContent(trigger_content_widget)
         parent_layout.addWidget(self.trigger_box)
 
     def _build_conditional_reset_ui(self, parent_layout):
@@ -249,6 +235,9 @@ class WordActionDialog(QDialog):
         self.action_mode_combo.currentTextChanged.connect(self._on_action_mode_changed)
         self.trigger_mode_combo.currentTextChanged.connect(self._on_trigger_mode_changed)
         self.operator_combo.currentTextChanged.connect(self._on_conditional_operator_changed)
+        # Ensure trigger range operator toggles RHS page and re-validates
+        if getattr(self, 'range_operator_combo', None) is not None:
+            self.range_operator_combo.currentTextChanged.connect(self._on_range_operator_changed)
         self.conditional_reset_group.toggled.connect(self._validate_form)
         self.else_checkbox.toggled.connect(self.else_group.setVisible)
         self.else_checkbox.toggled.connect(self._validate_form)
@@ -257,72 +246,11 @@ class WordActionDialog(QDialog):
 
     def _on_trigger_mode_changed(self, mode: str):
         # Switch pre-built pages without destroying widgets
-        if mode == TriggerMode.ORDINARY.value:
-            self.trigger_stack.setCurrentWidget(self.trigger_empty_page)
-        elif mode in [TriggerMode.ON.value, TriggerMode.OFF.value]:
-            self.trigger_stack.setCurrentWidget(self.trigger_onoff_page)
-        elif mode == TriggerMode.RANGE.value:
-            self.trigger_stack.setCurrentWidget(self.trigger_range_page)
-        else:
-            self.trigger_stack.setCurrentWidget(self.trigger_empty_page)
+        if hasattr(self, '_trigger_helper') and self._trigger_helper:
+            self._trigger_helper.on_mode_changed(mode)
         self._validate_form()
 
-    def _create_range_trigger_page(self) -> QWidget:
-        range_group = QGroupBox("Range Configuration")
-        range_group.setObjectName("CardGroup")
-        layout = QGridLayout(range_group)
-        layout.setSpacing(10)
-
-        allowed_types = [
-            DataTypeMapper.normalize_type(t) for t in ["INT", "DINT", "REAL"]
-        ]
-
-        op1_layout = QVBoxLayout()
-        self.range_operand1_selector = TagSelector(allowed_tag_types=allowed_types)
-        self.range_operand1_selector.main_tag_selector.set_mode_fixed("Tag")
-        op1_layout.addWidget(QLabel("Operand 1"))
-        op1_layout.addWidget(self.range_operand1_selector)
-        op1_layout.addStretch(1)
-
-        op_layout = QVBoxLayout()
-        self.range_operator_combo = QComboBox()
-        self.range_operator_combo.addItems(["==", "!=", ">", ">=", "<", "<=", "between", "outside"])
-        op_layout.addWidget(QLabel("Operator"))
-        op_layout.addWidget(self.range_operator_combo)
-        op_layout.addStretch(1)
-
-        self.range_rhs_stack = QStackedWidget()
-
-        layout.addLayout(op1_layout, 0, 0)
-        layout.addLayout(op_layout, 0, 1)
-        layout.addWidget(self.range_rhs_stack, 0, 2, alignment=Qt.AlignmentFlag.AlignTop)
-        layout.setColumnStretch(0, 1)
-        layout.setColumnStretch(2, 1)
-
-        op2_page = QWidget(); op2_page_layout = QVBoxLayout(op2_page); op2_page_layout.setContentsMargins(0,0,0,0)
-        self.range_operand2_selector = TagSelector(allowed_tag_types=allowed_types)
-        op2_page_layout.addWidget(QLabel("Operand 2")); op2_page_layout.addWidget(self.range_operand2_selector); op2_page_layout.addStretch(1)
-        self.range_rhs_stack.addWidget(op2_page)
-
-        between_page = QWidget(); between_layout = QGridLayout(between_page); between_layout.setContentsMargins(0,0,0,0)
-        self.range_lower_bound_selector = TagSelector(allowed_tag_types=allowed_types)
-        self.range_upper_bound_selector = TagSelector(allowed_tag_types=allowed_types)
-        between_layout.addWidget(QLabel("Lower Bound"), 0, 0); between_layout.addWidget(self.range_lower_bound_selector, 1, 0)
-        between_layout.addWidget(QLabel("Upper Bound"), 0, 1); between_layout.addWidget(self.range_upper_bound_selector, 1, 1)
-        between_layout.setRowStretch(2, 1)
-        self.range_rhs_stack.addWidget(between_page)
-
-        # Connect validation and operator switching once
-        self.range_operand1_selector.inputChanged.connect(self._validate_form)
-        self.range_operator_combo.currentTextChanged.connect(self._on_range_operator_changed)
-        self.range_operand2_selector.inputChanged.connect(self._validate_form)
-        self.range_lower_bound_selector.inputChanged.connect(self._validate_form)
-        self.range_upper_bound_selector.inputChanged.connect(self._validate_form)
-
-        # Initialize RHS page without triggering validation during build
-        op = self.range_operator_combo.currentText()
-        self.range_rhs_stack.setCurrentIndex(1 if op in ["between", "outside"] else 0)
-        return range_group
+    # Range page is created by TriggerUI helper; no separate builder here.
 
     def _on_action_mode_changed(self, mode_text: str):
         label_map = {
@@ -334,8 +262,8 @@ class WordActionDialog(QDialog):
         self._validate_form()
 
     def _on_range_operator_changed(self, operator: str):
-        if self.range_rhs_stack:
-            self.range_rhs_stack.setCurrentIndex(1 if operator in ["between", "outside"] else 0)
+        if hasattr(self, '_trigger_helper') and self._trigger_helper:
+            self._trigger_helper.on_range_operator_changed(operator)
         self._validate_form()
 
     def _on_conditional_operator_changed(self, operator: str):
@@ -436,38 +364,8 @@ class WordActionDialog(QDialog):
         return True, None
 
     def _validate_trigger_section(self):
-        """Validate the trigger section."""
-        trigger_mode = self.trigger_mode_combo.currentText()
-
-        if trigger_mode == TriggerMode.ORDINARY.value:
-            return True, None
-        elif trigger_mode in [TriggerMode.ON.value, TriggerMode.OFF.value]:
-            return self._validate_on_off_trigger()
-        elif trigger_mode == TriggerMode.RANGE.value:
-            return self._validate_range_trigger()
-
-        return True, None
-
-    def _validate_on_off_trigger(self):
-        """Validate On/Off trigger configuration."""
-        if not (self.on_off_tag_selector and self.on_off_tag_selector.get_data()):
-            trigger_mode = self.trigger_mode_combo.currentText()
-            return False, f"A tag must be selected for '{trigger_mode}' trigger."
-        return True, None
-
-    def _validate_range_trigger(self):
-        """Validate Range trigger configuration."""
-        if not (self.range_operand1_selector and self.range_operator_combo):
-            return True, None
-
-        return validate_range_section(
-            self.range_operand1_selector,
-            self.range_operator_combo.currentText(),
-            self.range_operand2_selector,
-            self.range_lower_bound_selector,
-            self.range_upper_bound_selector,
-            "Range Trigger",
-        )
+        """Validate the trigger section via shared helper."""
+        return self._trigger_helper.validate()
 
     def _validate_conditional_section(self):
         """Validate the conditional reset section."""
