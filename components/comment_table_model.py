@@ -222,10 +222,11 @@ class CommentTableModel(QAbstractTableModel):
                 env[self._cell_name(r, c)] = cell.get("value")
 
         def parse_cell(name: str) -> tuple[int, int]:
-            match = re.fullmatch(r"([A-Z]+)([0-9]+)", name)
+            match = re.fullmatch(r"([A-Z]+)([0-9]+)", name, re.IGNORECASE)
             if not match:
                 raise ValueError(f"Invalid cell name: {name}")
             letters, number = match.groups()
+            letters = letters.upper()
             col = 0
             for ch in letters:
                 col = col * 26 + (ord(ch) - ord('A') + 1)
@@ -281,7 +282,7 @@ class CommentTableModel(QAbstractTableModel):
             'cell_range': cell_range,
         })
 
-        range_re = re.compile(r"([A-Z]+[0-9]+):([A-Z]+[0-9]+)")
+        range_re = re.compile(r"([A-Z]+[0-9]+):([A-Z]+[0-9]+)", re.IGNORECASE)
 
         changed = True
         iterations = 0
@@ -293,7 +294,7 @@ class CommentTableModel(QAbstractTableModel):
                 for c, cell in enumerate(row):
                     raw = cell.get('raw', '')
                     if isinstance(raw, str) and raw.startswith('=') and c != 0:
-                        expr = raw[1:]
+                        expr = raw[1:].upper()
                         expr = range_re.sub(lambda m: f"cell_range('{m.group(1)}','{m.group(2)}')", expr)
                         self._asteval.symtable.update(env)
                         try:
