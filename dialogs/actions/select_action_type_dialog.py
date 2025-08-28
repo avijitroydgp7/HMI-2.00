@@ -2,6 +2,7 @@
 # A simple dialog to let the user choose the type of action to create.
 
 from PyQt6.QtWidgets import QPushButton, QVBoxLayout, QDialog
+from .constants import ActionType
 
 class SelectActionTypeDialog(QDialog):
     """
@@ -17,11 +18,11 @@ class SelectActionTypeDialog(QDialog):
         
         self.bit_button = QPushButton("Bit Action")
         self.bit_button.setToolTip("Control a single bit (ON/OFF, Toggle, etc.)")
-        self.bit_button.clicked.connect(lambda: self.select_type("bit"))
+        self.bit_button.clicked.connect(lambda: self.select_type(ActionType.BIT.value))
 
         self.word_button = QPushButton("Word Action")
         self.word_button.setToolTip("Manipulate numerical data (INT, REAL, etc.)")
-        self.word_button.clicked.connect(lambda: self.select_type("word"))
+        self.word_button.clicked.connect(lambda: self.select_type(ActionType.WORD.value))
 
         content_layout.addWidget(self.bit_button)
         content_layout.addWidget(self.word_button)

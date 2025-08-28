@@ -13,6 +13,7 @@ import copy
 from dialogs.actions.select_action_type_dialog import SelectActionTypeDialog
 from dialogs.actions.bit_action_dialog import BitActionDialog
 from dialogs.actions.word_action_dialog import WordActionDialog
+from dialogs.actions.constants import ActionType, TriggerMode
 
 from .conditional_style import (
     ConditionalStyleManager,
@@ -223,11 +224,11 @@ class ButtonPropertiesDialog(QDialog):
         action_data = self.properties['actions'][row]
         action_type = action_data.get('action_type')
 
-        if action_type == "bit":
+        if action_type == ActionType.BIT.value:
             self.action_properties_stack.setCurrentIndex(1)
             self.action_properties_group.setTitle("Bit Action Properties")
             self._populate_bit_action_properties(action_data)
-        elif action_type == "word":
+        elif action_type == ActionType.WORD.value:
             self.action_properties_stack.setCurrentIndex(2)
             self.action_properties_group.setTitle("Word Action Properties")
             self._populate_word_action_properties(action_data)
@@ -254,9 +255,9 @@ class ButtonPropertiesDialog(QDialog):
         action_data = self.properties['actions'][row]
         action_type = action_data.get('action_type')
         action_dialog = None
-        if action_type == "bit":
+        if action_type == ActionType.BIT.value:
             action_dialog = BitActionDialog(self, action_data=action_data)
-        elif action_type == "word":
+        elif action_type == ActionType.WORD.value:
             action_dialog = WordActionDialog(self, action_data=action_data)
         if action_dialog and action_dialog.exec():
             new_action_data = action_dialog.get_data()
@@ -301,22 +302,22 @@ class ButtonPropertiesDialog(QDialog):
         if not trigger_data:
             return ""
         
-        mode = trigger_data.get('mode', 'Ordinary')
-        if mode == "Ordinary":
+        mode = trigger_data.get('mode', TriggerMode.ORDINARY.value)
+        if mode == TriggerMode.ORDINARY.value:
             return ""
-        elif mode == "On":
+        elif mode == TriggerMode.ON.value:
             tag_data = trigger_data.get('tag')
             if tag_data:
                 tag_display = self._format_operand_for_display(tag_data)
                 return f"ON = {tag_display}"
             return "ON"
-        elif mode == "Off":
+        elif mode == TriggerMode.OFF.value:
             tag_data = trigger_data.get('tag')
             if tag_data:
                 tag_display = self._format_operand_for_display(tag_data)
                 return f"OFF = {tag_display}"
             return "OFF"
-        elif mode == "Range":
+        elif mode == TriggerMode.RANGE.value:
             operator = trigger_data.get('operator', '==')
             operand1 = trigger_data.get('operand1')
             if operand1:
@@ -399,9 +400,9 @@ class ButtonPropertiesDialog(QDialog):
 
         action_type = type_dialog.selected_action_type
         action_dialog = None
-        if action_type == "bit":
+        if action_type == ActionType.BIT.value:
             action_dialog = BitActionDialog(self)
-        elif action_type == "word":
+        elif action_type == ActionType.WORD.value:
             action_dialog = WordActionDialog(self)
         
         if action_dialog and action_dialog.exec():
@@ -422,9 +423,9 @@ class ButtonPropertiesDialog(QDialog):
         action_type = action_data.get('action_type')
 
         action_dialog = None
-        if action_type == "bit":
+        if action_type == ActionType.BIT.value:
             action_dialog = BitActionDialog(self, action_data=action_data)
-        elif action_type == "word":
+        elif action_type == ActionType.WORD.value:
             action_dialog = WordActionDialog(self, action_data=action_data)
 
         if action_dialog and action_dialog.exec():

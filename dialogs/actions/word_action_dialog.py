@@ -11,6 +11,7 @@ from typing import Dict, Optional
 
 from ..widgets import TagSelector, CollapsibleBox
 from .range_helpers import DataTypeMapper, validate_range_section
+from .constants import ActionType, TriggerMode
 
 class WordActionDialog(QDialog):
     """
@@ -73,6 +74,16 @@ class WordActionDialog(QDialog):
 
         # --- Initialize dialog state ---
         self._initialize_dialog(action_data)
+        
+        # Ensure dynamic trigger widgets exist as attributes
+        # so signal handlers can safely reference them before creation.
+        if not hasattr(self, 'on_off_tag_selector'): self.on_off_tag_selector = None
+        if not hasattr(self, 'range_operand1_selector'): self.range_operand1_selector = None
+        if not hasattr(self, 'range_operand2_selector'): self.range_operand2_selector = None
+        if not hasattr(self, 'range_lower_bound_selector'): self.range_lower_bound_selector = None
+        if not hasattr(self, 'range_upper_bound_selector'): self.range_upper_bound_selector = None
+        if not hasattr(self, 'range_operator_combo'): self.range_operator_combo = None
+        if not hasattr(self, 'range_rhs_stack'): self.range_rhs_stack = None
 
     # -------------------------------------------------------------------------
     # UI Building Methods
@@ -125,7 +136,7 @@ class WordActionDialog(QDialog):
         trigger_main_layout.setContentsMargins(5, 10, 5, 5)
         
         self.trigger_mode_combo = QComboBox()
-        self.trigger_mode_combo.addItems(["Ordinary", "On", "Off", "Range"])
+        self.trigger_mode_combo.addItems(TriggerMode.values())
         trigger_main_layout.addWidget(self.trigger_mode_combo)
         
         self.trigger_options_container = QWidget()
@@ -261,13 +272,13 @@ class WordActionDialog(QDialog):
             if hasattr(self, attr):
                 setattr(self, attr, None)
 
-        if mode in ["On", "Off"]:
+        if mode in [TriggerMode.ON.value, TriggerMode.OFF.value]:
             self.on_off_tag_selector = TagSelector()
             self.on_off_tag_selector.set_allowed_tag_types(["BOOL"])
             self.on_off_tag_selector.main_tag_selector.set_mode_fixed("Tag")
             self.on_off_tag_selector.inputChanged.connect(self._validate_form)
             layout.addWidget(self.on_off_tag_selector)
-        elif mode == "Range":
+        elif mode == TriggerMode.RANGE.value:
             self._build_range_trigger_options(layout)
 
         # Show container after widgets are updated
@@ -351,7 +362,7 @@ class WordActionDialog(QDialog):
         sender = self.sender()
         if sender == self.target_tag_selector:
             self._on_target_tag_selected(tag_data)
-        elif self.range_operand1_selector and sender == self.range_operand1_selector:
+        elif getattr(self, 'range_operand1_selector', None) is not None and sender == self.range_operand1_selector:
             self._on_range_operand1_selected(tag_data)
         self._validate_form()
 
@@ -444,11 +455,11 @@ class WordActionDialog(QDialog):
         """Validate the trigger section."""
         trigger_mode = self.trigger_mode_combo.currentText()
 
-        if trigger_mode == "Ordinary":
+        if trigger_mode == TriggerMode.ORDINARY.value:
             return True, None
-        elif trigger_mode in ["On", "Off"]:
+        elif trigger_mode in [TriggerMode.ON.value, TriggerMode.OFF.value]:
             return self._validate_on_off_trigger()
-        elif trigger_mode == "Range":
+        elif trigger_mode == TriggerMode.RANGE.value:
             return self._validate_range_trigger()
 
         return True, None
@@ -502,7 +513,7 @@ class WordActionDialog(QDialog):
         """Update the UI status indicators based on validation results."""
         trigger_mode = self.trigger_mode_combo.currentText()
         
-        if trigger_mode == "Ordinary":
+        if trigger_mode == TriggerMode.ORDINARY.value:
             self.trigger_box.setStatus(CollapsibleBox.Status.NEUTRAL)
         else:
             self.trigger_box.setStatus(CollapsibleBox.Status.OK if trigger_valid else CollapsibleBox.Status.ERROR)
@@ -529,7 +540,7 @@ class WordActionDialog(QDialog):
         if action_data:
             # Load data into model controls
             self.action_mode_combo.setCurrentText(action_data.get("action_mode", "Addition"))
-            self.trigger_mode_combo.setCurrentText(action_data.get("trigger", {}).get("mode", "Ordinary"))
+            self.trigger_mode_combo.setCurrentText(action_data.get("trigger", {}).get("mode", TriggerMode.ORDINARY.value))
             
             cond_data = action_data.get("conditional_reset")
             if cond_data:
@@ -577,9 +588,9 @@ class WordActionDialog(QDialog):
         # Trigger data
         trigger_data = data.get("trigger", {})
         trigger_mode = trigger_data.get("mode")
-        if trigger_mode in ["On", "Off"] and self.on_off_tag_selector:
+        if trigger_mode in [TriggerMode.ON.value, TriggerMode.OFF.value] and self.on_off_tag_selector:
             self._set_tag_selector_data(self.on_off_tag_selector, trigger_data.get("tag"))
-        elif trigger_mode == "Range" and self.range_operator_combo:
+        elif trigger_mode == TriggerMode.RANGE.value and self.range_operator_combo:
             self.range_operator_combo.setCurrentText(trigger_data.get("operator", "=="))
             self._on_range_operator_changed(self.range_operator_combo.currentText())
             if self.range_operand1_selector:
@@ -613,18 +624,18 @@ class WordActionDialog(QDialog):
             return None
 
         action_data = {
-            "action_type": "word",
+            "action_type": ActionType.WORD.value,
             "target_tag": self.target_tag_selector.get_data(),
             "action_mode": self.action_mode_combo.currentText(),
             "value": self.value_selector.get_data(),
         }
 
         trigger_mode = self.trigger_mode_combo.currentText()
-        if trigger_mode != "Ordinary":
+        if trigger_mode != TriggerMode.ORDINARY.value:
             trigger_dict = {"mode": trigger_mode}
-            if trigger_mode in ["On", "Off"] and self.on_off_tag_selector:
+            if trigger_mode in [TriggerMode.ON.value, TriggerMode.OFF.value] and self.on_off_tag_selector:
                 trigger_dict["tag"] = self.on_off_tag_selector.get_data()
-            elif trigger_mode == "Range" and self.range_operator_combo and self.range_operand1_selector:
+            elif trigger_mode == TriggerMode.RANGE.value and self.range_operator_combo and self.range_operand1_selector:
                 trigger_dict["operator"] = self.range_operator_combo.currentText()
                 trigger_dict["operand1"] = self.range_operand1_selector.get_data()
                 if trigger_dict["operator"] in ["between", "outside"]:

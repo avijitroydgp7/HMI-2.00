@@ -11,6 +11,7 @@ from typing import Dict, Optional
 
 from ..widgets import TagSelector, CollapsibleBox
 from .range_helpers import DataTypeMapper, validate_range_section
+from .constants import ActionType, TriggerMode
 
 class BitActionDialog(QDialog):
     """
@@ -110,7 +111,7 @@ class BitActionDialog(QDialog):
         trigger_main_layout.setContentsMargins(5, 10, 5, 5)
         
         self.trigger_mode_combo = QComboBox()
-        self.trigger_mode_combo.addItems(["Ordinary", "On", "Off", "Range"])
+        self.trigger_mode_combo.addItems(TriggerMode.values())
         trigger_main_layout.addWidget(self.trigger_mode_combo)
         
         self.trigger_options_container = QWidget()
@@ -154,13 +155,13 @@ class BitActionDialog(QDialog):
             if hasattr(self, attr):
                 setattr(self, attr, None)
 
-        if mode in ["On", "Off"]:
+        if mode in [TriggerMode.ON.value, TriggerMode.OFF.value]:
             self.on_off_tag_selector = TagSelector()
             self.on_off_tag_selector.set_allowed_tag_types(["BOOL"])
             self.on_off_tag_selector.main_tag_selector.set_mode_fixed("Tag")
             self.on_off_tag_selector.inputChanged.connect(self._validate_form)
             layout.addWidget(self.on_off_tag_selector)
-        elif mode == "Range":
+        elif mode == TriggerMode.RANGE.value:
             self._build_range_trigger_options(layout)
         
         self._validate_form()
@@ -237,16 +238,16 @@ class BitActionDialog(QDialog):
         self._set_tag_selector_data(self.target_tag_selector, data.get("target_tag"))
         
         trigger_data = data.get("trigger", {})
-        trigger_mode = trigger_data.get("mode", "Ordinary")
+        trigger_mode = trigger_data.get("mode", TriggerMode.ORDINARY.value)
         
         self.trigger_mode_combo.blockSignals(True)
         self.trigger_mode_combo.setCurrentText(trigger_mode)
         self.trigger_mode_combo.blockSignals(False)
         self._on_trigger_mode_changed(trigger_mode)
 
-        if trigger_mode in ["On", "Off"] and self.on_off_tag_selector:
+        if trigger_mode in [TriggerMode.ON.value, TriggerMode.OFF.value] and self.on_off_tag_selector:
             self._set_tag_selector_data(self.on_off_tag_selector, trigger_data.get("tag"))
-        elif trigger_mode == "Range" and self.range_operator_combo:
+        elif trigger_mode == TriggerMode.RANGE.value and self.range_operator_combo:
             self.range_operator_combo.setCurrentText(trigger_data.get("operator"))
             if self.range_operand1_selector:
                 self._set_tag_selector_data(self.range_operand1_selector, trigger_data.get("operand1"))
@@ -281,12 +282,12 @@ class BitActionDialog(QDialog):
 
         trigger_mode = self.trigger_mode_combo.currentText()
         trigger_is_valid = True
-        if trigger_mode in ["On", "Off"]:
+        if trigger_mode in [TriggerMode.ON.value, TriggerMode.OFF.value]:
             if not (self.on_off_tag_selector and self.on_off_tag_selector.get_data()):
                 if error_msg is None:
                     error_msg = f"A tag must be selected for '{trigger_mode}' trigger."
                 trigger_is_valid = False
-        elif trigger_mode == "Range":
+        elif trigger_mode == TriggerMode.RANGE.value:
             if self.range_operand1_selector and self.range_operator_combo:
                 trigger_is_valid, range_error = validate_range_section(
                     self.range_operand1_selector,
@@ -299,7 +300,7 @@ class BitActionDialog(QDialog):
                     error_msg = range_error
 
         is_valid &= trigger_is_valid
-        if trigger_mode == "Ordinary":
+        if trigger_mode == TriggerMode.ORDINARY.value:
             self.trigger_box.setStatus(CollapsibleBox.Status.NEUTRAL)
         else:
             self.trigger_box.setStatus(CollapsibleBox.Status.OK if trigger_is_valid else CollapsibleBox.Status.ERROR)
@@ -316,17 +317,17 @@ class BitActionDialog(QDialog):
             return None
             
         action_data = {
-            "action_type": "bit",
+            "action_type": ActionType.BIT.value,
             "target_tag": target_tag_data,
             "mode": self.mode_group.checkedButton().text()
         }
 
         trigger_mode = self.trigger_mode_combo.currentText()
-        if trigger_mode != "Ordinary":
+        if trigger_mode != TriggerMode.ORDINARY.value:
             trigger_dict = {"mode": trigger_mode}
-            if trigger_mode in ["On", "Off"]:
+            if trigger_mode in [TriggerMode.ON.value, TriggerMode.OFF.value]:
                 trigger_dict["tag"] = self.on_off_tag_selector.get_data()
-            elif trigger_mode == "Range":
+            elif trigger_mode == TriggerMode.RANGE.value:
                 trigger_dict["operator"] = self.range_operator_combo.currentText()
                 trigger_dict["operand1"] = self.range_operand1_selector.get_data()
                 if trigger_dict["operator"] in ["between", "outside"]:
@@ -338,7 +339,7 @@ class BitActionDialog(QDialog):
         
         target_str = self._format_operand_for_display(target_tag_data)
         mode_str = action_data.get("mode", "N/A")
-        if trigger_mode != "Ordinary":
+        if trigger_mode != TriggerMode.ORDINARY.value:
             mode_str = f"Triggered ({trigger_mode})"
             
         action_data["details"] = f"{mode_str} -> {target_str}"

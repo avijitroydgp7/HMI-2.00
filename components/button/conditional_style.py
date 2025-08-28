@@ -1,4 +1,5 @@
 from typing import Dict, Any, List, Optional, ClassVar, Callable, Union
+from dialogs.actions.constants import TriggerMode
 from dataclasses import dataclass, field
 import copy
 import ast
@@ -483,7 +484,7 @@ class ConditionalStyle:
     """
     style_id: str = ""
     condition: Optional[Union[str, Callable[[Dict[str, Any]], bool]]] = None
-    condition_data: Dict[str, Any] = field(default_factory=lambda: {"mode": "Ordinary"})
+    condition_data: Dict[str, Any] = field(default_factory=lambda: {"mode": TriggerMode.ORDINARY.value})
     # core text/style attributes
     text_type: str = "Text"
     text_value: str = ""
@@ -625,11 +626,11 @@ class ConditionalStyle:
             click_properties=click,
             style_sheet=data.get('style_sheet', ''),
         )
-        cond = data.get('condition_data', {"mode": "Ordinary"})
-        if cond.get('mode') in ('On', 'Off'):
+        cond = data.get('condition_data', {"mode": TriggerMode.ORDINARY.value})
+        if cond.get('mode') in (TriggerMode.ON.value, TriggerMode.OFF.value):
             if 'operand1' not in cond and 'tag' in cond:
                 cond['operand1'] = cond.pop('tag')
-        if cond.get('mode') == 'Range':
+        if cond.get('mode') == TriggerMode.RANGE.value:
             if 'operand1' not in cond and 'tag' in cond:
                 cond['operand1'] = cond.pop('tag')
             if 'operand2' not in cond and 'operand' in cond:
@@ -644,7 +645,7 @@ class ConditionalStyle:
                 else:
                     cond['operator'] = '=='
 
-        if cond.get('mode') in ('On', 'Off', 'Range'):
+        if cond.get('mode') in (TriggerMode.ON.value, TriggerMode.OFF.value, TriggerMode.RANGE.value):
             op1 = cond.get('operand1')
             if op1 and 'main_tag' not in op1 and 'source' in op1:
                 cond['operand1'] = {'main_tag': op1, 'indices': []}
@@ -716,9 +717,9 @@ class ConditionalStyleManager(QObject):
         tag_values = tag_values or {}
 
         for style in self.conditional_styles:
-            cond_cfg = getattr(style, 'condition_data', {"mode": "Ordinary"})
+            cond_cfg = getattr(style, 'condition_data', {"mode": TriggerMode.ORDINARY.value})
             cond = style.condition
-            condition = cond_cfg if cond_cfg.get('mode', 'Ordinary') != 'Ordinary' else cond
+            condition = cond_cfg if cond_cfg.get('mode', TriggerMode.ORDINARY.value) != TriggerMode.ORDINARY.value else cond
             match = self._evaluate_condition(condition, tag_values)
 
             if match:
@@ -755,16 +756,16 @@ class ConditionalStyleManager(QObject):
 
         if isinstance(condition, dict):
             cfg = condition
-            mode = cfg.get('mode', 'Ordinary')
-            if mode == 'Ordinary':
+            mode = cfg.get('mode', TriggerMode.ORDINARY.value)
+            if mode == TriggerMode.ORDINARY.value:
                 return True
-            if mode in ('On', 'Off'):
+            if mode in (TriggerMode.ON.value, TriggerMode.OFF.value):
                 op1 = cfg.get('operand1', cfg.get('tag'))
                 tag_val = self._extract_value(op1, tag_values)
                 if tag_val is None:
                     return False
-                return bool(tag_val) if mode == 'On' else not bool(tag_val)
-            if mode == 'Range':
+                return bool(tag_val) if mode == TriggerMode.ON.value else not bool(tag_val)
+            if mode == TriggerMode.RANGE.value:
                 op1 = cfg.get('operand1', cfg.get('tag'))
                 tag_val = self._extract_value(op1, tag_values)
                 if tag_val is None:
@@ -1111,7 +1112,7 @@ class ConditionalStyleEditorDialog(QDialog):
         condition_layout.setContentsMargins(5, 10, 5, 5)
 
         self.condition_mode_combo = QComboBox()
-        self.condition_mode_combo.addItems(["Ordinary", "On", "Off", "Range"])
+        self.condition_mode_combo.addItems(TriggerMode.values())
         condition_layout.addWidget(self.condition_mode_combo)
 
         self.condition_options_container = QWidget()
@@ -1122,13 +1123,13 @@ class ConditionalStyleEditorDialog(QDialog):
 
         self.condition_mode_combo.currentTextChanged.connect(self._on_condition_mode_changed)
 
-        initial_mode = self.style.condition_data.get("mode", "Ordinary")
+        initial_mode = self.style.condition_data.get("mode", TriggerMode.ORDINARY.value)
         self.condition_mode_combo.setCurrentText(initial_mode)
         self._on_condition_mode_changed(initial_mode)
         op1_cfg = self.style.condition_data.get("operand1")
-        if initial_mode in ("On", "Off") and op1_cfg:
+        if initial_mode in (TriggerMode.ON.value, TriggerMode.OFF.value) and op1_cfg:
             self.condition_tag_selector.set_data(op1_cfg)
-        elif initial_mode == "Range":
+        elif initial_mode == TriggerMode.RANGE.value:
             if op1_cfg:
                 self.range_tag_selector.set_data(op1_cfg)
             operator = self.style.condition_data.get("operator")
@@ -1534,13 +1535,13 @@ class ConditionalStyleEditorDialog(QDialog):
                 getattr(self, attr).deleteLater()
                 delattr(self, attr)
 
-        if mode in ("On", "Off"):
+        if mode in (TriggerMode.ON.value, TriggerMode.OFF.value):
             self.condition_tag_selector = TagSelector()
             self.condition_tag_selector.set_allowed_tag_types(["BOOL"])
             self.condition_tag_selector.main_tag_selector.set_mode_fixed("Tag")
             self.condition_tag_selector.inputChanged.connect(self._validate_condition_section)
             layout.addWidget(self.condition_tag_selector)
-        elif mode == "Range":
+        elif mode == TriggerMode.RANGE.value:
             self._build_range_condition_options(layout)
 
         self.condition_options_container.setVisible(True)
@@ -1615,9 +1616,9 @@ class ConditionalStyleEditorDialog(QDialog):
     def _validate_condition_section(self, *args):
         mode = self.condition_mode_combo.currentText()
         valid = True
-        if mode in ("On", "Off"):
+        if mode in (TriggerMode.ON.value, TriggerMode.OFF.value):
             valid = hasattr(self, 'condition_tag_selector') and self.condition_tag_selector.get_data() is not None
-        elif mode == "Range":
+        elif mode == TriggerMode.RANGE.value:
             operator = self.range_operator_combo.currentText() if hasattr(self, 'range_operator_combo') else ""
             if operator in ["between", "outside"]:
                 valid = all([
@@ -2324,10 +2325,10 @@ class ConditionalStyleEditorDialog(QDialog):
             click_properties["text_value"] = self.click_controls["text_edit"].toPlainText()
 
         condition_cfg = {"mode": self.condition_mode_combo.currentText()}
-        if condition_cfg["mode"] in ("On", "Off"):
+        if condition_cfg["mode"] in (TriggerMode.ON.value, TriggerMode.OFF.value):
             data = self.condition_tag_selector.get_data() if hasattr(self, 'condition_tag_selector') else None
             condition_cfg["operand1"] = data if data else None
-        elif condition_cfg["mode"] == "Range":
+        elif condition_cfg["mode"] == TriggerMode.RANGE.value:
             data = self.range_tag_selector.get_data() if hasattr(self, 'range_tag_selector') else None
             condition_cfg["operand1"] = data if data else None
             operator = self.range_operator_combo.currentText() if hasattr(self, 'range_operator_combo') else "=="
