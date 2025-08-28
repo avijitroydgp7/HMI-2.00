@@ -18,13 +18,14 @@ class WordActionDialog(QDialog):
     """
     A redesigned dialog for configuring a 'Word Action' with a focus on
     progressive disclosure, inline validation, and clearer visual hierarchy.
-    Now uses a fixed-height, scrollable layout.
+    Uses a scrollable layout.
     """
     def __init__(self, parent=None, action_data: Optional[Dict] = None):
         super().__init__(parent)
         self.setWindowTitle("Word Action Configuration")
         self.setMinimumWidth(800)
-        self.setFixedHeight(750)
+        # Provide a sensible initial size without fixing the height
+        self.resize(800, 750)
         # Remove borderless styling so combo boxes use the standard dropdown
         # appearance consistent with the Conditional Style window
 

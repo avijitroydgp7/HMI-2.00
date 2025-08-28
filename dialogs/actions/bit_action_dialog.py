@@ -23,7 +23,8 @@ class BitActionDialog(QDialog):
         super().__init__(parent)
         self.setWindowTitle("Bit Action Configuration")
         self.setMinimumWidth(600)
-        self.setFixedHeight(650)
+        # Provide a sensible initial size without fixing the height
+        self.resize(600, 650)
         # Use default styling so dropdowns match the Conditional Style window
 
         content_layout = QVBoxLayout(self)
