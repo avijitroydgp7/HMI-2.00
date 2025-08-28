@@ -60,6 +60,8 @@ class ScreenManagerWidget(QWidget):
     def sync_tree_with_service(self):
         self.tree.blockSignals(True)
 
+        # Preserve current expansion state of roots and items before sync
+        root_expanded_states = {rtype: ritem.isExpanded() for rtype, ritem in self.root_items.items()}
         expanded_ids = {sid for sid, itm in self.item_map.items() if itm.isExpanded()}
 
         self._get_or_create_root_item('base', "Base Screens", 'fa5.clone', '#5dadec')
@@ -92,8 +94,9 @@ class ScreenManagerWidget(QWidget):
                 self._sync_item_children(item, screen_data)
 
         self.tree.sortItems(0, Qt.SortOrder.AscendingOrder)
-        for root_item in self.root_items.values():
-            root_item.setExpanded(True)
+        # Restore previous expansion state of root items
+        for rtype, root_item in self.root_items.items():
+            root_item.setExpanded(root_expanded_states.get(rtype, root_item.isExpanded()))
         for sid, itm in self.item_map.items():
             itm.setExpanded(sid in expanded_ids)
         self.tree.blockSignals(False)
