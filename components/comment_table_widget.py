@@ -13,8 +13,8 @@ from PyQt6.QtWidgets import (
     QColorDialog,
     QInputDialog,
 )
-from PyQt6.QtGui import QKeySequence, QAction
-from PyQt6.QtCore import Qt, pyqtSignal
+from PyQt6.QtGui import QKeySequence, QAction, QPainter, QBrush, QColor
+from PyQt6.QtCore import Qt, pyqtSignal, QRect, QPoint
 from services.comment_data_service import comment_data_service
 from services.command_history_service import command_history_service
 from services.commands import (
@@ -64,26 +64,13 @@ class CommentItemDelegate(QStyledItemDelegate):
 
 
 class _FillHandle(QWidget):
-    """Small square shown at selection corner to start fill operations."""
+    """Deprecated: retained for compatibility but not used.
 
-    def __init__(self, table_view):
-        # Parent the handle to the table's viewport so it overlays cells,
-        # but keep a reference to the table view to call its helpers.
-        super().__init__(table_view.viewport())
-        self._table_view = table_view
-        self.setFixedSize(6, 6)
-        self.setCursor(Qt.CursorShape.CrossCursor)
-        self.setStyleSheet("background-color: black")
-        self.hide()
-
-    def mousePressEvent(self, event):  # noqa: N802
-        self._table_view._start_fill_drag()
-
-    def mouseReleaseEvent(self, event):  # noqa: N802
-        self._table_view._end_fill_drag(self.mapToParent(event.pos()))
-
-    def mouseDoubleClickEvent(self, event):  # noqa: N802
-        self._table_view._auto_fill_down()
+    The fill handle is now drawn directly in the table viewport to avoid
+    stacking/z-order issues across platforms and styles. Keeping this class
+    avoids import errors if referenced elsewhere.
+    """
+    pass
 
 
 class CommentTableView(QTableView):
@@ -91,9 +78,10 @@ class CommentTableView(QTableView):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        # Pass the table view itself; the handle will parent to viewport
-        # and retain a reference to the table for helper calls.
-        self._fill_handle = _FillHandle(self)
+        # Drawn fill handle state (in viewport coordinates)
+        self._handle_size = 9  # px, slightly larger for visibility
+        self._handle_rect = QRect()
+        self._handle_visible = False
         self._dragging_fill = False
         self.verticalScrollBar().valueChanged.connect(lambda _: self._update_fill_handle())
         self.horizontalScrollBar().valueChanged.connect(lambda _: self._update_fill_handle())
@@ -103,23 +91,32 @@ class CommentTableView(QTableView):
         self._update_fill_handle()
 
     def _update_fill_handle(self):
-        indexes = self.selectionModel().selectedIndexes()
+        # Compute bottom-right of current selection and set handle rect
+        sel_model = self.selectionModel()
+        if not sel_model:
+            self._handle_visible = False
+            self.viewport().update()
+            return
+        indexes = sel_model.selectedIndexes()
         if not indexes:
-            self._fill_handle.hide()
+            self._handle_visible = False
+            self.viewport().update()
             return
         rows = [i.row() for i in indexes]
         cols = [i.column() for i in indexes]
         bottom, right = max(rows), max(cols)
-        rect = self.visualRect(self.model().index(bottom, right))
-        size = self._fill_handle.size()
-        self._fill_handle.move(rect.right() - size.width(), rect.bottom() - size.height())
-        self._fill_handle.show()
-        self._fill_handle.raise_()
+        vr = self.visualRect(self.model().index(bottom, right))
+        # place handle inside the cell bounds
+        x = max(vr.left(), min(vr.right() - self._handle_size, vr.right()))
+        y = max(vr.top(), min(vr.bottom() - self._handle_size, vr.bottom()))
+        self._handle_rect = QRect(x, y, self._handle_size, self._handle_size)
+        self._handle_visible = True
+        self.viewport().update()
 
     def _start_fill_drag(self):
         self._dragging_fill = True
 
-    def _end_fill_drag(self, pos):
+    def _end_fill_drag(self, pos: QPoint):
         if not self._dragging_fill:
             return
         self._dragging_fill = False
@@ -145,6 +142,47 @@ class CommentTableView(QTableView):
         target = model.mapFromSource(target_source) if hasattr(model, "mapFromSource") else target_source
         self._apply_fill(target)
         self._update_fill_handle()
+
+    # Painting and mouse handling for the drawn handle -----------------
+    def paintEvent(self, event):  # noqa: N802
+        super().paintEvent(event)
+        if self._handle_visible and not self._handle_rect.isNull():
+            try:
+                painter = QPainter(self.viewport())
+                painter.setBrush(QBrush(QColor(0, 0, 0)))
+                painter.setPen(Qt.PenStyle.NoPen)
+                painter.drawRect(self._handle_rect)
+                painter.end()
+            except Exception:
+                # Painting should not crash the view; ignore errors
+                pass
+
+    def mousePressEvent(self, event):  # noqa: N802
+        # Check if the press is on the handle area
+        if self._handle_visible and self._handle_rect.contains(event.pos()):
+            self._start_fill_drag()
+            event.accept()
+            return
+        super().mousePressEvent(event)
+
+    def mouseReleaseEvent(self, event):  # noqa: N802
+        if self._dragging_fill:
+            self._end_fill_drag(event.pos())
+            event.accept()
+            return
+        super().mouseReleaseEvent(event)
+
+    def resizeEvent(self, event):  # noqa: N802
+        super().resizeEvent(event)
+        self._update_fill_handle()
+
+    def mouseDoubleClickEvent(self, event):  # noqa: N802
+        # Support auto-fill on double-click of the handle, Excel-style
+        if self._handle_visible and self._handle_rect.contains(event.pos()):
+            self._auto_fill_down()
+            event.accept()
+            return
+        super().mouseDoubleClickEvent(event)
 
     def _apply_fill(self, target_index):
         model = self.model()
