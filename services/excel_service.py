@@ -55,6 +55,8 @@ class ExcelService:
         sheet_name = group.get("excel", {}).get("sheet_name", "Sheet1")
         ws.title = sheet_name
         columns = group.get("columns", [])
+        # ensure latest column names are stored in the data service
+        comment_data_service.update_comments(group_id, group.get("comments", []), columns)
         for c, header in enumerate(columns, start=1):
             ws.cell(row=1, column=c, value=header)
         comments = group.get("comments", [])

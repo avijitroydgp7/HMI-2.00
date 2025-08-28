@@ -11,6 +11,7 @@ from PyQt6.QtWidgets import (
     QCompleter,
     QToolBar,
     QColorDialog,
+    QInputDialog,
 )
 from PyQt6.QtGui import QKeySequence, QAction
 from PyQt6.QtCore import Qt
@@ -373,7 +374,9 @@ class CommentTableWidget(QWidget):
         self.table.setSortingEnabled(True)
         self.filter_input.textChanged.connect(self.proxy_model.set_filter_text)
 
-        self.table.horizontalHeader().setStretchLastSection(True)
+        header = self.table.horizontalHeader()
+        header.setStretchLastSection(True)
+        header.sectionDoubleClicked.connect(self._handle_header_double_click)
         self.table.verticalHeader().setVisible(False)
 
         for row_data in group.get("comments", []):
@@ -435,6 +438,18 @@ class CommentTableWidget(QWidget):
         ]
         cmd = RemoveCommentColumnCommand(self._model, col_index, header, column_data, self.columns, self._sync_to_service)
         command_history_service.add_command(cmd)
+
+    def _handle_header_double_click(self, section: int) -> None:
+        """Prompt for a new column name when header is double-clicked."""
+        if section == 0:
+            return
+        old_name = self.columns[section - 1]
+        new_name, ok = QInputDialog.getText(self, "Rename Column", "Column name:", text=old_name)
+        new_name = new_name.strip()
+        if ok and new_name and new_name != old_name:
+            self.columns[section - 1] = new_name
+            self._model.rename_header(section, new_name)
+            self._sync_to_service()
 
     def _sync_to_service(self) -> None:
         model = self._model

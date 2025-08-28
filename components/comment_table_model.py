@@ -134,6 +134,12 @@ class CommentTableModel(QAbstractTableModel):
         self.endRemoveColumns()
         return True
 
+    def rename_header(self, column: int, name: str) -> None:
+        """Rename a column header and notify views."""
+        if 0 <= column < len(self._headers):
+            self._headers[column] = name
+            self.headerDataChanged.emit(Qt.Orientation.Horizontal, column, column)
+
     # Utility ---------------------------------------------------------
     def get_raw(self, row: int, col: int) -> Any:
         return self._data[row][col].get("raw", "")
