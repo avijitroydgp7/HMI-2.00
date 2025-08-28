@@ -87,46 +87,48 @@ class ScreenWidget(QWidget):
     def clear_selection(self):
         self.design_canvas.clear_selection()
 
-    def zoom_in(self):
-        new_zoom = min(self.design_canvas.current_zoom * 1.25, self.design_canvas.max_zoom)
-        factor = new_zoom / self.design_canvas.current_zoom
-        if factor != 1.0:
+    def _apply_zoom(self, factor: float):
+        """Apply a zoom factor while clamping to min/max and keeping focus position.
+
+        The factor is relative (e.g., 1.25 to zoom in by 25%, 0.8 to zoom out by 20%).
+        Shared logic between zoom_in and zoom_out, including shadow/visibility updates.
+        """
+        # Clamp the new zoom within allowed bounds
+        current = self.design_canvas.current_zoom
+        min_zoom = self.design_canvas.min_zoom
+        max_zoom = self.design_canvas.max_zoom
+        new_zoom = max(min(current * factor, max_zoom), min_zoom)
+
+        # Effective factor after clamping
+        effective = new_zoom / current if current else 1.0
+
+        if effective != 1.0:
+            # Determine the scene position to anchor zoom around
             mouse_view_pos = self.design_canvas.mapFromGlobal(QCursor.pos())
             if self.design_canvas.viewport().rect().contains(mouse_view_pos):
                 scene_pos = self.design_canvas.mapToScene(mouse_view_pos)
             else:
                 scene_pos = self.design_canvas._last_mouse_scene_pos
+
             view_pt = self.design_canvas.mapFromScene(scene_pos)
             if not self.design_canvas.viewport().rect().contains(view_pt):
                 scene_pos = self.design_canvas.mapToScene(self.design_canvas.viewport().rect().center())
                 view_pt = self.design_canvas.mapFromScene(scene_pos)
-            self.design_canvas.scale(factor, factor)
+
+            # Apply scale and translate to keep the anchor under cursor
+            self.design_canvas.scale(effective, effective)
             new_scene_pos = self.design_canvas.mapToScene(view_pt)
             delta = scene_pos - new_scene_pos
             self.design_canvas.translate(delta.x(), delta.y())
+
+        # Update zoom state and related visuals
         self.design_canvas.current_zoom = new_zoom
         self.design_canvas._update_shadow_for_zoom()
         self.design_canvas.update_visible_items()
         self.zoom_changed.emit(self.get_zoom_percentage())
 
+    def zoom_in(self):
+        self._apply_zoom(1.25)
+
     def zoom_out(self):
-        new_zoom = max(self.design_canvas.current_zoom * 0.8, self.design_canvas.min_zoom)
-        factor = new_zoom / self.design_canvas.current_zoom
-        if factor != 1.0:
-            mouse_view_pos = self.design_canvas.mapFromGlobal(QCursor.pos())
-            if self.design_canvas.viewport().rect().contains(mouse_view_pos):
-                scene_pos = self.design_canvas.mapToScene(mouse_view_pos)
-            else:
-                scene_pos = self.design_canvas._last_mouse_scene_pos
-            view_pt = self.design_canvas.mapFromScene(scene_pos)
-            if not self.design_canvas.viewport().rect().contains(view_pt):
-                scene_pos = self.design_canvas.mapToScene(self.design_canvas.viewport().rect().center())
-                view_pt = self.design_canvas.mapFromScene(scene_pos)
-            self.design_canvas.scale(factor, factor)
-            new_scene_pos = self.design_canvas.mapToScene(view_pt)
-            delta = scene_pos - new_scene_pos
-            self.design_canvas.translate(delta.x(), delta.y())
-        self.design_canvas.current_zoom = new_zoom
-        self.design_canvas._update_shadow_for_zoom()
-        self.design_canvas.update_visible_items()
-        self.zoom_changed.emit(self.get_zoom_percentage())
+        self._apply_zoom(0.8)
