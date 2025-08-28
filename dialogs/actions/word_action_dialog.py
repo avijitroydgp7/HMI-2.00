@@ -130,18 +130,39 @@ class WordActionDialog(QDialog):
 
     def _build_trigger_ui(self, parent_layout):
         self.trigger_box = CollapsibleBox("Trigger")
-        
+
         trigger_content_widget = QWidget()
         trigger_main_layout = QVBoxLayout(trigger_content_widget)
         trigger_main_layout.setContentsMargins(5, 10, 5, 5)
-        
+
         self.trigger_mode_combo = QComboBox()
         self.trigger_mode_combo.addItems(TriggerMode.values())
         trigger_main_layout.addWidget(self.trigger_mode_combo)
-        
-        self.trigger_options_container = QWidget()
-        trigger_main_layout.addWidget(self.trigger_options_container)
-        
+
+        # Use a stacked widget to avoid creating/destroying child widgets
+        self.trigger_stack = QStackedWidget()
+
+        # 1) ORDINARY: empty page
+        self.trigger_empty_page = QWidget()
+        self.trigger_stack.addWidget(self.trigger_empty_page)
+
+        # 2) ON/OFF: single TagSelector page
+        self.trigger_onoff_page = QWidget()
+        onoff_layout = QVBoxLayout(self.trigger_onoff_page)
+        onoff_layout.setContentsMargins(0, 10, 0, 0)
+        self.on_off_tag_selector = TagSelector()
+        self.on_off_tag_selector.set_allowed_tag_types(["BOOL"])
+        self.on_off_tag_selector.main_tag_selector.set_mode_fixed("Tag")
+        onoff_layout.addWidget(self.on_off_tag_selector)
+        onoff_layout.addStretch(1)
+        self.trigger_stack.addWidget(self.trigger_onoff_page)
+
+        # 3) RANGE: full range config page
+        self.trigger_range_page = self._create_range_trigger_page()
+        self.trigger_stack.addWidget(self.trigger_range_page)
+
+        trigger_main_layout.addWidget(self.trigger_stack)
+
         self.trigger_box.setContent(trigger_content_widget)
         parent_layout.addWidget(self.trigger_box)
 
@@ -232,70 +253,30 @@ class WordActionDialog(QDialog):
         self.else_checkbox.toggled.connect(self.else_group.setVisible)
         self.else_checkbox.toggled.connect(self._validate_form)
 
-    def _clear_layout(self, layout):
-        if layout is not None:
-            while layout.count():
-                item = layout.takeAt(0)
-                widget = item.widget()
-                if widget is not None:
-                    widget.deleteLater()
-
-    def _clear_widget_children(self, widget):
-        """Helper to delete all child widgets of a given widget."""
-        for child in widget.findChildren(QWidget):
-            child.deleteLater()
+    # Note: Widget clearing helpers removed in favor of stacked pages.
 
     def _on_trigger_mode_changed(self, mode: str):
-        # Hide container to prevent residual widget visibility
-        self.trigger_options_container.setVisible(False)
-
-        # Clear all child widgets explicitly
-        self._clear_widget_children(self.trigger_options_container)
-
-        layout = self.trigger_options_container.layout()
-        if layout is not None:
-            self._clear_layout(layout)
-        else:
-            layout = QVBoxLayout(self.trigger_options_container)
-            self.trigger_options_container.setLayout(layout)
-        layout.setContentsMargins(0, 10, 0, 0)
-        # Reset selector attributes
-        for attr in [
-            "on_off_tag_selector",
-            "range_operand1_selector",
-            "range_operand2_selector",
-            "range_lower_bound_selector",
-            "range_upper_bound_selector",
-            "range_operator_combo",
-            "range_rhs_stack",
-        ]:
-            if hasattr(self, attr):
-                setattr(self, attr, None)
-
-        if mode in [TriggerMode.ON.value, TriggerMode.OFF.value]:
-            self.on_off_tag_selector = TagSelector()
-            self.on_off_tag_selector.set_allowed_tag_types(["BOOL"])
-            self.on_off_tag_selector.main_tag_selector.set_mode_fixed("Tag")
-            self.on_off_tag_selector.inputChanged.connect(self._validate_form)
-            layout.addWidget(self.on_off_tag_selector)
+        # Switch pre-built pages without destroying widgets
+        if mode == TriggerMode.ORDINARY.value:
+            self.trigger_stack.setCurrentWidget(self.trigger_empty_page)
+        elif mode in [TriggerMode.ON.value, TriggerMode.OFF.value]:
+            self.trigger_stack.setCurrentWidget(self.trigger_onoff_page)
         elif mode == TriggerMode.RANGE.value:
-            self._build_range_trigger_options(layout)
-
-        # Show container after widgets are updated
-        self.trigger_options_container.setVisible(True)
-
+            self.trigger_stack.setCurrentWidget(self.trigger_range_page)
+        else:
+            self.trigger_stack.setCurrentWidget(self.trigger_empty_page)
         self._validate_form()
 
-    def _build_range_trigger_options(self, parent_layout):
+    def _create_range_trigger_page(self) -> QWidget:
         range_group = QGroupBox("Range Configuration")
         range_group.setObjectName("CardGroup")
         layout = QGridLayout(range_group)
         layout.setSpacing(10)
-        
+
         allowed_types = [
             DataTypeMapper.normalize_type(t) for t in ["INT", "DINT", "REAL"]
         ]
-        
+
         op1_layout = QVBoxLayout()
         self.range_operand1_selector = TagSelector(allowed_tag_types=allowed_types)
         self.range_operand1_selector.main_tag_selector.set_mode_fixed("Tag")
@@ -309,20 +290,20 @@ class WordActionDialog(QDialog):
         op_layout.addWidget(QLabel("Operator"))
         op_layout.addWidget(self.range_operator_combo)
         op_layout.addStretch(1)
-        
+
         self.range_rhs_stack = QStackedWidget()
-        
+
         layout.addLayout(op1_layout, 0, 0)
         layout.addLayout(op_layout, 0, 1)
         layout.addWidget(self.range_rhs_stack, 0, 2, alignment=Qt.AlignmentFlag.AlignTop)
         layout.setColumnStretch(0, 1)
         layout.setColumnStretch(2, 1)
-        
+
         op2_page = QWidget(); op2_page_layout = QVBoxLayout(op2_page); op2_page_layout.setContentsMargins(0,0,0,0)
         self.range_operand2_selector = TagSelector(allowed_tag_types=allowed_types)
         op2_page_layout.addWidget(QLabel("Operand 2")); op2_page_layout.addWidget(self.range_operand2_selector); op2_page_layout.addStretch(1)
         self.range_rhs_stack.addWidget(op2_page)
-        
+
         between_page = QWidget(); between_layout = QGridLayout(between_page); between_layout.setContentsMargins(0,0,0,0)
         self.range_lower_bound_selector = TagSelector(allowed_tag_types=allowed_types)
         self.range_upper_bound_selector = TagSelector(allowed_tag_types=allowed_types)
@@ -330,15 +311,18 @@ class WordActionDialog(QDialog):
         between_layout.addWidget(QLabel("Upper Bound"), 0, 1); between_layout.addWidget(self.range_upper_bound_selector, 1, 1)
         between_layout.setRowStretch(2, 1)
         self.range_rhs_stack.addWidget(between_page)
-        
+
+        # Connect validation and operator switching once
         self.range_operand1_selector.inputChanged.connect(self._validate_form)
         self.range_operator_combo.currentTextChanged.connect(self._on_range_operator_changed)
         self.range_operand2_selector.inputChanged.connect(self._validate_form)
         self.range_lower_bound_selector.inputChanged.connect(self._validate_form)
         self.range_upper_bound_selector.inputChanged.connect(self._validate_form)
-        
-        self._on_range_operator_changed(self.range_operator_combo.currentText())
-        parent_layout.addWidget(range_group)
+
+        # Initialize RHS page without triggering validation during build
+        op = self.range_operator_combo.currentText()
+        self.range_rhs_stack.setCurrentIndex(1 if op in ["between", "outside"] else 0)
+        return range_group
 
     def _on_action_mode_changed(self, mode_text: str):
         label_map = {
@@ -487,6 +471,9 @@ class WordActionDialog(QDialog):
 
     def _validate_conditional_section(self):
         """Validate the conditional reset section."""
+        # During early build, the conditional section may not exist yet.
+        if not hasattr(self, 'conditional_reset_group') or not self.conditional_reset_group:
+            return True, None
         if not self.conditional_reset_group.isChecked():
             return True, None
 
@@ -518,10 +505,12 @@ class WordActionDialog(QDialog):
         else:
             self.trigger_box.setStatus(CollapsibleBox.Status.OK if trigger_valid else CollapsibleBox.Status.ERROR)
         
-        if self.conditional_reset_group.isChecked():
-            self.conditional_reset_group.setStatus(CollapsibleBox.Status.OK if conditional_valid else CollapsibleBox.Status.ERROR)
-        else:
-            self.conditional_reset_group.setStatus(CollapsibleBox.Status.NEUTRAL)
+        # Guard: conditional section may not exist during early build
+        if hasattr(self, 'conditional_reset_group') and self.conditional_reset_group:
+            if self.conditional_reset_group.isChecked():
+                self.conditional_reset_group.setStatus(CollapsibleBox.Status.OK if conditional_valid else CollapsibleBox.Status.ERROR)
+            else:
+                self.conditional_reset_group.setStatus(CollapsibleBox.Status.NEUTRAL)
 
 
     # -------------------------------------------------------------------------
@@ -533,51 +522,39 @@ class WordActionDialog(QDialog):
             selector.set_data(data)
 
     def _initialize_dialog(self, action_data: Optional[Dict]):
-        """Simplified initialization logic that handles both new and existing data."""
-        # Ensure clean state by clearing any existing dynamic widgets
-        self._clear_dynamic_widgets()
-        
+        """Initialize dialog state without destroying UI widgets."""
+        # Default states
+        self.conditional_reset_group.setChecked(False)
+        self.else_checkbox.setChecked(False)
+        self.else_group.setVisible(False)
+
+        # Load provided data
         if action_data:
-            # Load data into model controls
             self.action_mode_combo.setCurrentText(action_data.get("action_mode", "Addition"))
             self.trigger_mode_combo.setCurrentText(action_data.get("trigger", {}).get("mode", TriggerMode.ORDINARY.value))
-            
+
             cond_data = action_data.get("conditional_reset")
             if cond_data:
                 self.conditional_reset_group.setChecked(True)
                 self.operator_combo.setCurrentText(cond_data.get("operator", "=="))
                 if "else_value" in cond_data:
                     self.else_checkbox.setChecked(True)
-            
+
             # Set expansion states
             self.trigger_box.setExpanded(bool(action_data.get("trigger")))
             self.conditional_reset_group.setExpanded(bool(cond_data))
-        
-        # Build dynamic UI based on current state
+
+        # Apply current selections to stacked widgets
         self._on_action_mode_changed(self.action_mode_combo.currentText())
         self._on_trigger_mode_changed(self.trigger_mode_combo.currentText())
         self._on_conditional_operator_changed(self.operator_combo.currentText())
-        
+
         # Populate widgets with data if editing
         if action_data:
             self._populate_widgets_with_data(action_data)
-        
+
         # Run initial validation
         self._validate_form()
-
-    def _clear_dynamic_widgets(self):
-        """Clear any existing dynamic widgets to prevent background artifacts."""
-        # Clear trigger options container
-        if hasattr(self, 'trigger_options_container'):
-            self._clear_layout(self.trigger_options_container.layout())
-        
-        # Reset conditional reset state
-        self.conditional_reset_group.setChecked(False)
-        self.else_checkbox.setChecked(False)
-        
-        # Hide conditional reset sections
-        if hasattr(self, 'else_group'):
-            self.else_group.setVisible(False)
 
     def _populate_widgets_with_data(self, data: Dict):
         """Populate widgets with loaded data after dynamic UI is built."""
