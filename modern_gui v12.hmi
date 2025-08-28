@@ -4,13 +4,14 @@
         "company": "",
         "description": "",
         "creation_date": "2025-08-26 17:51:48",
-        "modification_date": "2025-08-28 12:45:26",
+        "modification_date": "2025-08-28 13:04:48",
         "save_history": [
             "Project Created on 2025-08-26 17:51:48",
             "Saved on 2025-08-26 17:54:13",
             "Saved on 2025-08-26 17:55:07",
             "Saved on 2025-08-28 12:44:08",
-            "Saved on 2025-08-28 12:45:26"
+            "Saved on 2025-08-28 12:45:26",
+            "Saved on 2025-08-28 13:04:48"
         ]
     },
     "screens": {
@@ -52,7 +53,75 @@
                         "position": {
                             "x": 217,
                             "y": 149
-                        }
+                        },
+                        "actions": [
+                            {
+                                "action_type": "word",
+                                "target_tag": {
+                                    "main_tag": {
+                                        "source": "tag",
+                                        "value": {
+                                            "db_id": "7ac5de69-7a29-41ac-a3e5-49063243b05d",
+                                            "db_name": "1",
+                                            "tag_name": "dddd"
+                                        }
+                                    },
+                                    "indices": []
+                                },
+                                "action_mode": "Addition",
+                                "value": {
+                                    "main_tag": {
+                                        "source": "constant",
+                                        "value": "01"
+                                    },
+                                    "indices": []
+                                },
+                                "trigger": {
+                                    "mode": "Range",
+                                    "operator": "between",
+                                    "operand1": {
+                                        "main_tag": {
+                                            "source": "tag",
+                                            "value": {
+                                                "db_id": "7ac5de69-7a29-41ac-a3e5-49063243b05d",
+                                                "db_name": "1",
+                                                "tag_name": "ii_a"
+                                            }
+                                        },
+                                        "indices": [
+                                            {
+                                                "source": "constant",
+                                                "value": "0"
+                                            },
+                                            {
+                                                "source": "tag",
+                                                "value": {
+                                                    "db_id": "7ac5de69-7a29-41ac-a3e5-49063243b05d",
+                                                    "db_name": "1",
+                                                    "tag_name": "ii"
+                                                }
+                                            }
+                                        ]
+                                    },
+                                    "lower_bound": {
+                                        "main_tag": {
+                                            "source": "constant",
+                                            "value": "0"
+                                        },
+                                        "indices": []
+                                    },
+                                    "upper_bound": {
+                                        "main_tag": {
+                                            "source": "constant",
+                                            "value": "50"
+                                        },
+                                        "indices": []
+                                    }
+                                },
+                                "details": "[1]::dddd += 01"
+                            }
+                        ],
+                        "conditional_styles": []
                     }
                 },
                 {

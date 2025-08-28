@@ -126,6 +126,7 @@ class WordActionDialog(QDialog):
         main_action_layout.addLayout(value_layout, 0, 2)
         
         main_action_layout.setColumnStretch(0, 1)
+        main_action_layout.setColumnStretch(1, 1)
         main_action_layout.setColumnStretch(2, 1)
         parent_layout.addWidget(main_action_group)
 
@@ -185,6 +186,7 @@ class WordActionDialog(QDialog):
         if_layout.addLayout(op_layout, 0, 1)
         if_layout.addWidget(self.cond_rhs_stack, 0, 2)
         if_layout.setColumnStretch(0, 1)
+        if_layout.setColumnStretch(1, 1)
         if_layout.setColumnStretch(2, 1)
         
         op2_page = QWidget(); op2_page_layout = QVBoxLayout(op2_page); op2_page_layout.setContentsMargins(0,0,0,0)
