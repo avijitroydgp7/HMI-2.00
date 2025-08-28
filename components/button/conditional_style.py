@@ -1,8 +1,10 @@
-from typing import Dict, Any, List, Optional, ClassVar, Callable, Union
+from typing import Dict, Any, List, Optional, ClassVar, Callable, Union, Tuple
 from dialogs.actions.constants import TriggerMode
 from dataclasses import dataclass, field
 import copy
 import ast
+import logging
+from collections import OrderedDict
 
 from PyQt6.QtCore import (
     QObject,
@@ -38,6 +40,8 @@ from PyQt6.QtWidgets import (
     QCheckBox,
     QScrollArea,
     QFileDialog,
+    QToolTip,
+    QMessageBox,
 )
 from PyQt6.QtGui import (
     QColor,
@@ -55,20 +59,53 @@ from PyQt6.QtSvg import QSvgRenderer
 from utils.icon_manager import IconManager
 from dialogs.widgets import TagSelector
 
+# ---------------------------------------------------------------------------
+# Logging setup for condition evaluation
+# ---------------------------------------------------------------------------
 
-def _safe_eval(expr: str, variables: Dict[str, Any]) -> Any:
+logger = logging.getLogger(__name__)
+
+# ---------------------------------------------------------------------------
+# Tiny LRU cache for parsed ASTs to speed up repeated conditions
+# ---------------------------------------------------------------------------
+
+_AST_CACHE: "OrderedDict[str, ast.AST]" = OrderedDict()
+_AST_CACHE_MAXSIZE = 128
+
+def _get_parsed_ast(expr: str) -> ast.AST:
+    node = _AST_CACHE.get(expr)
+    if node is not None:
+        # mark as recently used
+        _AST_CACHE.move_to_end(expr)
+        return node
+    node = ast.parse(expr, mode="eval")
+    _AST_CACHE[expr] = node
+    # evict oldest
+    if len(_AST_CACHE) > _AST_CACHE_MAXSIZE:
+        _AST_CACHE.popitem(last=False)
+    return node
+
+
+def _safe_eval(expr: str, variables: Dict[str, Any]) -> Tuple[Any, Optional[str]]:
     """Safely evaluate a small Python expression.
+
+    Returns a tuple of (value, error). On success, error is None. On failure,
+    value is None and error contains a concise message.
 
     Only a restricted subset of Python expressions is supported consisting of
     literals, variable names, boolean operations, arithmetic operators and
     comparisons. Any use of function calls, attribute access or other Python
-    constructs will raise a ``ValueError``.
+    constructs will result in an error message.
     """
 
     try:
-        tree = ast.parse(expr, mode="eval")
+        tree = _get_parsed_ast(expr)
     except SyntaxError as exc:  # pragma: no cover - syntax error path
-        raise ValueError("Invalid expression") from exc
+        logger.warning("Condition syntax error: %s", exc)
+        return None, "Invalid expression syntax"
+    except Exception as exc:  # pragma: no cover - defensive
+        logger.exception("Unexpected error parsing condition")
+        return None, f"Parse error: {exc}"
 
     def _eval(node: ast.AST):
         if isinstance(node, ast.Expression):
@@ -133,11 +170,21 @@ def _safe_eval(expr: str, variables: Dict[str, Any]) -> Any:
             if node.id in variables:
                 return variables[node.id]
             raise ValueError(f"Unknown variable '{node.id}'")
+        if isinstance(node, ast.Call):
+            # Disallow any function calls for safety
+            raise ValueError("Function calls are not allowed")
+        if isinstance(node, ast.Attribute):
+            # Disallow attribute access for safety
+            raise ValueError("Attribute access is not allowed")
         if isinstance(node, ast.Constant):
             return node.value
         raise ValueError(f"Unsupported expression: {ast.dump(node)}")
 
-    return _eval(tree)
+    try:
+        return _eval(tree), None
+    except Exception as exc:
+        logger.debug("Condition evaluation error for '%s': %s", expr, exc)
+        return None, str(exc)
 
 # ---------------------------------------------------------------------------
 # Helper widgets previously provided by button_creator
@@ -660,6 +707,8 @@ class ConditionalStyle:
 class ConditionalStyleManager(QObject):
     """Manages conditional styles for buttons"""
     styles_changed: ClassVar[pyqtSignal] = pyqtSignal()
+    # Emitted when a condition fails to evaluate; payload is an error message.
+    condition_error: ClassVar[pyqtSignal] = pyqtSignal(str)
     parent: Optional[QObject] = None
     conditional_styles: List[ConditionalStyle] = field(default_factory=list)
     default_style: Dict[str, Any] = field(default_factory=dict)
@@ -720,7 +769,15 @@ class ConditionalStyleManager(QObject):
             cond_cfg = getattr(style, 'condition_data', {"mode": TriggerMode.ORDINARY.value})
             cond = style.condition
             condition = cond_cfg if cond_cfg.get('mode', TriggerMode.ORDINARY.value) != TriggerMode.ORDINARY.value else cond
-            match = self._evaluate_condition(condition, tag_values)
+            match, err = self._evaluate_condition(condition, tag_values)
+            if err:
+                # Surface via signal and log, but continue to next style.
+                try:
+                    type(self).condition_error.emit(err)
+                except Exception:
+                    # In case Qt isn't initialised in some contexts
+                    pass
+                logger.warning("Condition evaluation error: %s", err)
 
             if match:
                 props = dict(style.properties)
@@ -740,7 +797,7 @@ class ConditionalStyleManager(QObject):
 
         return dict(self.default_style)
 
-    def _evaluate_condition(self, condition: Any, tag_values: Dict[str, Any]) -> bool:
+    def _evaluate_condition(self, condition: Any, tag_values: Dict[str, Any]) -> Tuple[bool, Optional[str]]:
         """Evaluate a condition using tag values.
 
         ``condition`` may be one of the following:
@@ -752,73 +809,73 @@ class ConditionalStyleManager(QObject):
         """
 
         if condition is None:
-            return True
+            return True, None
 
         if isinstance(condition, dict):
             cfg = condition
             mode = cfg.get('mode', TriggerMode.ORDINARY.value)
             if mode == TriggerMode.ORDINARY.value:
-                return True
+                return True, None
             if mode in (TriggerMode.ON.value, TriggerMode.OFF.value):
                 op1 = cfg.get('operand1', cfg.get('tag'))
                 tag_val = self._extract_value(op1, tag_values)
                 if tag_val is None:
-                    return False
-                return bool(tag_val) if mode == TriggerMode.ON.value else not bool(tag_val)
+                    return False, "ON/OFF condition: operand1 tag value not found"
+                return (bool(tag_val) if mode == TriggerMode.ON.value else not bool(tag_val)), None
             if mode == TriggerMode.RANGE.value:
                 op1 = cfg.get('operand1', cfg.get('tag'))
                 tag_val = self._extract_value(op1, tag_values)
                 if tag_val is None:
-                    return False
+                    return False, "RANGE condition: operand1 tag value not found"
                 operator = cfg.get('operator', '==')
                 if operator in ['between', 'outside']:
                     lower = self._extract_value(cfg.get('lower_bound', cfg.get('lower')), tag_values)
                     upper = self._extract_value(cfg.get('upper_bound', cfg.get('upper')), tag_values)
                     try:
                         if operator == 'between':
-                            return lower <= tag_val <= upper
+                            return (lower <= tag_val <= upper), None
                         else:
-                            return tag_val < lower or tag_val > upper
-                    except Exception:
-                        return False
+                            return (tag_val < lower or tag_val > upper), None
+                    except Exception as exc:
+                        return False, f"RANGE condition error: {exc}"
                 else:
                     operand = self._extract_value(cfg.get('operand2', cfg.get('operand')), tag_values)
                     if operand is None:
-                        return False
+                        return False, "RANGE condition: operand2 value not found"
                     try:
                         if operator == '==':
-                            return tag_val == operand
+                            return (tag_val == operand), None
                         if operator == '!=':
-                            return tag_val != operand
+                            return (tag_val != operand), None
                         if operator == '>':
-                            return tag_val > operand
+                            return (tag_val > operand), None
                         if operator == '>=':
-                            return tag_val >= operand
+                            return (tag_val >= operand), None
                         if operator == '<':
-                            return tag_val < operand
+                            return (tag_val < operand), None
                         if operator == '<=':
-                            return tag_val <= operand
-                    except Exception:
-                        return False
-                    return False
-            return False
+                            return (tag_val <= operand), None
+                    except Exception as exc:
+                        return False, f"RANGE comparison error: {exc}"
+                    return False, f"Unsupported operator: {operator}"
+            return False, f"Unsupported mode: {mode}"
 
         if callable(condition):
             try:
-                return bool(condition(tag_values))
-            except Exception:
-                return False
+                return bool(condition(tag_values)), None
+            except Exception as exc:
+                return False, f"Callable condition error: {exc}"
 
         if isinstance(condition, str):
-            try:
-                return bool(_safe_eval(condition, tag_values))
-            except Exception:
-                return False
+            val, err = _safe_eval(condition, tag_values)
+            if err:
+                return False, f"Expression error: {err}"
+            return bool(val), None
 
         try:
-            return bool(condition)
-        except Exception:
-            return False
+            return bool(condition), None
+        except Exception as exc:
+            return False, f"Invalid condition type: {exc}"
 
     def _extract_value(self, data: Optional[Dict[str, Any]], tag_values: Dict[str, Any]):
         if not data:
@@ -917,6 +974,13 @@ class ConditionalStyleEditorDialog(QDialog):
         main_layout.setColumnStretch(0, 1)
         main_layout.setColumnStretch(1, 1)
         main_layout.setRowStretch(2, 1)
+
+        # Listen for condition errors emitted by the manager, if any
+        try:
+            ConditionalStyleManager.condition_error.connect(self.handle_condition_error)
+        except Exception:
+            # If Qt not fully initialized or signal unavailable, ignore
+            pass
 
         info_layout = QGridLayout()
         self.tooltip_edit = QLineEdit(self.style.tooltip)
@@ -2209,13 +2273,13 @@ class ConditionalStyleEditorDialog(QDialog):
             self.preview_button.set_click_icon(self.click_controls["icon_edit"].text())
             icon_sz = self.style.properties.get("icon_size", 48)
             self.preview_button.set_icon_size(icon_sz)
+            text = ""
             if component_type in {"Icon-Only Button", "Image Button"}:
-                self.preview_button.setText("")
-            else:
                 text = ""
+            else:
                 if self.base_controls["text_type_combo"].currentText() == "Text":
                     text = self.base_controls["text_edit"].toPlainText()
-                self.preview_button.setText(text or "Preview")
+            self.preview_button.setText(text or "Preview")
 
 
     def get_style(self) -> ConditionalStyle:
@@ -2379,3 +2443,18 @@ class ConditionalStyleEditorDialog(QDialog):
         )
         style.style_sheet = self.generate_qss(component_type)
         return style
+
+    # ------------------------------------------------------------------
+    # Error surfacing from condition evaluation
+    # ------------------------------------------------------------------
+    def handle_condition_error(self, message: str):
+        """Show a brief tooltip and a warning dialog for condition errors."""
+        try:
+            QToolTip.showText(self.mapToGlobal(QPoint(12, 12)), message, self)
+        except Exception:
+            pass
+        try:
+            QMessageBox.warning(self, "Condition Error", message)
+        except Exception:
+            # In headless contexts or during tests, QMessageBox may fail.
+            logger.warning("Condition Error: %s", message)
