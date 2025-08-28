@@ -1,6 +1,14 @@
+"""Comment table model with spreadsheet-like formula support.
+
+The model evaluates cell formulas using :mod:`asteval` and exposes a small
+set of common spreadsheet functions such as :func:`SUM`, :func:`AVERAGE`,
+:func:`MIN` and :func:`MAX`. Functions accept either individual values or
+Excel-style ranges, e.g. ``=SUM(A1:A5)``.
+"""
 from __future__ import annotations
 
 from typing import Any, List
+import re
 
 from PyQt6.QtCore import QAbstractTableModel, QModelIndex, Qt
 from PyQt6.QtGui import QFont, QColor
@@ -193,7 +201,73 @@ class CommentTableModel(QAbstractTableModel):
                 for cell in row:
                     cell["value"] = cell.get("raw", "")
             return
-        env = {}
+        env: dict[str, Any] = {}
+        for r, row in enumerate(self._data):
+            for c, cell in enumerate(row):
+                env[self._cell_name(r, c)] = cell.get("value")
+
+        def parse_cell(name: str) -> tuple[int, int]:
+            match = re.fullmatch(r"([A-Z]+)([0-9]+)", name)
+            if not match:
+                raise ValueError(f"Invalid cell name: {name}")
+            letters, number = match.groups()
+            col = 0
+            for ch in letters:
+                col = col * 26 + (ord(ch) - ord('A') + 1)
+            return int(number) - 1, col
+
+        def cell_range(start: str, end: str):
+            sr, sc = parse_cell(start)
+            er, ec = parse_cell(end)
+            values: list[Any] = []
+            for r in range(min(sr, er), max(sr, er) + 1):
+                for c in range(min(sc, ec), max(sc, ec) + 1):
+                    values.append(env.get(self._cell_name(r, c)))
+            return values
+
+        def _flatten(items):
+            out: list[Any] = []
+            for it in items:
+                if isinstance(it, (list, tuple)):
+                    out.extend(_flatten(it))
+                else:
+                    out.append(it)
+            return out
+
+        def _coerce_number(value: Any) -> Any:
+            if isinstance(value, (int, float)):
+                return value
+            try:
+                return float(value)
+            except (TypeError, ValueError):
+                return None
+
+        def SUM(*args):
+            vals = [_coerce_number(v) for v in _flatten(args)]
+            return sum(v for v in vals if v is not None)
+
+        def AVERAGE(*args):
+            vals = [v for v in (_coerce_number(v) for v in _flatten(args)) if v is not None]
+            return sum(vals) / len(vals) if vals else 0
+
+        def MIN(*args):
+            vals = [v for v in (_coerce_number(v) for v in _flatten(args)) if v is not None]
+            return min(vals) if vals else 0
+
+        def MAX(*args):
+            vals = [v for v in (_coerce_number(v) for v in _flatten(args)) if v is not None]
+            return max(vals) if vals else 0
+
+        env.update({
+            'SUM': SUM,
+            'AVERAGE': AVERAGE,
+            'MIN': MIN,
+            'MAX': MAX,
+            'cell_range': cell_range,
+        })
+
+        range_re = re.compile(r"([A-Z]+[0-9]+):([A-Z]+[0-9]+)")
+
         changed = True
         iterations = 0
         max_iter = self.rowCount() * self.columnCount() + 1
@@ -202,24 +276,25 @@ class CommentTableModel(QAbstractTableModel):
             iterations += 1
             for r, row in enumerate(self._data):
                 for c, cell in enumerate(row):
-                    raw = cell.get("raw", "")
-                    if isinstance(raw, str) and raw.startswith("=") and c != 0:
+                    raw = cell.get('raw', '')
+                    if isinstance(raw, str) and raw.startswith('=') and c != 0:
                         expr = raw[1:]
+                        expr = range_re.sub(lambda m: f"cell_range('{m.group(1)}','{m.group(2)}')", expr)
                         self._asteval.symtable.update(env)
                         try:
                             val = self._asteval(expr)
                         except Exception:
-                            val = "ERR"
+                            val = 'ERR'
                     else:
                         val = raw
-                    if cell.get("value") != val:
-                        cell["value"] = val
+                    if cell.get('value') != val:
+                        cell['value'] = val
                         env[self._cell_name(r, c)] = val
                         changed = True
         # final population for non-formula cells
         for r, row in enumerate(self._data):
             for c, cell in enumerate(row):
-                env[self._cell_name(r, c)] = cell.get("value")
+                env[self._cell_name(r, c)] = cell.get('value')
 
     @staticmethod
     def _cell_name(row: int, col: int) -> str:
