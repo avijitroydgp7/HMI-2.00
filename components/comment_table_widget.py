@@ -33,6 +33,8 @@ from .comment_filter_model import CommentFilterProxyModel
 class CommentItemDelegate(QStyledItemDelegate):
     """Delegate providing auto-completion support."""
 
+    _FUNCTIONS = ["SUM", "AVERAGE", "MIN", "MAX"]
+
     def createEditor(self, parent, option, index):  # noqa: N802 - Qt naming convention
         editor = QLineEdit(parent)
         model = index.model()
@@ -42,9 +44,22 @@ class CommentItemDelegate(QStyledItemDelegate):
         for r in range(model.rowCount()):
             for c in range(1, model.columnCount()):
                 refs.append(model._cell_name(r, c))
+        refs.extend(f"{fn}(" for fn in self._FUNCTIONS)
         completer = QCompleter(refs, editor)
         completer.setCaseSensitivity(Qt.CaseSensitivity.CaseInsensitive)
         editor.setCompleter(completer)
+        editor.setToolTip("Functions: " + ", ".join(self._FUNCTIONS))
+
+        def _show_menu(pos):
+            menu = editor.createStandardContextMenu()
+            func_menu = menu.addMenu("Functions")
+            for fn in self._FUNCTIONS:
+                action = func_menu.addAction(fn)
+                action.triggered.connect(lambda _=False, f=fn: editor.insert(f + "("))
+            menu.exec(editor.mapToGlobal(pos))
+
+        editor.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        editor.customContextMenuRequested.connect(_show_menu)
         return editor
 
 
