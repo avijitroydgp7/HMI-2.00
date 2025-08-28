@@ -28,13 +28,14 @@ class ScreenWidget(QWidget):
         self.design_canvas = DesignCanvas(screen_id, self)
         layout.addWidget(self.design_canvas)
         
-        self.design_canvas.selection_changed.connect(self.selection_changed)
-        self.design_canvas.open_screen_requested.connect(self.open_screen_requested)
-        self.design_canvas.mouse_moved_on_scene.connect(self.mouse_moved_on_scene)
-        self.design_canvas.mouse_left_scene.connect(self.mouse_left_scene)
-        self.design_canvas.selection_dragged.connect(self.selection_dragged)
+        # Forward canvas signals explicitly via this widget's signals
+        self.design_canvas.selection_changed.connect(self.selection_changed.emit)
+        self.design_canvas.open_screen_requested.connect(self.open_screen_requested.emit)
+        self.design_canvas.mouse_moved_on_scene.connect(self.mouse_moved_on_scene.emit)
+        self.design_canvas.mouse_left_scene.connect(self.mouse_left_scene.emit)
+        self.design_canvas.selection_dragged.connect(self.selection_dragged.emit)
         # MODIFIED: Connect the new signal to the existing one.
-        self.design_canvas.view_zoomed.connect(self.zoom_changed)
+        self.design_canvas.view_zoomed.connect(self.zoom_changed.emit)
 
         screen_service.screen_modified.connect(self.on_screen_modified)
 

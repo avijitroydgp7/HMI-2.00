@@ -26,6 +26,7 @@ from PyQt6.QtGui import (
     QBrush,
 )
 from PyQt6.QtCore import Qt, QPoint, QPointF, pyqtSignal, QRectF, QRect, QEvent, QLineF, QTimer
+import math
 import copy
 import uuid
 
@@ -570,24 +571,84 @@ class DesignCanvas(QGraphicsView):
                         path = QPainterPath(self._draw_points[0])
                         for p in self._draw_points[1:]:
                             path.lineTo(p)
-                        path.lineTo(current_scene_pos)
+                        candidate = current_scene_pos
+                        modifiers = event.modifiers()
+                        if modifiers & Qt.KeyboardModifier.ShiftModifier:
+                            start = self._draw_points[-1]
+                            v = candidate - start
+                            angle = math.degrees(math.atan2(v.y(), v.x()))
+                            snapped = round(angle / 45.0) * 45.0
+                            length = math.hypot(v.x(), v.y())
+                            rad = math.radians(snapped)
+                            candidate = QPointF(start.x() + math.cos(rad) * length, start.y() + math.sin(rad) * length)
+                        path.lineTo(candidate)
                         self._preview_item.setPath(path)
                 elif self.active_tool == constants.TOOL_LINE:
-                    self._preview_item.setLine(QLineF(self._start_pos, current_scene_pos))
+                    # Apply drawing modifiers: Shift (45° lock), Ctrl (from center)
+                    modifiers = event.modifiers()
+                    start = self._start_pos
+                    v = current_scene_pos - start
+                    if modifiers & Qt.KeyboardModifier.ShiftModifier:
+                        angle = math.degrees(math.atan2(v.y(), v.x()))
+                        snapped = round(angle / 45.0) * 45.0
+                        length = math.hypot(v.x(), v.y())
+                        rad = math.radians(snapped)
+                        v = QPointF(math.cos(rad) * length, math.sin(rad) * length)
+                    if modifiers & Qt.KeyboardModifier.ControlModifier:
+                        p1 = start - v
+                        p2 = start + v
+                    else:
+                        p1 = start
+                        p2 = start + v
+                    self._preview_item.setLine(QLineF(p1, p2))
                 elif self.active_tool in (
                     constants.TOOL_RECT,
                     constants.TOOL_TABLE,
                     constants.TOOL_SCALE,
                     constants.TOOL_DXF,
                 ):
-                    rect = QRectF(self._start_pos, current_scene_pos).normalized()
+                    # Shift -> constrain to square, Ctrl -> draw from center
+                    modifiers = event.modifiers()
+                    start = self._start_pos
+                    if modifiers & Qt.KeyboardModifier.ControlModifier:
+                        v = current_scene_pos - start
+                        w = abs(v.x())
+                        h = abs(v.y())
+                        if modifiers & Qt.KeyboardModifier.ShiftModifier:
+                            m = max(w, h)
+                            w = h = m
+                        rect = QRectF(start.x() - w, start.y() - h, 2 * w, 2 * h).normalized()
+                    else:
+                        rect = QRectF(start, current_scene_pos).normalized()
+                        if modifiers & Qt.KeyboardModifier.ShiftModifier:
+                            w = rect.width()
+                            h = rect.height()
+                            m = max(w, h)
+                            rect = QRectF(rect.left(), rect.top(), m, m)
                     self._preview_item.setRect(rect)
                 elif self.active_tool in (
                     constants.TOOL_CIRCLE,
                     constants.TOOL_ARC,
                     constants.TOOL_SECTOR,
                 ):
-                    rect = QRectF(self._start_pos, current_scene_pos).normalized()
+                    # Shift -> enforce circle, Ctrl -> draw from center
+                    modifiers = event.modifiers()
+                    start = self._start_pos
+                    if modifiers & Qt.KeyboardModifier.ControlModifier:
+                        v = current_scene_pos - start
+                        w = abs(v.x())
+                        h = abs(v.y())
+                        if modifiers & Qt.KeyboardModifier.ShiftModifier:
+                            m = max(w, h)
+                            w = h = m
+                        rect = QRectF(start.x() - w, start.y() - h, 2 * w, 2 * h).normalized()
+                    else:
+                        rect = QRectF(start, current_scene_pos).normalized()
+                        if modifiers & Qt.KeyboardModifier.ShiftModifier:
+                            w = rect.width()
+                            h = rect.height()
+                            m = max(w, h)
+                            rect = QRectF(rect.left(), rect.top(), m, m)
                     self._preview_item.setRect(rect)
                 self._update_dimension_label(current_scene_pos)
             return
@@ -633,9 +694,16 @@ class DesignCanvas(QGraphicsView):
             self.scene.addItem(self._dimension_item)
 
         if self.active_tool == constants.TOOL_LINE:
-            line = QLineF(self._start_pos, current_scene_pos)
-            text = f"{int(line.length())}"
-            pos = (self._start_pos + current_scene_pos) / 2
+            # Use preview geometry so Ctrl/Shift modifiers reflect in measurement
+            line = self._preview_item.line() if hasattr(self._preview_item, 'line') else QLineF(self._start_pos, current_scene_pos)
+            try:
+                p1 = line.p1()
+                p2 = line.p2()
+                text = f"{int(QLineF(p1, p2).length())}"
+                pos = (p1 + p2) / 2
+            except Exception:
+                text = f"{int(QLineF(self._start_pos, current_scene_pos).length())}"
+                pos = (self._start_pos + current_scene_pos) / 2
         elif self.active_tool in (
             constants.TOOL_RECT,
             constants.TOOL_TABLE,
@@ -645,16 +713,32 @@ class DesignCanvas(QGraphicsView):
             constants.TOOL_ARC,
             constants.TOOL_SECTOR,
         ):
-            width = abs(current_scene_pos.x() - self._start_pos.x())
-            height = abs(current_scene_pos.y() - self._start_pos.y())
+            rect = self._preview_item.rect() if hasattr(self._preview_item, 'rect') else QRectF(self._start_pos, current_scene_pos).normalized()
+            width = rect.width()
+            height = rect.height()
             text = f"{int(width)} x {int(height)}"
-            pos = QPointF(max(self._start_pos.x(), current_scene_pos.x()),
-                          max(self._start_pos.y(), current_scene_pos.y()))
+            pos = rect.bottomRight()
         elif self.active_tool in (
             constants.TOOL_POLYGON,
             constants.TOOL_FREEFORM,
         ):
-            pts = self._draw_points + [current_scene_pos]
+            # Shift: snap last segment to 45° for polygon preview bounding size
+            modifiers = Qt.KeyboardModifier.NoModifier
+            try:
+                from PyQt6.QtWidgets import QApplication
+                modifiers = QApplication.keyboardModifiers()
+            except Exception:
+                pass
+            candidate = current_scene_pos
+            if self.active_tool == constants.TOOL_POLYGON and self._draw_points and (modifiers & Qt.KeyboardModifier.ShiftModifier):
+                start = self._draw_points[-1]
+                v = candidate - start
+                angle = math.degrees(math.atan2(v.y(), v.x()))
+                snapped = round(angle / 45.0) * 45.0
+                length = math.hypot(v.x(), v.y())
+                rad = math.radians(snapped)
+                candidate = QPointF(start.x() + math.cos(rad) * length, start.y() + math.sin(rad) * length)
+            pts = self._draw_points + [candidate]
             xs = [p.x() for p in pts]
             ys = [p.y() for p in pts]
             width = max(xs) - min(xs)
@@ -901,11 +985,15 @@ class DesignCanvas(QGraphicsView):
             if event.button() == Qt.MouseButton.LeftButton and self._drawing:
                 scene_pos = self._snap_position(self.mapToScene(event.pos()))
                 if self.active_tool == constants.TOOL_LINE:
-                    pts = [self._start_pos, scene_pos]
+                    # Finalize using preview endpoints so modifiers apply
+                    line = self._preview_item.line() if hasattr(self._preview_item, 'line') else QLineF(self._start_pos, scene_pos)
+                    p1 = line.p1()
+                    p2 = line.p2()
+                    pts = [p1, p2]
                     min_x = min(p.x() for p in pts)
                     min_y = min(p.y() for p in pts)
-                    start = {"x": int(self._start_pos.x() - min_x), "y": int(self._start_pos.y() - min_y)}
-                    end = {"x": int(scene_pos.x() - min_x), "y": int(scene_pos.y() - min_y)}
+                    start = {"x": int(p1.x() - min_x), "y": int(p1.y() - min_y)}
+                    end = {"x": int(p2.x() - min_x), "y": int(p2.y() - min_y)}
                     props = line_tool.get_default_properties()
                     props.update({"start": start, "end": end, "position": {"x": int(min_x), "y": int(min_y)}})
                     self._add_tool_item(constants.TOOL_LINE, props)
@@ -918,10 +1006,12 @@ class DesignCanvas(QGraphicsView):
                     props.update({"points": rel, "position": {"x": int(min_x), "y": int(min_y)}})
                     self._add_tool_item(constants.TOOL_FREEFORM, props)
                 elif self.active_tool == constants.TOOL_RECT:
-                    x = int(min(self._start_pos.x(), scene_pos.x()))
-                    y = int(min(self._start_pos.y(), scene_pos.y()))
-                    w = int(abs(scene_pos.x() - self._start_pos.x()))
-                    h = int(abs(scene_pos.y() - self._start_pos.y()))
+                    # Use preview rect for final properties to include modifiers
+                    rect = self._preview_item.rect() if hasattr(self._preview_item, 'rect') else QRectF(self._start_pos, scene_pos).normalized()
+                    x = int(rect.left())
+                    y = int(rect.top())
+                    w = int(rect.width())
+                    h = int(rect.height())
                     props = {
                         "position": {"x": x, "y": y},
                         "size": {"width": w, "height": h},
@@ -932,10 +1022,11 @@ class DesignCanvas(QGraphicsView):
                     }
                     self._add_tool_item(constants.TOOL_RECT, props)
                 elif self.active_tool == constants.TOOL_CIRCLE:
-                    x = int(min(self._start_pos.x(), scene_pos.x()))
-                    y = int(min(self._start_pos.y(), scene_pos.y()))
-                    w = int(abs(scene_pos.x() - self._start_pos.x()))
-                    h = int(abs(scene_pos.y() - self._start_pos.y()))
+                    rect = self._preview_item.rect() if hasattr(self._preview_item, 'rect') else QRectF(self._start_pos, scene_pos).normalized()
+                    x = int(rect.left())
+                    y = int(rect.top())
+                    w = int(rect.width())
+                    h = int(rect.height())
                     props = {
                         "position": {"x": x, "y": y},
                         "size": {"width": w, "height": h},
@@ -1322,6 +1413,21 @@ class DesignCanvas(QGraphicsView):
             return
         if self.active_tool == constants.TOOL_POLYGON and self._drawing:
             scene_pos = self.mapToScene(event.pos())
+            # If Shift is pressed on finalization, snap the last segment to 45°
+            try:
+                from PyQt6.QtWidgets import QApplication
+                modifiers = QApplication.keyboardModifiers()
+            except Exception:
+                modifiers = Qt.KeyboardModifier.NoModifier
+            if self._draw_points and (modifiers & Qt.KeyboardModifier.ShiftModifier):
+                start = self._draw_points[-1]
+                v = scene_pos - start
+                import math as _math
+                angle = _math.degrees(_math.atan2(v.y(), v.x()))
+                snapped = round(angle / 45.0) * 45.0
+                length = _math.hypot(v.x(), v.y())
+                rad = _math.radians(snapped)
+                scene_pos = QPointF(start.x() + _math.cos(rad) * length, start.y() + _math.sin(rad) * length)
             self._draw_points.append(scene_pos)
             min_x = min(p.x() for p in self._draw_points)
             min_y = min(p.y() for p in self._draw_points)

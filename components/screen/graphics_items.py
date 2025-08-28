@@ -18,6 +18,44 @@ import copy
 from services.screen_data_service import screen_service
 from services.tag_service import tag_service
 
+
+def _apply_pen_style_from_name(pen: QPen, style_name: str):
+    """Apply a named pen style to a QPen.
+
+    Supports extended dash patterns approximating styles from the manual.
+    """
+    if not style_name:
+        return
+    name = str(style_name).lower()
+    if name in ("solid",):
+        pen.setStyle(Qt.PenStyle.SolidLine)
+        return
+    if name in ("dash", "dashed", "dashline"):
+        pen.setStyle(Qt.PenStyle.DashLine)
+        return
+    if name in ("dot", "dotted", "dotline"):
+        pen.setStyle(Qt.PenStyle.DotLine)
+        return
+
+    # Custom patterns
+    patterns = {
+        # Fine broken line: short dashes
+        "fine_broken": [4, 4],
+        # Coarse broken line: longer dashes
+        "coarse_broken": [10, 6],
+        # Speck chain line: dash-dot pattern
+        "speck_chain": [12, 3, 3, 3],
+        # Two-dot long and two short dashes line
+        "two_dot_long_two_short": [14, 4, 2, 4, 2, 6],
+    }
+    pattern = patterns.get(name)
+    if pattern:
+        pen.setStyle(Qt.PenStyle.CustomDashLine)
+        pen.setDashPattern(pattern)
+    else:
+        # Fallback
+        pen.setStyle(Qt.PenStyle.SolidLine)
+
 class BaseGraphicsItem(QGraphicsObject):
     """
     A base class for all custom graphics items on the canvas. It is now a simple
@@ -359,10 +397,7 @@ class LineItem(BaseGraphicsItem):
         width = props.get("width", 1)
         style = props.get("style", "solid")
         pen = QPen(color, width)
-        if style == "dash":
-            pen.setStyle(Qt.PenStyle.DashLine)
-        elif style == "dot":
-            pen.setStyle(Qt.PenStyle.DotLine)
+        _apply_pen_style_from_name(pen, style)
         painter.save()
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
         painter.setPen(pen)
@@ -407,10 +442,7 @@ class FreeformItem(BaseGraphicsItem):
         stroke_color = QColor(props.get("stroke_color", "#000000"))
         pen = QPen(stroke_color, props.get("stroke_width", 1))
         style = props.get("stroke_style", "solid")
-        if style == "dash":
-            pen.setStyle(Qt.PenStyle.DashLine)
-        elif style == "dot":
-            pen.setStyle(Qt.PenStyle.DotLine)
+        _apply_pen_style_from_name(pen, style)
         painter.save()
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
         painter.setPen(pen)
@@ -444,10 +476,7 @@ class RectItem(BaseGraphicsItem):
         h = int(size.get("height", 100))
         pen = QPen(QColor(props.get("stroke_color", "#000000")), props.get("stroke_width", 1))
         style = props.get("stroke_style", "solid")
-        if style == "dash":
-            pen.setStyle(Qt.PenStyle.DashLine)
-        elif style == "dot":
-            pen.setStyle(Qt.PenStyle.DotLine)
+        _apply_pen_style_from_name(pen, style)
         painter.save()
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
         painter.setPen(pen)
@@ -488,10 +517,7 @@ class PolygonItem(BaseGraphicsItem):
         polygon = QPolygonF(pts)
         pen = QPen(QColor(props.get("stroke_color", "#000000")), props.get("stroke_width", 1))
         style = props.get("stroke_style", "solid")
-        if style == "dash":
-            pen.setStyle(Qt.PenStyle.DashLine)
-        elif style == "dot":
-            pen.setStyle(Qt.PenStyle.DotLine)
+        _apply_pen_style_from_name(pen, style)
         painter.save()
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
         painter.setPen(pen)
@@ -560,10 +586,7 @@ class ArcItem(BaseGraphicsItem):
         rect = self.boundingRect()
         pen = QPen(QColor(props.get("color", "#000000")), props.get("width", 1))
         style = props.get("style", "solid")
-        if style == "dash":
-            pen.setStyle(Qt.PenStyle.DashLine)
-        elif style == "dot":
-            pen.setStyle(Qt.PenStyle.DotLine)
+        _apply_pen_style_from_name(pen, style)
         painter.save()
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
         painter.setPen(pen)
@@ -602,10 +625,7 @@ class SectorItem(BaseGraphicsItem):
         path.closeSubpath()
         pen = QPen(QColor(props.get("stroke_color", "#000000")), props.get("stroke_width", 1))
         style = props.get("stroke_style", "solid")
-        if style == "dash":
-            pen.setStyle(Qt.PenStyle.DashLine)
-        elif style == "dot":
-            pen.setStyle(Qt.PenStyle.DotLine)
+        _apply_pen_style_from_name(pen, style)
         painter.save()
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
         painter.setPen(pen)
