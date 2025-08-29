@@ -10,10 +10,10 @@ from typing import Dict, Any, Optional
 import logging
 import copy
 
-from dialogs.actions.select_action_type_dialog import SelectActionTypeDialog
-from dialogs.actions.bit_action_dialog import BitActionDialog
-from dialogs.actions.word_action_dialog import WordActionDialog
-from dialogs.actions.constants import ActionType, TriggerMode
+from tools.button.actions.select_action_type_dialog import SelectActionTypeDialog
+from tools.button.actions.bit_action_dialog import BitActionDialog
+from tools.button.actions.word_action_dialog import WordActionDialog
+from tools.button.actions.constants import ActionType, TriggerMode
 
 from .conditional_style import (
     ConditionalStyleManager,

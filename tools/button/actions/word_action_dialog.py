@@ -9,7 +9,7 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtCore import Qt
 from typing import Dict, Optional
 
-from ..widgets import TagSelector, CollapsibleBox
+from dialogs.widgets import TagSelector, CollapsibleBox
 from .range_helpers import DataTypeMapper, validate_range_section
 from .constants import ActionType, TriggerMode
 from .trigger_utils import TriggerUI

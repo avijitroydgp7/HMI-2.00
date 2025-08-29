@@ -2,7 +2,7 @@
 
 import copy
 
-from components.button.conditional_style import get_style_by_id
+from tools.button.conditional_style import get_style_by_id
 
 _default_style = get_style_by_id("default_rounded")
 DEFAULT_PROPERTIES = {

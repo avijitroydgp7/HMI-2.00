@@ -73,3 +73,4 @@ def validate_range_section(
                 return False, "Data type must match Operand 1."
 
     return True, None
+

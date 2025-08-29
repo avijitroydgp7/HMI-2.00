@@ -20,3 +20,4 @@ class TriggerMode(str, Enum):
     def values(cls):
         return [m.value for m in cls]
 
+

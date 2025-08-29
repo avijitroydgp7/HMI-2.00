@@ -1,5 +1,5 @@
 from typing import Dict, Any, List, Optional, ClassVar, Callable, Union, Tuple
-from dialogs.actions.constants import TriggerMode
+from tools.button.actions.constants import TriggerMode
 from dataclasses import dataclass, field
 import copy
 import ast
@@ -1070,6 +1070,8 @@ class ConditionalStyleEditorDialog(QDialog):
 
         self.link_radius_btn = QPushButton()
         self.link_radius_btn.setCheckable(True)
+        # Default to linked corners
+        self.link_radius_btn.setChecked(True)
         corner_layout.addWidget(self.link_radius_btn, 1, 0)
 
         left_label = QLabel("Left")
@@ -1110,7 +1112,9 @@ class ConditionalStyleEditorDialog(QDialog):
         for key, spin in self.corner_spins.items():
             spin.valueChanged.connect(lambda val, k=key: self.on_corner_radius_changed(k, val))
         self.link_radius_btn.toggled.connect(self.on_link_radius_toggled)
-        self.on_link_radius_toggled(self.link_radius_btn.isChecked())
+        # Initialize icon without forcing values to unify on startup
+        init_icon = "fa5s.link" if self.link_radius_btn.isChecked() else "fa5s.unlink"
+        self.link_radius_btn.setIcon(IconManager.create_icon(init_icon))
 
         border_layout.addWidget(self.corner_frame, 0, 0, 1, 2)
 

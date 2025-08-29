@@ -14,7 +14,7 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtCore import Qt
 
-from ..widgets import TagSelector, CollapsibleBox
+from dialogs.widgets import TagSelector, CollapsibleBox
 from .constants import TriggerMode
 from .range_helpers import DataTypeMapper, validate_range_section
 

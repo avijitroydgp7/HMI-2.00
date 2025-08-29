@@ -33,3 +33,4 @@ class SelectActionTypeDialog(QDialog):
         """Sets the selected type and accepts the dialog."""
         self.selected_action_type = action_type
         self.accept()
+

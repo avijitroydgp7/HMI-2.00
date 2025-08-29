@@ -1758,7 +1758,7 @@ class DesignCanvas(QGraphicsView):
                 self.selection_dragged.emit(pos_dict)
 
     def _open_button_properties(self, button_instance_data):
-        from components.button.button_properties_dialog import ButtonPropertiesDialog
+        from tools.button.button_properties_dialog import ButtonPropertiesDialog
         
         # Store original position before dialog
         original_pos = None

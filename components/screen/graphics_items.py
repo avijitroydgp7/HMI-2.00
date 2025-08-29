@@ -168,7 +168,7 @@ class ButtonItem(BaseGraphicsItem):
     def _get_conditional_style_manager(self):
         """Lazy load conditional style manager"""
         if self._conditional_style_manager is None:
-            from components.button.conditional_style import ConditionalStyleManager, ConditionalStyle
+            from tools.button.conditional_style import ConditionalStyleManager, ConditionalStyle
             self._conditional_style_manager = ConditionalStyleManager()
             
             # Load conditional styles from properties
