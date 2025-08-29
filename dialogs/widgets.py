@@ -168,6 +168,11 @@ class ValueSelector(QWidget):
         
         input_layout.addWidget(self.source_combo)
         input_layout.addWidget(self.input_stack, 1)
+
+        # Optional suggestions combo for constant mode (hidden by default)
+        self.constant_suggestion_combo = QComboBox()
+        self.constant_suggestion_combo.setVisible(False)
+        input_layout.addWidget(self.constant_suggestion_combo)
         layout.addLayout(input_layout)
 
         self.error_label = QLabel()
@@ -184,6 +189,14 @@ class ValueSelector(QWidget):
 
         self.source_combo.currentIndexChanged.connect(self.inputChanged.emit)
         self.constant_input.textChanged.connect(self.inputChanged.emit)
+
+        # Keep suggestions in sync with constant input
+        self.constant_input.textChanged.connect(self._sync_suggestion_from_text)
+        self.constant_suggestion_combo.currentIndexChanged.connect(self._apply_suggestion_to_text)
+        self.source_combo.currentIndexChanged.connect(self._update_suggestion_visibility)
+
+        # initialize visibility
+        self._update_suggestion_visibility()
         
     def _browse_for_tag(self):
         dialog = TagBrowserDialog(self, allowed_types=self.allowed_tag_types, allow_arrays=self.allow_arrays)
@@ -242,6 +255,58 @@ class ValueSelector(QWidget):
         else:
             self.source_combo.setCurrentIndex(0)
         self.source_combo.setVisible(False)
+
+    # --- Constant suggestions API -------------------------------------
+    def set_constant_suggestions(self, items: list[tuple[str, str]]):
+        """
+        Provide optional suggestions for constant mode.
+
+        items: list of (value, label). The value will be written into
+        the constant input when selected.
+        """
+        self.constant_suggestion_combo.blockSignals(True)
+        self.constant_suggestion_combo.clear()
+        for value, label in items:
+            self.constant_suggestion_combo.addItem(label, value)
+        self.constant_suggestion_combo.blockSignals(False)
+        self._update_suggestion_visibility()
+        self._sync_suggestion_from_text()
+
+    def clear_constant_suggestions(self):
+        self.constant_suggestion_combo.blockSignals(True)
+        self.constant_suggestion_combo.clear()
+        self.constant_suggestion_combo.blockSignals(False)
+        self._update_suggestion_visibility()
+
+    def _update_suggestion_visibility(self):
+        show = (
+            self.source_combo.currentText() == "Constant"
+            and self.constant_suggestion_combo.count() > 0
+        )
+        self.constant_suggestion_combo.setVisible(show)
+
+    def _apply_suggestion_to_text(self):
+        if not self.constant_suggestion_combo.isVisible():
+            return
+        idx = self.constant_suggestion_combo.currentIndex()
+        if idx >= 0:
+            value = self.constant_suggestion_combo.currentData()
+            # Avoid feedback loop: only set if different
+            if str(self.constant_input.text()) != str(value):
+                self.constant_input.setText(str(value))
+
+    def _sync_suggestion_from_text(self):
+        text = str(self.constant_input.text())
+        # Find index with matching value data
+        found = -1
+        for i in range(self.constant_suggestion_combo.count()):
+            if str(self.constant_suggestion_combo.itemData(i)) == text:
+                found = i
+                break
+        # Block to avoid _apply_suggestion_to_text firing needlessly
+        self.constant_suggestion_combo.blockSignals(True)
+        self.constant_suggestion_combo.setCurrentIndex(found)
+        self.constant_suggestion_combo.blockSignals(False)
 
     def setError(self, message: Optional[str]):
         try:

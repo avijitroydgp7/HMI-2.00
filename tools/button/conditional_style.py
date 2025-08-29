@@ -58,6 +58,7 @@ from PyQt6.QtGui import (
 from PyQt6.QtSvg import QSvgRenderer
 from utils.icon_manager import IconManager
 from dialogs.widgets import TagSelector
+from services.comment_data_service import comment_data_service
 
 # ---------------------------------------------------------------------------
 # Logging setup for condition evaluation
@@ -1332,6 +1333,70 @@ class ConditionalStyleEditorDialog(QDialog):
         c_layout.addWidget(comment_row, 2, 1)
         c_layout.setColumnStretch(1, 1)
 
+        # --- Populate constant suggestions for comment selectors --------
+        def _get_group_by_number(num_str: str) -> Optional[Dict[str, Any]]:
+            groups = comment_data_service.get_all_groups()
+            for _gid, g in groups.items():
+                if g.get("number") == num_str:
+                    return g
+            return None
+
+        def _update_comment_number_suggestions():
+            groups = comment_data_service.get_all_groups()
+            items = []
+            for g in groups.values():
+                number = g.get("number")
+                if not number:
+                    continue
+                name = g.get("name", "")
+                label = f"{number} - {name}" if name else str(number)
+                items.append((str(number), label))
+            # sort by numeric order when possible
+            try:
+                items.sort(key=lambda t: int(t[0]))
+            except Exception:
+                items.sort(key=lambda t: t[0])
+            comment_number.main_tag_selector.set_constant_suggestions(items)
+
+        def _update_column_row_suggestions():
+            data = comment_number.main_tag_selector.get_data()
+            # Only available when comment number is a constant
+            if not data or data.get("source") != "constant":
+                comment_column.main_tag_selector.clear_constant_suggestions()
+                comment_row.main_tag_selector.clear_constant_suggestions()
+                return
+            num_str = str(data.get("value", "")).strip()
+            group = _get_group_by_number(num_str)
+            if not group:
+                comment_column.main_tag_selector.clear_constant_suggestions()
+                comment_row.main_tag_selector.clear_constant_suggestions()
+                return
+            # Columns
+            cols = group.get("columns", ["Comment"]) or ["Comment"]
+            col_items = []
+            for idx, name in enumerate(cols, start=1):
+                label = f"{idx} - {name}" if name else str(idx)
+                col_items.append((str(idx), label))
+            comment_column.main_tag_selector.set_constant_suggestions(col_items)
+            # Rows
+            rows = group.get("comments", []) or []
+            row_items = [(str(i), str(i)) for i in range(1, len(rows) + 1)]
+            comment_row.main_tag_selector.set_constant_suggestions(row_items)
+
+        # Initial fill and live updates
+        _update_comment_number_suggestions()
+        _update_column_row_suggestions()
+        try:
+            comment_data_service.comment_group_list_changed.connect(_update_comment_number_suggestions)
+            comment_data_service.comments_changed.connect(lambda _gid: _update_column_row_suggestions())
+        except Exception:
+            pass
+        # Also react when the number selector changes
+        try:
+            comment_number.inputChanged.connect(_update_column_row_suggestions)
+        except Exception:
+            pass
+
         text_page = QWidget()
         t_layout = QGridLayout(text_page)
         text_edit = QTextEdit()
@@ -2296,6 +2361,36 @@ class ConditionalStyleEditorDialog(QDialog):
             else:
                 if self.base_controls["text_type_combo"].currentText() == "Text":
                     text = self.base_controls["text_edit"].toPlainText()
+                elif self.base_controls["text_type_combo"].currentText() == "Comment":
+                    # Try to resolve constant comment reference for preview
+                    try:
+                        num_data = self.base_controls["comment_number"].get_data()
+                        col_data = self.base_controls["comment_column"].get_data()
+                        row_data = self.base_controls["comment_row"].get_data()
+                        if (
+                            num_data and col_data and row_data and
+                            num_data.get("main_tag", {}).get("source") == "constant" and
+                            col_data.get("main_tag", {}).get("source") == "constant" and
+                            row_data.get("main_tag", {}).get("source") == "constant"
+                        ):
+                            number = str(num_data["main_tag"].get("value", "")).strip()
+                            col = int(float(col_data["main_tag"].get("value", 0)))
+                            row = int(float(row_data["main_tag"].get("value", 0)))
+                            groups = comment_data_service.get_all_groups()
+                            group = None
+                            for g in groups.values():
+                                if g.get("number") == number:
+                                    group = g
+                                    break
+                            if group and row > 0 and col > 0:
+                                comments = group.get("comments", [])
+                                columns = group.get("columns", ["Comment"]) or ["Comment"]
+                                if row - 1 < len(comments):
+                                    row_vals = comments[row - 1]
+                                    if col - 1 < len(row_vals):
+                                        text = str(row_vals[col - 1])
+                    except Exception:
+                        pass
             self.preview_button.setText(text or "Preview")
 
 
