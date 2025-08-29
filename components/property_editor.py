@@ -103,12 +103,14 @@ class PropertyEditor(QStackedWidget):
             # Finalize on the next event loop cycle: release blockers and
             # emit a single consolidated screen_modified while still guarded.
             def _finalize_post_update():
-                # Release blockers first so emissions below propagate.
-                for b in blockers:
+                # Explicitly unblock all blockers so emissions below propagate,
+                # then drop references to ensure they are released.
+                for blocker in blockers:
                     try:
-                        del b
+                        blocker.unblock()
                     except Exception:
                         pass
+                blockers.clear()
                 # If an edit occurred that affects a concrete instance,
                 # notify listeners to refresh views.
                 try:
