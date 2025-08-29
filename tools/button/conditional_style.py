@@ -57,6 +57,8 @@ from PyQt6.QtGui import (
 
 from PyQt6.QtSvg import QSvgRenderer
 from utils.icon_manager import IconManager
+from dialogs.icon_picker_dialog import IconPickerDialog
+import os
 from dialogs.widgets import TagSelector
 from services.comment_data_service import comment_data_service
 
@@ -252,34 +254,96 @@ class SwitchButton(QPushButton):
 
 
 class IconButton(QPushButton):
-    """Button capable of displaying SVG icons for previewing styles."""
+    """Button capable of displaying SVG or QtAwesome icons for previewing styles."""
 
     def __init__(self, parent=None):
         super().__init__(parent)
+        # SVG renderers
         self.svg_renderer: Optional[QSvgRenderer] = None
         self.svg_renderer_hover: Optional[QSvgRenderer] = None
         self.svg_renderer_click: Optional[QSvgRenderer] = None
+        # QtAwesome icon names (without the 'qta:' prefix)
+        self.qt_icon_name: Optional[str] = None
+        self.qt_icon_hover_name: Optional[str] = None
+        self.qt_icon_click_name: Optional[str] = None
+        # Raster image fallbacks
+        self.pixmap: Optional[QPixmap] = None
+        self.pixmap_hover: Optional[QPixmap] = None
+        self.pixmap_click: Optional[QPixmap] = None
+
         self.icon_size = QSize(50, 50)
         self._is_pressed = False
 
-    def set_icon(self, path: str):
-        self.svg_renderer = QSvgRenderer(path) if path else None
+    def set_icon(self, source: str):
+        self._assign_icon_source(source, variant="base")
         self.update()
 
-    def set_hover_icon(self, path: str):
-        self.svg_renderer_hover = QSvgRenderer(path) if path else None
+    def set_hover_icon(self, source: str):
+        self._assign_icon_source(source, variant="hover")
         self.update()
 
-    def set_click_icon(self, path: str):
-        self.svg_renderer_click = QSvgRenderer(path) if path else None
+    def set_click_icon(self, source: str):
+        self._assign_icon_source(source, variant="click")
         self.update()
 
-    def set_icon_clicked(self, path: str):
-        self.set_click_icon(path)
+    def set_icon_clicked(self, source: str):
+        self.set_click_icon(source)
 
     def set_icon_size(self, size: int):
         self.icon_size = QSize(size, size)
         self.update()
+
+    def _assign_icon_source(self, source: Optional[str], variant: str):
+        # Reset variant slots
+        if variant == "base":
+            self.svg_renderer = None
+            self.qt_icon_name = None
+            self.pixmap = None
+        elif variant == "hover":
+            self.svg_renderer_hover = None
+            self.qt_icon_hover_name = None
+            self.pixmap_hover = None
+        elif variant == "click":
+            self.svg_renderer_click = None
+            self.qt_icon_click_name = None
+            self.pixmap_click = None
+
+        if not source:
+            return
+        src = str(source)
+        # QtAwesome shorthand
+        if src.startswith("qta:"):
+            name = src.split(":", 1)[1]
+            if variant == "base":
+                self.qt_icon_name = name
+            elif variant == "hover":
+                self.qt_icon_hover_name = name
+            else:
+                self.qt_icon_click_name = name
+            return
+
+        # File path
+        ext = os.path.splitext(src)[1].lower()
+        if ext == ".svg":
+            renderer = QSvgRenderer(src)
+            if not renderer.isValid():
+                return
+            if variant == "base":
+                self.svg_renderer = renderer
+            elif variant == "hover":
+                self.svg_renderer_hover = renderer
+            else:
+                self.svg_renderer_click = renderer
+            return
+        # Raster image
+        pix = QPixmap(src)
+        if pix and not pix.isNull():
+            if variant == "base":
+                self.pixmap = pix
+            elif variant == "hover":
+                self.pixmap_hover = pix
+            else:
+                self.pixmap_click = pix
 
     def mousePressEvent(self, e):
         self._is_pressed = True
@@ -299,21 +363,39 @@ class IconButton(QPushButton):
         self.update()
         super().leaveEvent(e)
 
+    def _current_sources(self):
+        if self._is_pressed:
+            return (self.svg_renderer_click, self.qt_icon_click_name, self.pixmap_click)
+        if self.underMouse():
+            return (self.svg_renderer_hover, self.qt_icon_hover_name, self.pixmap_hover)
+        return (self.svg_renderer, self.qt_icon_name, self.pixmap)
+
     def paintEvent(self, event):
         super().paintEvent(event)
-        if self._is_pressed and self.svg_renderer_click:
-            renderer = self.svg_renderer_click
-        elif self.underMouse() and self.svg_renderer_hover:
-            renderer = self.svg_renderer_hover
-        else:
-            renderer = self.svg_renderer
+        svg_renderer, qt_name, pixmap = self._current_sources()
+        target_rect = self.rect()
+        icon_rect = QRect(0, 0, self.icon_size.width(), self.icon_size.height())
+        icon_rect.moveCenter(target_rect.center())
 
-        if renderer:
+        if svg_renderer:
             painter = QPainter(self)
-            target_rect = self.rect()
-            icon_rect = QRect(0, 0, self.icon_size.width(), self.icon_size.height())
-            icon_rect.moveCenter(target_rect.center())
-            renderer.render(painter, QRectF(icon_rect))
+            svg_renderer.render(painter, QRectF(icon_rect))
+            return
+        if qt_name:
+            icon = IconManager.create_icon(qt_name)
+            if not icon.isNull():
+                pm = icon.pixmap(self.icon_size)
+                painter = QPainter(self)
+                x = icon_rect.x() + (icon_rect.width() - pm.width()) // 2
+                y = icon_rect.y() + (icon_rect.height() - pm.height()) // 2
+                painter.drawPixmap(x, y, pm)
+                return
+        if pixmap:
+            pm = pixmap.scaled(self.icon_size, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
+            painter = QPainter(self)
+            x = icon_rect.x() + (icon_rect.width() - pm.width()) // 2
+            y = icon_rect.y() + (icon_rect.height() - pm.height()) // 2
+            painter.drawPixmap(x, y, pm)
 
 # Predefined gradient orientations used for visual selection
 _GRADIENT_STYLES = {
@@ -1360,7 +1442,8 @@ class ConditionalStyleEditorDialog(QDialog):
         icon_edit = QLineEdit()
         icon_btn = QToolButton()
         icon_btn.setText("...")
-        icon_btn.clicked.connect(lambda _=None, e=icon_edit: self._select_icon_file(e))
+        # Open custom icon picker (QtAwesome or SVG from lib/icon)
+        icon_btn.clicked.connect(lambda _=None, e=icon_edit: self._open_icon_picker(e))
         icon_layout = QHBoxLayout()
         icon_layout.setContentsMargins(0, 0, 0, 0)
         icon_layout.addWidget(icon_edit)
@@ -1905,6 +1988,19 @@ class ConditionalStyleEditorDialog(QDialog):
         path, _ = QFileDialog.getOpenFileName(self, "Select Icon", "", "Images (*.svg *.png *.jpg *.jpeg)")
         if path:
             edit.setText(path)
+
+    def _open_icon_picker(self, edit: QLineEdit):
+        # Restrict SVG selection to lib/icon directory, and allow QtAwesome icons.
+        try:
+            base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+            icons_root = os.path.join(base_dir, "lib", "icon")
+        except Exception:
+            icons_root = os.path.join(os.getcwd(), "lib", "icon")
+        dlg = IconPickerDialog(icons_root, self)
+        if dlg.exec() == QDialog.DialogCode.Accepted:
+            value = dlg.selected_value()
+            if value:
+                edit.setText(value)
 
     def on_corner_radius_changed(self, corner, value):
         if self.link_radius_btn.isChecked():
