@@ -78,6 +78,10 @@ class PropertyEditor(QStackedWidget):
         """
         Sets the currently selected object(s) to be edited.
         """
+        # If we are in the middle of applying an edit from the editor,
+        # skip rebuilding the editor to avoid re-entrancy/refresh loops.
+        if getattr(self, "_is_editing", False):
+            return
         # Clear previous editor if it exists
         if self.count() > 2:
             old_widget = self.widget(2)

@@ -1225,6 +1225,7 @@ class DesignCanvas(QGraphicsView):
             for item in self.scene.selectedItems()
             if isinstance(item, BaseGraphicsItem)
         ]
+        old_selection_ids = set(selected_ids)
 
         self.screen_data = screen_service.get_screen(self.screen_id)
         if not self.screen_data:
@@ -1262,8 +1263,15 @@ class DesignCanvas(QGraphicsView):
             item = self._item_map.get(inst_id)
             if item:
                 item.setSelected(True)
+        # Determine if the selection actually changed as a result of sync
+        new_selection_ids = {
+            it.instance_data.get('instance_id')
+            for it in self.scene.selectedItems()
+            if isinstance(it, BaseGraphicsItem)
+        }
         self.scene.blockSignals(False)
-        self._on_selection_changed()
+        if new_selection_ids != old_selection_ids:
+            self._on_selection_changed()
         self.update()
         self._update_shadow_for_zoom()
         self.update_visible_items()
