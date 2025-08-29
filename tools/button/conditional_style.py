@@ -1,4 +1,4 @@
-from typing import Dict, Any, List, Optional, ClassVar, Callable, Union, Tuple
+﻿from typing import Dict, Any, List, Optional, ClassVar, Callable, Union, Tuple
 from tools.button.actions.constants import TriggerMode
 from dataclasses import dataclass, field
 import copy
@@ -802,10 +802,10 @@ class ConditionalStyleManager(QObject):
 
         ``condition`` may be one of the following:
 
-        * ``None`` – always ``True``
-        * ``dict`` – a configuration dictionary as produced by the editor
-        * ``str`` – a Python expression evaluated by :func:`_safe_eval`
-        * ``callable`` – a function receiving ``tag_values``
+        * ``None`` â€“ always ``True``
+        * ``dict`` â€“ a configuration dictionary as produced by the editor
+        * ``str`` â€“ a Python expression evaluated by :func:`_safe_eval`
+        * ``callable`` â€“ a function receiving ``tag_values``
         """
 
         if condition is None:
@@ -1119,16 +1119,16 @@ class ConditionalStyleEditorDialog(QDialog):
         border_layout.addWidget(self.corner_frame, 0, 0, 1, 2)
 
 
-        border_layout.addWidget(QLabel("Border Width (px):"), 1, 0)
+        border_layout.addWidget(QLabel("Border Width (px):"), 2, 0)
         self.border_width_spin = QSpinBox()
         # Allow border width up to 20px, final limit is adjusted dynamically
         self.border_width_spin.setRange(0, 20)
         self.border_width_spin.setValue(self.style.properties.get("border_width", 0))
         self.border_width_spin.valueChanged.connect(self.update_preview)
-        border_layout.addWidget(self.border_width_spin, 1, 1)
+        border_layout.addWidget(self.border_width_spin, 2, 1)
 
         self.border_style_label = QLabel("Border Style:")
-        border_layout.addWidget(self.border_style_label, 2, 0)
+        border_layout.addWidget(self.border_style_label, 1, 0)
         self.border_style_combo = QComboBox()
         self.border_style_combo.setIconSize(QSize(60, 12))
         _styles = ["none", "solid", "dashed", "dotted", "double", "groove", "ridge"]
@@ -1139,8 +1139,8 @@ class ConditionalStyleEditorDialog(QDialog):
         current_style = self.style.properties.get("border_style", "solid")
         if current_style in _styles:
             self.border_style_combo.setCurrentIndex(_styles.index(current_style))
-        self.border_style_combo.currentIndexChanged.connect(self.update_preview)
-        border_layout.addWidget(self.border_style_combo, 2, 1)
+        self.border_style_combo.currentIndexChanged.connect(self.on_border_style_changed)
+        border_layout.addWidget(self.border_style_combo, 1, 1)
 
         self.border_group.setLayout(border_layout)
         options_layout.addWidget(self.border_group, 0, 0)
@@ -1267,6 +1267,12 @@ class ConditionalStyleEditorDialog(QDialog):
         # Initialize copy states after colors and preview widgets are ready
         self.on_copy_hover_toggled(False)
         self.on_copy_click_toggled(False)
+
+        # Ensure border width enablement reflects current style selection
+
+
+        self.on_border_style_changed()
+
 
         self.update_controls_state()
         self.update_preview()
@@ -2046,6 +2052,13 @@ class ConditionalStyleEditorDialog(QDialog):
         painter.end()
         return QIcon(pixmap)
 
+    def on_border_style_changed(self):
+        style = self.border_style_combo.currentData()
+        allow_width = bool(style) and style != "none"
+        self.border_width_spin.setEnabled(allow_width)
+        if not allow_width:
+            self.border_width_spin.setValue(0)
+        self.update_preview()
     def _init_gradient_type_combo(self):
         for name, coords in _GRADIENT_STYLES.items():
             self.gradient_type_combo.addItem(self._create_gradient_icon(coords), name)
@@ -2462,3 +2475,4 @@ class ConditionalStyleEditorDialog(QDialog):
         except Exception:
             # In headless contexts or during tests, QMessageBox may fail.
             logger.warning("Condition Error: %s", message)
+
