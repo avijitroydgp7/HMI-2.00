@@ -68,44 +68,94 @@ class ScreenDataService(QObject):
         return None
 
     def reorder_child(self, parent_id, instance_id, direction):
-        if parent_id not in self._screens: return
-        children = self._screens[parent_id].get('children', [])
-        indices = [i for i, child in enumerate(children) if child['instance_id'] == instance_id]
-        if not indices: return
-        idx = indices[0]
-        
-        if direction == 'front':
-            children.append(children.pop(idx))
-        elif direction == 'back':
-            children.insert(0, children.pop(idx))
-        elif direction == 'forward':
-            children.insert(idx + 1, children.pop(idx))
-        elif direction == 'backward':
-            children.insert(idx - 1, children.pop(idx))
-        else:
-            return
-            
-        self.screen_modified.emit(parent_id)
+        """
+        Reorder a single child by delegating to the generic helper.
+        """
+        self._reorder_children(parent_id, [instance_id], direction, group=False)
 
     def reorder_children(self, parent_id, instance_ids, direction):
-        if parent_id not in self._screens: return
-        
-        children = self._screens[parent_id].get('children', [])
-        instance_id_set = set(instance_ids)
+        """
+        Reorder multiple children by delegating to the generic helper.
+        """
+        self._reorder_children(parent_id, instance_ids, direction, group=True)
 
-        selected_group = [child for child in children if child['instance_id'] in instance_id_set]
-        unselected = [child for child in children if child['instance_id'] not in instance_id_set]
+    def _reorder_children(self, parent_id, instance_ids, direction, group=False):
+        """
+        Generic helper to reorder one or more children under a given parent.
 
-        if not selected_group: return
+        - parent existence checks handled here
+        - supports directions: 'front', 'back', 'forward', 'backward'
+        - emits screen_modified exactly once after a successful reorder
 
-        if direction == 'front':
-            self._screens[parent_id]['children'] = unselected + selected_group
-        elif direction == 'back':
-            self._screens[parent_id]['children'] = selected_group + unselected
-        else:
+        The 'group' flag is reserved for potential future semantics tweaks for
+        forward/backward moves; current implementation preserves relative order
+        of selected items for 'front'/'back', and moves contiguous runs by one
+        step for 'forward'/'backward'.
+        """
+        if parent_id not in self._screens:
             return
 
-        self.screen_modified.emit(parent_id)
+        children = self._screens[parent_id].get('children', [])
+        if not children:
+            return
+
+        # Filter provided IDs to those actually present under the parent
+        id_set = set(instance_ids or [])
+        if not id_set:
+            return
+
+        selected = [c for c in children if c.get('instance_id') in id_set]
+        if not selected:
+            return
+
+        changed = False
+
+        if direction == 'front':
+            # Move selected to the end, preserving relative order
+            unselected = [c for c in children if c.get('instance_id') not in id_set]
+            new_children = unselected + selected
+            if new_children != children:
+                self._screens[parent_id]['children'] = new_children
+                changed = True
+        elif direction == 'back':
+            # Move selected to the beginning, preserving relative order
+            unselected = [c for c in children if c.get('instance_id') not in id_set]
+            new_children = selected + unselected
+            if new_children != children:
+                self._screens[parent_id]['children'] = new_children
+                changed = True
+        elif direction == 'forward':
+            # Move selected items one step toward the front.
+            # Operate in-place by swapping selected runs with the next unselected item.
+            i = len(children) - 2
+            while i >= 0:
+                cur = children[i]
+                nxt = children[i + 1]
+                cur_sel = cur.get('instance_id') in id_set
+                nxt_sel = nxt.get('instance_id') in id_set
+                if cur_sel and not nxt_sel:
+                    children[i], children[i + 1] = nxt, cur
+                    changed = True
+                i -= 1
+        elif direction == 'backward':
+            # Move selected items one step toward the back.
+            i = 1
+            n = len(children)
+            while i < n:
+                prev = children[i - 1]
+                cur = children[i]
+                prev_sel = prev.get('instance_id') in id_set
+                cur_sel = cur.get('instance_id') in id_set
+                if cur_sel and not prev_sel:
+                    children[i - 1], children[i] = cur, prev
+                    changed = True
+                i += 1
+        else:
+            # Unknown direction; do nothing
+            return
+
+        if changed:
+            self.screen_modified.emit(parent_id)
         
     def get_parent_screens(self, child_screen_id):
         return list(self._child_to_parents.get(child_screen_id, set()))

@@ -1,5 +1,12 @@
-# utils/constants.py
-# A central place for all constant values used throughout the application.
+"""
+Central constants and enums used across the application.
+
+- Introduces `ToolType` enum to replace scattered string identifiers.
+- Provides helpers to convert to/from strings for serialization.
+"""
+
+from enum import Enum
+from typing import Optional, Union
 
 # --- MIME Types ---
 MIME_TYPE_SCREEN_ID = 'application/x-screen-id'
@@ -11,22 +18,64 @@ CLIPBOARD_TYPE_TAG_DATABASE = 'tag_database'
 CLIPBOARD_TYPE_SCREEN = 'screen'
 CLIPBOARD_TYPE_COMMENT_GROUP = 'comment_group'
 
-# --- Tool Names ---
-TOOL_SELECT = 'select'
-TOOL_BUTTON = 'button'
-TOOL_TEXT = 'text'
-TOOL_LINE = 'line'
-TOOL_FREEFORM = 'freeform'
-TOOL_RECT = 'rect'
-TOOL_POLYGON = 'polygon'
-TOOL_CIRCLE = 'circle'
-TOOL_ARC = 'arc'
-TOOL_SECTOR = 'sector'
-TOOL_TABLE = 'table'
-TOOL_SCALE = 'scale'
-TOOL_IMAGE = 'image'
-TOOL_DXF = 'dxf'
-TOOL_PATH_EDIT = 'path_edit'
+
+class ToolType(str, Enum):
+    """Enumeration of all design/runtime tool identifiers.
+
+    Subclasses ``str`` so values behave like strings for Qt/JSON,
+    while giving type-safety and autocomplete throughout the codebase.
+    """
+    SELECT = 'select'
+    PATH_EDIT = 'path_edit'
+
+    BUTTON = 'button'
+    TEXT = 'text'
+    LINE = 'line'
+    FREEFORM = 'freeform'
+    RECT = 'rect'
+    POLYGON = 'polygon'
+    CIRCLE = 'circle'
+    ARC = 'arc'
+    SECTOR = 'sector'
+    TABLE = 'table'
+    SCALE = 'scale'
+    IMAGE = 'image'
+    DXF = 'dxf'
+
+
+# Helper alias type used in signatures
+ToolLike = Union[ToolType, str]
+
+
+def tool_type_to_str(tool: Optional[ToolLike]) -> str:
+    """Return the string identifier for a tool enum or string input.
+
+    - For ``ToolType`` values, returns the underlying ``value``.
+    - For strings, returns the string as-is.
+    - For ``None``, returns an empty string.
+    """
+    if tool is None:
+        return ''
+    if isinstance(tool, ToolType):
+        return tool.value
+    return str(tool)
+
+
+def tool_type_from_str(value: Optional[ToolLike]) -> Optional[ToolType]:
+    """Parse a tool type from a string or return the enum unchanged.
+
+    Returns ``None`` if the input is falsy or doesn't match any known tool.
+    """
+    if not value:
+        return None
+    if isinstance(value, ToolType):
+        return value
+    try:
+        return ToolType(str(value))
+    except ValueError:
+        return None
+
+
 # --- Project Tree Item Types ---
 PROJECT_TREE_ITEM_PROJECT_INFO = 'project_info'
 PROJECT_TREE_ITEM_SYSTEM = 'system'

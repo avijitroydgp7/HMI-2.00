@@ -82,9 +82,9 @@ class ToolsToolbar(QToolBar):
         self._action_group.triggered.connect(lambda action: self.tool_changed.emit(action.data()))
 
         tools = [
-            {"id": constants.TOOL_SELECT, "name": "Select Tool", "icon": "fa5s.mouse-pointer", "shortcut": "V", "checked": True},
-            {"id": constants.TOOL_PATH_EDIT, "name": "Path Edit Tool", "icon": "fa5s.edit", "shortcut": "E", "checked": False},
-            {"id": constants.TOOL_BUTTON, "name": "Button Tool", "icon": "mdi.gesture-tap-box", "shortcut": "B", "checked": False},
+            {"id": constants.ToolType.SELECT, "name": "Select Tool", "icon": "fa5s.mouse-pointer", "shortcut": "V", "checked": True},
+            {"id": constants.ToolType.PATH_EDIT, "name": "Path Edit Tool", "icon": "fa5s.edit", "shortcut": "E", "checked": False},
+            {"id": constants.ToolType.BUTTON, "name": "Button Tool", "icon": "mdi.gesture-tap-box", "shortcut": "B", "checked": False},
         ]
 
         icon_sz = self.iconSize().width()
@@ -98,7 +98,7 @@ class ToolsToolbar(QToolBar):
             self._action_group.addAction(action)
             self.addAction(action)
 
-    def set_active_tool(self, tool_id: str):
+    def set_active_tool(self, tool_id):
         """Programmatically sets the active tool in the toolbar."""
         for action in self._action_group.actions():
             if action.data() == tool_id:
@@ -132,24 +132,24 @@ class DrawingToolbar(QToolBar):
 
         tool_groups = [
             [
-                {"id": constants.TOOL_LINE, "name": "Line Tool", "icon": "fa5s.slash", "shortcut": "L"},
-                {"id": constants.TOOL_FREEFORM, "name": "Freeform Tool", "icon": "fa5s.pencil-alt", "shortcut": "F"},
+                {"id": constants.ToolType.LINE, "name": "Line Tool", "icon": "fa5s.slash", "shortcut": "L"},
+                {"id": constants.ToolType.FREEFORM, "name": "Freeform Tool", "icon": "fa5s.pencil-alt", "shortcut": "F"},
             ],
             [
-                {"id": constants.TOOL_RECT, "name": "Rectangle Tool", "icon": "fa5.square", "shortcut": "R"},
-                {"id": constants.TOOL_POLYGON, "name": "Polygon Tool", "icon": "fa5s.draw-polygon", "shortcut": "P"},
-                {"id": constants.TOOL_CIRCLE, "name": "Circle Tool", "icon": "fa5s.circle", "shortcut": "C"},
-                {"id": constants.TOOL_ARC, "name": "Arc Tool", "icon": "fa5s.circle-notch", "shortcut": "A"},
-                {"id": constants.TOOL_SECTOR, "name": "Sector Tool", "icon": "fa5s.chart-pie", "shortcut": "S"},
+                {"id": constants.ToolType.RECT, "name": "Rectangle Tool", "icon": "fa5.square", "shortcut": "R"},
+                {"id": constants.ToolType.POLYGON, "name": "Polygon Tool", "icon": "fa5s.draw-polygon", "shortcut": "P"},
+                {"id": constants.ToolType.CIRCLE, "name": "Circle Tool", "icon": "fa5s.circle", "shortcut": "C"},
+                {"id": constants.ToolType.ARC, "name": "Arc Tool", "icon": "fa5s.circle-notch", "shortcut": "A"},
+                {"id": constants.ToolType.SECTOR, "name": "Sector Tool", "icon": "fa5s.chart-pie", "shortcut": "S"},
             ],
             [
-                {"id": constants.TOOL_TEXT, "name": "Text Tool", "icon": "fa5s.font", "shortcut": "T"},
-                {"id": constants.TOOL_TABLE, "name": "Table Tool", "icon": "fa5s.table", "shortcut": "Ctrl+T"},
-                {"id": constants.TOOL_SCALE, "name": "Scale Tool", "icon": "fa5s.ruler-combined", "shortcut": "K"},
+                {"id": constants.ToolType.TEXT, "name": "Text Tool", "icon": "fa5s.font", "shortcut": "T"},
+                {"id": constants.ToolType.TABLE, "name": "Table Tool", "icon": "fa5s.table", "shortcut": "Ctrl+T"},
+                {"id": constants.ToolType.SCALE, "name": "Scale Tool", "icon": "fa5s.ruler-combined", "shortcut": "K"},
             ],
             [
-                {"id": constants.TOOL_IMAGE, "name": "Image Tool", "icon": "fa5s.image", "shortcut": "I"},
-                {"id": constants.TOOL_DXF, "name": "DXF Tool", "icon": "fa5s.file-import", "shortcut": "D"},
+                {"id": constants.ToolType.IMAGE, "name": "Image Tool", "icon": "fa5s.image", "shortcut": "I"},
+                {"id": constants.ToolType.DXF, "name": "DXF Tool", "icon": "fa5s.file-import", "shortcut": "D"},
             ],
         ]
 
@@ -166,7 +166,7 @@ class DrawingToolbar(QToolBar):
             if i < len(tool_groups) - 1:
                 self.addSeparator()
 
-    def set_active_tool(self, tool_id: str):
+    def set_active_tool(self, tool_id):
         """Programmatically sets the active drawing tool in the toolbar."""
         for action in self._action_group.actions():
             if action.data() == tool_id:

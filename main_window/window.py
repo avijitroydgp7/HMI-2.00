@@ -3,6 +3,7 @@
 
 from PyQt6.QtWidgets import QMainWindow, QStackedWidget, QTabWidget, QDockWidget
 from PyQt6.QtCore import Qt, pyqtSignal
+from functools import partial
 
 from components.ribbon import Ribbon
 from components.toolbar import QuickAccessToolBar, ToolsToolbar, DrawingToolbar
@@ -33,7 +34,7 @@ class MainWindow(QMainWindow):
         self.open_tag_tabs = {}
         self.open_comment_tabs = {}
         self.last_focused_copypaste_widget = None
-        self.active_tool = constants.TOOL_SELECT
+        self.active_tool = constants.ToolType.SELECT
 
         ui_setup.setup_window(self)
 
@@ -86,7 +87,7 @@ class MainWindow(QMainWindow):
         actions.update_edit_actions(self)
 
 
-    def set_active_tool(self, tool_name: str):
+    def set_active_tool(self, tool_name):
 
         """
         Sets the active tool for the application and informs the current canvas.
@@ -98,10 +99,10 @@ class MainWindow(QMainWindow):
             current_widget.set_active_tool(tool_name)
 
     def revert_to_select_tool(self):
-        self.tools_toolbar.set_active_tool(constants.TOOL_SELECT)
+        self.tools_toolbar.set_active_tool(constants.ToolType.SELECT)
         self.drawing_toolbar.clear_selection()
-        self.set_active_tool(constants.TOOL_SELECT)
-        self.docks['properties'].widget().set_active_tool(constants.TOOL_SELECT)
+        self.set_active_tool(constants.ToolType.SELECT)
+        self.docks['properties'].widget().set_active_tool(constants.ToolType.SELECT)
 
     def on_tools_toolbar_tool_changed(self, tool_name: str):
         """Handle selection from the tools toolbar."""
@@ -129,79 +130,111 @@ class MainWindow(QMainWindow):
         actions.update_edit_actions(self)
 
     def _connect_signals(self):
+        """Connect all UI signals, grouped by functional area.
+
+        Uses small helper methods and mapping lists to keep this method concise.
+        """
         from PyQt6.QtWidgets import QApplication
         from . import events, tabs, project_actions, handlers
         from services.screen_data_service import screen_service
         from services.tag_data_service import tag_data_service
 
-        QApplication.instance().focusChanged.connect(lambda old, new: events.on_focus_changed(self, old, new))
-        self.tab_widget.tabCloseRequested.connect(lambda index: tabs.close_tab(self, index))
-        self.tab_widget.currentChanged.connect(lambda index: tabs.on_tab_changed(self, index))
-        self.tab_widget.customContextMenuRequested.connect(lambda pos: tabs.show_tab_context_menu(self, pos))
+        # Helper to bulk-connect a list of (signal, handler) pairs
+        def bulk_connect(pairs):
+            for sig, handler in pairs:
+                sig.connect(handler)
 
-        self.screen_detached.connect(lambda w: tabs.focus_detached_screen(self, w))
-        self.screen_reattached.connect(lambda w: tabs.focus_detached_screen(self, w))
-        
-        self.welcome_widget.new_project_requested.connect(lambda: project_actions.new_project(self))
-        self.welcome_widget.open_project_requested.connect(lambda: project_actions.open_project(self))
-        
-        screen_service.screen_list_changed.connect(lambda: handlers.on_screen_data_changed(self))
-        tag_data_service.database_list_changed.connect(lambda: handlers.on_database_list_changed(self))
-        command_history_service.history_changed.connect(lambda: actions.update_undo_redo_actions(self))
+        # Application focus and data-service updates
+        bulk_connect([
+            (QApplication.instance().focusChanged, partial(events.on_focus_changed, self)),
+            (screen_service.screen_list_changed, partial(handlers.on_screen_data_changed, self)),
+            (tag_data_service.database_list_changed, partial(handlers.on_database_list_changed, self)),
+            (command_history_service.history_changed, partial(actions.update_undo_redo_actions, self)),
+        ])
         project_service.project_state_changed.connect(self.update_window_title)
-        project_service.project_loaded.connect(lambda: tabs.update_central_widget(self))
-        project_service.project_closed.connect(lambda: tabs.update_central_widget(self))
-        
-        self.ribbon.new_action.triggered.connect(lambda: project_actions.new_project(self))
-        self.quick_access_toolbar.new_action.triggered.connect(lambda: project_actions.new_project(self))
-        self.ribbon.open_action.triggered.connect(lambda: project_actions.open_project(self))
-        self.quick_access_toolbar.open_action.triggered.connect(lambda: project_actions.open_project(self))
-        self.ribbon.save_action.triggered.connect(lambda: project_actions.save_project(self))
-        self.quick_access_toolbar.save_action.triggered.connect(lambda: project_actions.save_project(self))
-        self.ribbon.save_as_action.triggered.connect(lambda: project_actions.save_project_as(self))
-        self.ribbon.run_action.triggered.connect(lambda: project_actions.run_simulator(self))
-        self.ribbon.close_tab_action.triggered.connect(lambda: tabs.close_current_tab(self))
-        self.ribbon.exit_action.triggered.connect(self.close)
-        
-        self.tools_toolbar.tool_changed.connect(self.on_tools_toolbar_tool_changed)
-        self.drawing_toolbar.tool_changed.connect(self.set_active_drawing_tool)
-        self.tools_toolbar.tool_changed.connect(self.docks['properties'].widget().set_active_tool)
-        self.drawing_toolbar.tool_changed.connect(self.docks['properties'].widget().set_active_tool)
+        bulk_connect([
+            (project_service.project_loaded, partial(tabs.update_central_widget, self)),
+            (project_service.project_closed, partial(tabs.update_central_widget, self)),
+        ])
 
-        self.undo_action.triggered.connect(command_history_service.undo)
+        # Tab widget + window screen attach/detach
+        bulk_connect([
+            (self.tab_widget.tabCloseRequested, partial(tabs.close_tab, self)),
+            (self.tab_widget.currentChanged, partial(tabs.on_tab_changed, self)),
+            (self.tab_widget.customContextMenuRequested, partial(tabs.show_tab_context_menu, self)),
+            (self.screen_detached, partial(tabs.focus_detached_screen, self)),
+            (self.screen_reattached, partial(tabs.focus_detached_screen, self)),
+        ])
 
-        self.redo_action.triggered.connect(command_history_service.redo)
-        
-        self.cut_action.triggered.connect(self.on_cut)
-        self.copy_action.triggered.connect(self.on_copy)
-        self.paste_action.triggered.connect(self.on_paste)
+        # Welcome screen actions
+        bulk_connect([
+            (self.welcome_widget.new_project_requested, partial(project_actions.new_project, self)),
+            (self.welcome_widget.open_project_requested, partial(project_actions.open_project, self)),
+        ])
 
-        self.align_left_action.triggered.connect(lambda: actions.align_left(self))
-        self.align_center_action.triggered.connect(lambda: actions.align_center(self))
-        self.align_right_action.triggered.connect(lambda: actions.align_right(self))
-        self.align_top_action.triggered.connect(lambda: actions.align_top(self))
-        self.align_middle_action.triggered.connect(lambda: actions.align_middle(self))
-        self.align_bottom_action.triggered.connect(lambda: actions.align_bottom(self))
-        self.distribute_h_action.triggered.connect(lambda: actions.distribute_horizontally(self))
-        self.distribute_v_action.triggered.connect(lambda: actions.distribute_vertically(self))
+        # Project/ribbon/quick-access related actions
+        bulk_connect([
+            (self.ribbon.new_action.triggered, partial(project_actions.new_project, self)),
+            (self.quick_access_toolbar.new_action.triggered, partial(project_actions.new_project, self)),
+            (self.ribbon.open_action.triggered, partial(project_actions.open_project, self)),
+            (self.quick_access_toolbar.open_action.triggered, partial(project_actions.open_project, self)),
+            (self.ribbon.save_action.triggered, partial(project_actions.save_project, self)),
+            (self.quick_access_toolbar.save_action.triggered, partial(project_actions.save_project, self)),
+            (self.ribbon.save_as_action.triggered, partial(project_actions.save_project_as, self)),
+            (self.ribbon.run_action.triggered, partial(project_actions.run_simulator, self)),
+            (self.ribbon.close_tab_action.triggered, partial(tabs.close_current_tab, self)),
+            (self.ribbon.exit_action.triggered, self.close),
+        ])
 
-        self.docks['screens'].widget().screen_open_requested.connect(lambda sid: tabs.open_screen_in_tab(self, sid))
-        self.docks['screens'].widget().selection_changed.connect(lambda: actions.update_clipboard_actions(self))
-        
+        # Toolbars and properties linking
+        bulk_connect([
+            (self.tools_toolbar.tool_changed, self.on_tools_toolbar_tool_changed),
+            (self.drawing_toolbar.tool_changed, self.set_active_drawing_tool),
+            (self.tools_toolbar.tool_changed, self.docks['properties'].widget().set_active_tool),
+            (self.drawing_toolbar.tool_changed, self.docks['properties'].widget().set_active_tool),
+        ])
+
+        # Edit actions
+        bulk_connect([
+            (self.undo_action.triggered, command_history_service.undo),
+            (self.redo_action.triggered, command_history_service.redo),
+            (self.cut_action.triggered, self.on_cut),
+            (self.copy_action.triggered, self.on_copy),
+            (self.paste_action.triggered, self.on_paste),
+            (self.align_left_action.triggered, partial(actions.align_left, self)),
+            (self.align_center_action.triggered, partial(actions.align_center, self)),
+            (self.align_right_action.triggered, partial(actions.align_right, self)),
+            (self.align_top_action.triggered, partial(actions.align_top, self)),
+            (self.align_middle_action.triggered, partial(actions.align_middle, self)),
+            (self.align_bottom_action.triggered, partial(actions.align_bottom, self)),
+            (self.distribute_h_action.triggered, partial(actions.distribute_horizontally, self)),
+            (self.distribute_v_action.triggered, partial(actions.distribute_vertically, self)),
+        ])
+
+        # Docks and their widgets
+        screens_widget = self.docks['screens'].widget()
+        bulk_connect([
+            (screens_widget.screen_open_requested, partial(tabs.open_screen_in_tab, self)),
+            (screens_widget.selection_changed, partial(actions.update_clipboard_actions, self)),
+        ])
+
         project_dock = self.docks['project']
-        project_dock.tag_database_open_requested.connect(lambda db_id: tabs.open_tag_editor_in_tab(self, db_id))
-        project_dock.comment_table_open_requested.connect(lambda gid: tabs.open_comment_table_in_tab(self, gid))
-        project_dock.project_info_requested.connect(lambda: project_actions.edit_project_info(self))
-        project_dock.tree.itemSelectionChanged.connect(lambda: actions.update_clipboard_actions(self))
-        project_dock.system_tab_requested.connect(self.docks['system'].raise_)
-        project_dock.screens_tab_requested.connect(self.docks['screens'].raise_)
+        bulk_connect([
+            (project_dock.tag_database_open_requested, partial(tabs.open_tag_editor_in_tab, self)),
+            (project_dock.comment_table_open_requested, partial(tabs.open_comment_table_in_tab, self)),
+            (project_dock.project_info_requested, partial(project_actions.edit_project_info, self)),
+            (project_dock.tree.itemSelectionChanged, partial(actions.update_clipboard_actions, self)),
+            (project_dock.system_tab_requested, self.docks['system'].raise_),
+            (project_dock.screens_tab_requested, self.docks['screens'].raise_),
+        ])
 
-        self.zoom_in_btn.clicked.connect(lambda: handlers.zoom_in_current_tab(self))
-        self.zoom_out_btn.clicked.connect(lambda: handlers.zoom_out_current_tab(self))
-
-        # Snapping controls
-        self.snap_objects_cb.toggled.connect(lambda checked: self._on_snap_objects_changed(checked))
-        self.snap_lines_cb.toggled.connect(lambda checked: self._on_snap_lines_visibility_changed(checked))
+        # Zoom and snapping controls
+        bulk_connect([
+            (self.zoom_in_btn.clicked, partial(handlers.zoom_in_current_tab, self)),
+            (self.zoom_out_btn.clicked, partial(handlers.zoom_out_current_tab, self)),
+            (self.snap_objects_cb.toggled, self._on_snap_objects_changed),
+            (self.snap_lines_cb.toggled, self._on_snap_lines_visibility_changed),
+        ])
 
     def update_window_title(self): project_actions.update_window_title(self)
     def closeEvent(self, event): events.closeEvent(self, event)

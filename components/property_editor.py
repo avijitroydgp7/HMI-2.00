@@ -12,6 +12,8 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtGui import QIcon
 from PyQt6.QtCore import pyqtSlot, QSignalBlocker, QTimer
+from dataclasses import dataclass
+from typing import Callable, Dict
 from contextlib import contextmanager
 import copy
 from services.command_history_service import command_history_service
@@ -19,6 +21,15 @@ from services.command_history_service import command_history_service
 from services.commands import UpdateChildPropertiesCommand
 from services.screen_data_service import screen_service
 from utils import constants
+from utils.editing_guard import EditingGuard
+
+
+@dataclass(frozen=True)
+class ToolSchema:
+    """Schema describing how to handle a specific tool type in the editor."""
+    type_id: str
+    defaults_fn: Callable[[dict], dict]  # incoming props -> merged props with defaults
+    editor_builder: Callable[[], QWidget]  # bound method that builds the editor widget
 
 class PropertyEditor(QStackedWidget):
     """
@@ -31,9 +42,11 @@ class PropertyEditor(QStackedWidget):
         self.current_parent_id = None
         self.current_properties = {}
         self.current_tool_type = None
-        self.active_tool = constants.TOOL_SELECT
+        self.active_tool = constants.ToolType.SELECT
         # Guard to avoid refresh loops while applying edits
         self._is_editing = False
+        # Tool schema registry
+        self._schemas: Dict[object, ToolSchema] = {}
 
         # --- Create Pages ---
         self.blank_page = QWidget()
@@ -52,77 +65,80 @@ class PropertyEditor(QStackedWidget):
         # Refresh properties when the underlying screen data changes
         screen_service.screen_modified.connect(self._on_screen_modified)
 
-    @contextmanager
-    def _editing_context(self):
-        """
-        Keep `_is_editing` True while suppressing cascaded updates and only
-        re-emit the final screen_modified once updates are ready.
+        # Initialize tool schema registry
+        self._init_schemas()
 
-        - Blocks `screen_service` signals so intermediate emissions from the
-          command do not refresh views prematurely.
-        - Attempts to block selection_changed propagation from the active
-          ScreenWidget during the update window to preserve focus.
-        - Re-emits a single `screen_modified` for the current parent after
-          the model change, while `_is_editing` is still True; then clears the
-          editing flag on the next event-loop turn.
-        """
-        self._is_editing = True
-
-        blockers = []
-        active_widget = None
+    # --- Utility: explicit begin/end edit guard ---
+    def _active_canvas_widget(self):
         try:
             win = self.window()
             if hasattr(win, 'tab_widget'):
-                active_widget = win.tab_widget.currentWidget()
+                return win.tab_widget.currentWidget()
         except Exception:
-            active_widget = None
+            return None
+        return None
 
-        # Block global screen_service emissions and, if available, block the
-        # active ScreenWidget's signals (selection_changed, etc.).
-        try:
-            blockers.append(QSignalBlocker(screen_service))
-        except Exception:
-            pass
-        if active_widget is not None:
+    def _begin_edit(self) -> EditingGuard:
+        active_widget = self._active_canvas_widget()
+
+        def _emit_final():
             try:
-                blockers.append(QSignalBlocker(active_widget))
+                if self.current_parent_id and self.current_object_id:
+                    screen_service.screen_modified.emit(self.current_parent_id)
             except Exception:
                 pass
 
-        # Flag to indicate whether we actually performed a data-changing
-        # command that needs a final screen_modified notification.
-        notify = {"needed": False}
+        return EditingGuard(self, screen_service, active_widget=active_widget, emit_final=_emit_final).begin()
 
-        def mark_changed():
-            notify["needed"] = True
+    def _init_schemas(self):
+        """Build the tool schema registry to reduce branching."""
+        def _merge(defaults: dict, incoming: dict) -> dict:
+            merged = copy.deepcopy(defaults)
+            merged.update(incoming or {})
+            return merged
 
+        # Lazily import inside closures to avoid import cycles at module import time
+        def _button_defaults(incoming: dict) -> dict:
+            from tools import button as _button
+            return _merge(_button.get_default_properties(), incoming)
+
+        def _line_defaults(incoming: dict) -> dict:
+            from tools import line as _line
+            return _merge(_line.get_default_properties(), incoming)
+
+        def _text_defaults(incoming: dict) -> dict:
+            from tools import text as _text
+            return _merge(_text.get_default_properties(), incoming)
+
+        def _polygon_defaults(incoming: dict) -> dict:
+            from tools import polygon as _polygon
+            return _merge(_polygon.get_default_properties(), incoming)
+
+        def _image_defaults(incoming: dict) -> dict:
+            from tools import image as _image
+            return _merge(_image.get_default_properties(incoming.get('path', '')), incoming)
+
+        def _scale_defaults(incoming: dict) -> dict:
+            from tools import scale as _scale
+            return _merge(_scale.get_default_properties(), incoming)
+
+        self._schemas = {
+            constants.ToolType.BUTTON: ToolSchema(constants.ToolType.BUTTON.value, _button_defaults, self._create_button_editor),
+            constants.ToolType.LINE: ToolSchema(constants.ToolType.LINE.value, _line_defaults, self._create_line_editor),
+            constants.ToolType.TEXT: ToolSchema(constants.ToolType.TEXT.value, _text_defaults, self._create_text_editor),
+            constants.ToolType.POLYGON: ToolSchema(constants.ToolType.POLYGON.value, _polygon_defaults, self._create_polygon_editor),
+            constants.ToolType.IMAGE: ToolSchema(constants.ToolType.IMAGE.value, _image_defaults, self._create_image_editor),
+            constants.ToolType.SCALE: ToolSchema(constants.ToolType.SCALE.value, _scale_defaults, self._create_scale_editor),
+        }
+
+    @contextmanager
+    def _editing_context(self):
+        """Backward-compatible contextmanager using the explicit EditingGuard."""
+        guard = self._begin_edit()
         try:
-            # Yield a callable so callers can mark that a change occurred.
-            yield mark_changed
+            yield guard.mark_changed
         finally:
-            # Finalize on the next event loop cycle: release blockers and
-            # emit a single consolidated screen_modified while still guarded.
-            def _finalize_post_update():
-                # Explicitly unblock all blockers so emissions below propagate,
-                # then drop references to ensure they are released.
-                for blocker in blockers:
-                    try:
-                        blocker.unblock()
-                    except Exception:
-                        pass
-                blockers.clear()
-                # If an edit occurred that affects a concrete instance,
-                # notify listeners to refresh views.
-                try:
-                    if notify["needed"] and self.current_parent_id and self.current_object_id:
-                        screen_service.screen_modified.emit(self.current_parent_id)
-                except Exception:
-                    pass
-                # Drop the editing guard on the next turn to ensure any
-                # cascaded updates complete while we are still guarded.
-                QTimer.singleShot(0, lambda: setattr(self, '_is_editing', False))
-
-            QTimer.singleShot(0, _finalize_post_update)
+            guard.end()
 
     @pyqtSlot(str)
     def _on_screen_modified(self, screen_id: str):
@@ -141,9 +157,10 @@ class PropertyEditor(QStackedWidget):
             else:
                 self.set_current_object(None, None)
 
-    def set_active_tool(self, tool_id: str):
+    def set_active_tool(self, tool_id):
         """Update the active tool."""
-        self.active_tool = tool_id
+        # Accept either ToolType or string identifiers
+        self.active_tool = constants.tool_type_from_str(tool_id) or tool_id
         if self.current_object_id is None:
             self.setCurrentWidget(self.blank_page)
 
@@ -158,32 +175,11 @@ class PropertyEditor(QStackedWidget):
             return
         # Normalize selection_data
         if not selection_data:
-            # Clear selection
-            self.current_object_id = None
-            self.current_parent_id = None
-            self.current_properties = {}
-            self.current_tool_type = None
-            # Clear editor widget if it exists
-            if self.count() > 2:
-                old_widget = self.widget(2)
-                self.removeWidget(old_widget)
-                old_widget.deleteLater()
-            self.setCurrentWidget(self.blank_page)
+            self._clear_selection()
             return
 
         if isinstance(selection_data, list):
-            if len(selection_data) > 1:
-                # Multi-select; show dedicated page and clear tracking
-                self.setCurrentWidget(self.multi_select_page)
-                self.current_object_id = None
-                self.current_parent_id = None
-                self.current_properties = {}
-                self.current_tool_type = None
-                # Clear editor widget if it exists
-                if self.count() > 2:
-                    old_widget = self.widget(2)
-                    self.removeWidget(old_widget)
-                    old_widget.deleteLater()
+            if self._handle_multi_select(selection_data):
                 return
             elif len(selection_data) == 1:
                 selection_data = selection_data[0]
@@ -198,7 +194,7 @@ class PropertyEditor(QStackedWidget):
         if 'screen_id' in selection_data:
             new_tool_type = 'screen'
         elif 'tool_type' in selection_data:
-            new_tool_type = selection_data.get('tool_type')
+            new_tool_type = constants.tool_type_from_str(selection_data.get('tool_type'))
 
         # Decide if selection truly changed (different object or type)
         selection_changed = (
@@ -227,34 +223,16 @@ class PropertyEditor(QStackedWidget):
 
         if not selection_changed and new_tool_type and new_tool_type != 'screen':
             # Same object/type: update properties and refresh existing widgets in place
-            # Merge with default props to keep editor fields consistent
-            if new_tool_type == 'button':
-                from tools import button
-                default_props = button.get_default_properties()
-            elif new_tool_type == 'line':
-                from tools import line as line_tool
-                default_props = line_tool.get_default_properties()
-            elif new_tool_type == 'text':
-                from tools import text as text_tool
-                default_props = text_tool.get_default_properties()
-            elif new_tool_type == 'polygon':
-                from tools import polygon as polygon_tool
-                default_props = polygon_tool.get_default_properties()
-            elif new_tool_type == 'image':
-                from tools import image as image_tool
-                default_props = image_tool.get_default_properties(incoming_props.get('path', ''))
-            elif new_tool_type == 'scale':
-                from tools import scale as scale_tool
-                default_props = scale_tool.get_default_properties()
+            # Ensure we look up by ToolType when possible
+            schema = self._schemas.get(new_tool_type)
+            if schema is not None:
+                merged = schema.defaults_fn(incoming_props)
+                self.current_properties = merged
+                # Update existing input widgets without rebuilding
+                self._update_editor_fields(new_tool_type, merged)
             else:
-                default_props = {}
-
-            merged = copy.deepcopy(default_props)
-            merged.update(incoming_props)
-            self.current_properties = merged
-
-            # Update existing input widgets without rebuilding
-            self._update_editor_fields(new_tool_type, merged)
+                # Fallback to incoming properties if unknown type
+                self.current_properties = incoming_props or {}
 
             # Attempt to restore caret position in focused line edit
             if restore_name:
@@ -287,51 +265,47 @@ class PropertyEditor(QStackedWidget):
             self.setCurrentWidget(self.blank_page)
             return
 
-        # Merge properties with defaults and build appropriate editor
-        editor = None
-        if new_tool_type == 'button':
-            from tools import button
-            default_props = button.get_default_properties()
-            props = copy.deepcopy(default_props)
-            props.update(incoming_props)
-            self.current_properties = props
-            editor = self._create_button_editor()
-        elif new_tool_type == 'line':
-            from tools import line as line_tool
-            default_props = line_tool.get_default_properties()
-            props = copy.deepcopy(default_props)
-            props.update(incoming_props)
-            self.current_properties = props
-            editor = self._create_line_editor()
-        elif new_tool_type == 'text':
-            from tools import text as text_tool
-            default_props = text_tool.get_default_properties()
-            props = copy.deepcopy(default_props)
-            props.update(incoming_props)
-            self.current_properties = props
-            editor = self._create_text_editor()
-        elif new_tool_type == 'polygon':
-            from tools import polygon as polygon_tool
-            default_props = polygon_tool.get_default_properties()
-            props = copy.deepcopy(default_props)
-            props.update(incoming_props)
-            self.current_properties = props
-            editor = self._create_polygon_editor()
-        elif new_tool_type == 'image':
-            from tools import image as image_tool
-            default_props = image_tool.get_default_properties(incoming_props.get('path', ''))
-            props = copy.deepcopy(default_props)
-            props.update(incoming_props)
-            self.current_properties = props
-            editor = self._create_image_editor()
-        elif new_tool_type == 'scale':
-            from tools import scale as scale_tool
-            default_props = scale_tool.get_default_properties()
-            props = copy.deepcopy(default_props)
-            props.update(incoming_props)
-            self.current_properties = props
-            editor = self._create_scale_editor()
+        # Build editor using schema
+        self._build_editor_for_instance(new_tool_type, incoming_props, restore_name, restore_cursor)
 
+    # --- Helpers extracted from set_current_object ---
+    def _clear_selection(self) -> None:
+        self.current_object_id = None
+        self.current_parent_id = None
+        self.current_properties = {}
+        self.current_tool_type = None
+        # Clear editor widget if it exists
+        if self.count() > 2:
+            old_widget = self.widget(2)
+            self.removeWidget(old_widget)
+            old_widget.deleteLater()
+        self.setCurrentWidget(self.blank_page)
+
+    def _handle_multi_select(self, selection_list) -> bool:
+        if len(selection_list) > 1:
+            # Multi-select; show dedicated page and clear tracking
+            self.setCurrentWidget(self.multi_select_page)
+            self.current_object_id = None
+            self.current_parent_id = None
+            self.current_properties = {}
+            self.current_tool_type = None
+            # Clear editor widget if it exists
+            if self.count() > 2:
+                old_widget = self.widget(2)
+                self.removeWidget(old_widget)
+                old_widget.deleteLater()
+            return True
+        return False
+
+    def _build_editor_for_instance(self, tool_type, incoming_props: dict, restore_name=None, restore_cursor=None):
+        schema = self._schemas.get(tool_type)
+        if schema is None:
+            self.current_properties = {}
+            self.setCurrentWidget(self.blank_page)
+            return None
+        props = schema.defaults_fn(incoming_props)
+        self.current_properties = props
+        editor = schema.editor_builder()
         if editor:
             self.addWidget(editor)
             self.setCurrentWidget(editor)
@@ -347,10 +321,11 @@ class PropertyEditor(QStackedWidget):
                             target.setCursorPosition(pos)
                         except Exception:
                             pass
-        else:
-            self.setCurrentWidget(self.blank_page)
+            return editor
+        self.setCurrentWidget(self.blank_page)
+        return None
 
-    def _update_editor_fields(self, tool_type: str, props: dict):
+    def _update_editor_fields(self, tool_type, props: dict):
         """Update existing editor widgets in place based on new props.
         Signals are blocked during programmatic updates to avoid feedback loops.
         """
@@ -382,12 +357,12 @@ class PropertyEditor(QStackedWidget):
                 finally:
                     del blocker
 
-        if tool_type == 'button':
+        if tool_type == constants.ToolType.BUTTON:
             _set_line('label', props.get('label', ''))
             _set_line('background_color', props.get('background_color', ''))
             _set_line('text_color', props.get('text_color', ''))
             _set_combo('style_id', data_value=props.get('style_id'))
-        elif tool_type == 'line':
+        elif tool_type == constants.ToolType.LINE:
             start = props.get('start', {})
             end = props.get('end', {})
             _set_line('start.x', start.get('x', 0))
@@ -397,7 +372,7 @@ class PropertyEditor(QStackedWidget):
             _set_line('color', props.get('color', ''))
             _set_line('width', props.get('width', 0))
             _set_line('style', props.get('style', ''))
-        elif tool_type == 'text':
+        elif tool_type == constants.ToolType.TEXT:
             font = props.get('font', {})
             _set_line('content', props.get('content', ''))
             _set_line('font.family', font.get('family', ''))
@@ -405,17 +380,17 @@ class PropertyEditor(QStackedWidget):
             _set_combo('font.bold', text_value='True' if font.get('bold') else 'False')
             _set_combo('font.italic', text_value='True' if font.get('italic') else 'False')
             _set_line('color', props.get('color', ''))
-        elif tool_type == 'polygon':
+        elif tool_type == constants.ToolType.POLYGON:
             _set_line('fill_color', props.get('fill_color', ''))
             _set_line('stroke_color', props.get('stroke_color', ''))
             _set_line('stroke_width', props.get('stroke_width', 0))
             _set_line('stroke_style', props.get('stroke_style', ''))
-        elif tool_type == 'image':
+        elif tool_type == constants.ToolType.IMAGE:
             size = props.get('size', {})
             _set_line('path', props.get('path', ''))
             _set_line('size.width', size.get('width', 0))
             _set_line('size.height', size.get('height', 0))
-        elif tool_type == 'scale':
+        elif tool_type == constants.ToolType.SCALE:
             _set_combo('orientation', text_value=props.get('orientation', 'horizontal'))
             _set_line('length', props.get('length', 0))
             _set_line('thickness', props.get('thickness', 0))
@@ -479,7 +454,8 @@ class PropertyEditor(QStackedWidget):
                 del blocker_text
 
         def on_property_changed():
-            with self._editing_context() as mark_changed:
+            guard = self._begin_edit()
+            try:
                 new_props = copy.deepcopy(self.current_properties)
                 new_props["label"] = label_edit.text()
                 new_props["background_color"] = bg_color_edit.text()
@@ -510,10 +486,12 @@ class PropertyEditor(QStackedWidget):
                             self.current_properties,
                         )
                         command_history_service.add_command(command)
-                        mark_changed()
+                        guard.mark_changed()
                     else:
                         button.set_default_properties(new_props)
                     self.current_properties = new_props
+            finally:
+                guard.end()
         
         label_edit.editingFinished.connect(on_property_changed)
         # When style changes, first update derived UI fields, then apply property change
@@ -560,7 +538,8 @@ class PropertyEditor(QStackedWidget):
         layout.addRow('Style:', style_edit)
 
         def on_property_changed():
-            with self._editing_context() as mark_changed:
+            guard = self._begin_edit()
+            try:
                 new_props = copy.deepcopy(self.current_properties)
                 new_props['start'] = {
                     'x': int(start_x.text() or 0),
@@ -582,10 +561,12 @@ class PropertyEditor(QStackedWidget):
                             self.current_properties,
                         )
                         command_history_service.add_command(command)
-                        mark_changed()
+                        guard.mark_changed()
                     else:
                         line_tool.set_default_properties(new_props)
                     self.current_properties = new_props
+            finally:
+                guard.end()
 
         for widget in (start_x, start_y, end_x, end_y, color_edit, width_edit, style_edit):
             widget.editingFinished.connect(on_property_changed)
@@ -626,7 +607,8 @@ class PropertyEditor(QStackedWidget):
         layout.addRow('Color:', color_edit)
 
         def on_property_changed():
-            with self._editing_context() as mark_changed:
+            guard = self._begin_edit()
+            try:
                 new_props = copy.deepcopy(self.current_properties)
                 new_props['content'] = content_edit.text()
                 new_props['font'] = {
@@ -645,10 +627,12 @@ class PropertyEditor(QStackedWidget):
                             self.current_properties,
                         )
                         command_history_service.add_command(command)
-                        mark_changed()
+                        guard.mark_changed()
                     else:
                         text_tool.set_default_properties(new_props)
                     self.current_properties = new_props
+            finally:
+                guard.end()
 
         content_edit.editingFinished.connect(on_property_changed)
         font_family.editingFinished.connect(on_property_changed)
@@ -683,7 +667,8 @@ class PropertyEditor(QStackedWidget):
         layout.addRow('Stroke Style:', stroke_style)
 
         def on_property_changed():
-            with self._editing_context() as mark_changed:
+            guard = self._begin_edit()
+            try:
                 new_props = copy.deepcopy(self.current_properties)
                 new_props['fill_color'] = fill_color.text()
                 new_props['stroke_color'] = stroke_color.text()
@@ -698,10 +683,12 @@ class PropertyEditor(QStackedWidget):
                             self.current_properties,
                         )
                         command_history_service.add_command(command)
-                        mark_changed()
+                        guard.mark_changed()
                     else:
                         polygon_tool.set_default_properties(new_props)
                     self.current_properties = new_props
+            finally:
+                guard.end()
 
         for widget in (fill_color, stroke_color, stroke_width, stroke_style):
             widget.editingFinished.connect(on_property_changed)
@@ -729,7 +716,8 @@ class PropertyEditor(QStackedWidget):
         layout.addRow('Height:', height_edit)
 
         def on_property_changed():
-            with self._editing_context() as mark_changed:
+            guard = self._begin_edit()
+            try:
                 new_props = copy.deepcopy(self.current_properties)
                 new_props['path'] = path_edit.text()
                 new_props['size'] = {
@@ -745,10 +733,12 @@ class PropertyEditor(QStackedWidget):
                             self.current_properties,
                         )
                         command_history_service.add_command(command)
-                        mark_changed()
+                        guard.mark_changed()
                     else:
                         image_tool.set_default_properties(new_props)
                     self.current_properties = new_props
+            finally:
+                guard.end()
 
         for widget in (path_edit, width_edit, height_edit):
             widget.editingFinished.connect(on_property_changed)
@@ -793,7 +783,8 @@ class PropertyEditor(QStackedWidget):
         layout.addRow('Color:', color_edit)
 
         def on_property_changed():
-            with self._editing_context() as mark_changed:
+            guard = self._begin_edit()
+            try:
                 new_props = copy.deepcopy(self.current_properties)
                 new_props['orientation'] = orientation_combo.currentText()
                 new_props['length'] = int(length_edit.text() or 0)
@@ -812,10 +803,12 @@ class PropertyEditor(QStackedWidget):
                             self.current_properties,
                         )
                         command_history_service.add_command(command)
-                        mark_changed()
+                        guard.mark_changed()
                     else:
                         scale_tool.set_default_properties(new_props)
                     self.current_properties = new_props
+            finally:
+                guard.end()
 
         orientation_combo.activated.connect(lambda _=None: on_property_changed())
         for widget in (

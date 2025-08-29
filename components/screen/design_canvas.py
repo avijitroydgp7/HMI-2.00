@@ -83,7 +83,7 @@ class DesignCanvas(QGraphicsView):
         super().__init__(parent)
         self.screen_id = screen_id
         self.screen_data = None
-        self.active_tool = constants.TOOL_SELECT
+        self.active_tool = constants.ToolType.SELECT
         self._item_map = {}
         self.selection_overlay = SelectionOverlay()
         self.path_edit_tool = path_edit.PathEditTool(self)
@@ -234,9 +234,9 @@ class DesignCanvas(QGraphicsView):
             self._dimension_item.setBrush(QBrush(self._preview_color))
 
     def _update_cursor(self):
-        if self.active_tool == constants.TOOL_TEXT:
+        if self.active_tool == constants.ToolType.TEXT:
             self.setCursor(QCursor(Qt.CursorShape.IBeamCursor))
-        elif self.active_tool == constants.TOOL_SELECT:
+        elif self.active_tool == constants.ToolType.SELECT:
             self.setCursor(QCursor(Qt.CursorShape.ArrowCursor))
         else:
             self.setCursor(QCursor(Qt.CursorShape.CrossCursor))
@@ -408,10 +408,10 @@ class DesignCanvas(QGraphicsView):
         self._schedule_visible_items_update()
 
     def mousePressEvent(self, event: QMouseEvent):
-        if self.active_tool == constants.TOOL_PATH_EDIT:
+        if self.active_tool == constants.ToolType.PATH_EDIT:
             super().mousePressEvent(event)
             return
-        if self.active_tool != constants.TOOL_SELECT:
+        if self.active_tool != constants.ToolType.SELECT:
             if event.button() == Qt.MouseButton.LeftButton:
                 scene_pos = self._snap_position(self.mapToScene(event.pos()))
 
@@ -422,28 +422,28 @@ class DesignCanvas(QGraphicsView):
                         self._remove_item_safely(self._dimension_item)
                         self._dimension_item = None
 
-                if self.active_tool == constants.TOOL_BUTTON:
+                if self.active_tool == constants.ToolType.BUTTON:
                     default_props = button_tool.get_default_properties()
                     pos_x = int(scene_pos.x() - default_props['size']['width'] / 2)
                     pos_y = int(scene_pos.y() - default_props['size']['height'] / 2)
                     default_props["position"] = {"x": pos_x, "y": pos_y}
-                    self._add_tool_item(constants.TOOL_BUTTON, default_props)
-                elif self.active_tool == constants.TOOL_TEXT:
+                    self._add_tool_item(constants.ToolType.BUTTON, default_props)
+                elif self.active_tool == constants.ToolType.TEXT:
                     default_props = text_tool.get_default_properties()
                     default_props["position"] = {
                         "x": int(scene_pos.x()),
                         "y": int(scene_pos.y()),
                     }
-                    self._add_tool_item(constants.TOOL_TEXT, default_props)
-                elif self.active_tool == constants.TOOL_IMAGE:
+                    self._add_tool_item(constants.ToolType.TEXT, default_props)
+                elif self.active_tool == constants.ToolType.IMAGE:
                     props = image_tool.prompt_for_image(self)
                     if props:
                         props["position"] = {
                             "x": int(scene_pos.x()),
                             "y": int(scene_pos.y()),
                         }
-                        self._add_tool_item(constants.TOOL_IMAGE, props)
-                elif self.active_tool == constants.TOOL_POLYGON:
+                        self._add_tool_item(constants.ToolType.IMAGE, props)
+                elif self.active_tool == constants.ToolType.POLYGON:
                     if not self._drawing:
                         self._drawing = True
                         self._draw_points = [scene_pos]
@@ -453,7 +453,7 @@ class DesignCanvas(QGraphicsView):
                         self.scene.addItem(self._preview_item)
                     else:
                         self._draw_points.append(scene_pos)
-                elif self.active_tool == constants.TOOL_FREEFORM:
+                elif self.active_tool == constants.ToolType.FREEFORM:
                     self._drawing = True
                     self._draw_points = [scene_pos]
                     pen = QPen(self._preview_pen)
@@ -464,19 +464,19 @@ class DesignCanvas(QGraphicsView):
                     self._drawing = True
                     self._start_pos = scene_pos
                     pen = QPen(self._preview_pen)
-                    if self.active_tool == constants.TOOL_LINE:
+                    if self.active_tool == constants.ToolType.LINE:
                         self._preview_item = QGraphicsLineItem()
                     elif self.active_tool in (
-                        constants.TOOL_RECT,
-                        constants.TOOL_TABLE,
-                        constants.TOOL_SCALE,
-                        constants.TOOL_DXF,
+                        constants.ToolType.RECT,
+                        constants.ToolType.TABLE,
+                        constants.ToolType.SCALE,
+                        constants.ToolType.DXF,
                     ):
                         self._preview_item = QGraphicsRectItem()
                     elif self.active_tool in (
-                        constants.TOOL_CIRCLE,
-                        constants.TOOL_ARC,
-                        constants.TOOL_SECTOR,
+                        constants.ToolType.CIRCLE,
+                        constants.ToolType.ARC,
+                        constants.ToolType.SECTOR,
                     ):
                         self._preview_item = QGraphicsEllipseItem()
                     else:
@@ -553,20 +553,20 @@ class DesignCanvas(QGraphicsView):
     def mouseMoveEvent(self, event: QMouseEvent):
         current_scene_pos = self._snap_position(self.mapToScene(event.pos()))
         self.mouse_moved_on_scene.emit(current_scene_pos)
-        if self.active_tool == constants.TOOL_PATH_EDIT:
+        if self.active_tool == constants.ToolType.PATH_EDIT:
             super().mouseMoveEvent(event)
             self._last_mouse_scene_pos = current_scene_pos
             return
 
-        if self.active_tool != constants.TOOL_SELECT:
+        if self.active_tool != constants.ToolType.SELECT:
             if self._drawing and self._preview_item:
-                if self.active_tool == constants.TOOL_FREEFORM:
+                if self.active_tool == constants.ToolType.FREEFORM:
                     self._draw_points.append(current_scene_pos)
                     path = QPainterPath(self._draw_points[0])
                     for p in self._draw_points[1:]:
                         path.lineTo(p)
                     self._preview_item.setPath(path)
-                elif self.active_tool == constants.TOOL_POLYGON:
+                elif self.active_tool == constants.ToolType.POLYGON:
                     if self._draw_points:
                         path = QPainterPath(self._draw_points[0])
                         for p in self._draw_points[1:]:
@@ -583,7 +583,7 @@ class DesignCanvas(QGraphicsView):
                             candidate = QPointF(start.x() + math.cos(rad) * length, start.y() + math.sin(rad) * length)
                         path.lineTo(candidate)
                         self._preview_item.setPath(path)
-                elif self.active_tool == constants.TOOL_LINE:
+                elif self.active_tool == constants.ToolType.LINE:
                     # Apply drawing modifiers: Shift (45° lock), Ctrl (from center)
                     modifiers = event.modifiers()
                     start = self._start_pos
@@ -602,10 +602,10 @@ class DesignCanvas(QGraphicsView):
                         p2 = start + v
                     self._preview_item.setLine(QLineF(p1, p2))
                 elif self.active_tool in (
-                    constants.TOOL_RECT,
-                    constants.TOOL_TABLE,
-                    constants.TOOL_SCALE,
-                    constants.TOOL_DXF,
+                    constants.ToolType.RECT,
+                    constants.ToolType.TABLE,
+                    constants.ToolType.SCALE,
+                    constants.ToolType.DXF,
                 ):
                     # Shift -> constrain to square, Ctrl -> draw from center
                     modifiers = event.modifiers()
@@ -627,9 +627,9 @@ class DesignCanvas(QGraphicsView):
                             rect = QRectF(rect.left(), rect.top(), m, m)
                     self._preview_item.setRect(rect)
                 elif self.active_tool in (
-                    constants.TOOL_CIRCLE,
-                    constants.TOOL_ARC,
-                    constants.TOOL_SECTOR,
+                    constants.ToolType.CIRCLE,
+                    constants.ToolType.ARC,
+                    constants.ToolType.SECTOR,
                 ):
                     # Shift -> enforce circle, Ctrl -> draw from center
                     modifiers = event.modifiers()
@@ -693,7 +693,7 @@ class DesignCanvas(QGraphicsView):
             self._dimension_item.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIgnoresTransformations)
             self.scene.addItem(self._dimension_item)
 
-        if self.active_tool == constants.TOOL_LINE:
+        if self.active_tool == constants.ToolType.LINE:
             # Use preview geometry so Ctrl/Shift modifiers reflect in measurement
             line = self._preview_item.line() if hasattr(self._preview_item, 'line') else QLineF(self._start_pos, current_scene_pos)
             try:
@@ -705,13 +705,13 @@ class DesignCanvas(QGraphicsView):
                 text = f"{int(QLineF(self._start_pos, current_scene_pos).length())}"
                 pos = (self._start_pos + current_scene_pos) / 2
         elif self.active_tool in (
-            constants.TOOL_RECT,
-            constants.TOOL_TABLE,
-            constants.TOOL_SCALE,
-            constants.TOOL_DXF,
-            constants.TOOL_CIRCLE,
-            constants.TOOL_ARC,
-            constants.TOOL_SECTOR,
+            constants.ToolType.RECT,
+            constants.ToolType.TABLE,
+            constants.ToolType.SCALE,
+            constants.ToolType.DXF,
+            constants.ToolType.CIRCLE,
+            constants.ToolType.ARC,
+            constants.ToolType.SECTOR,
         ):
             rect = self._preview_item.rect() if hasattr(self._preview_item, 'rect') else QRectF(self._start_pos, current_scene_pos).normalized()
             width = rect.width()
@@ -719,8 +719,8 @@ class DesignCanvas(QGraphicsView):
             text = f"{int(width)} x {int(height)}"
             pos = rect.bottomRight()
         elif self.active_tool in (
-            constants.TOOL_POLYGON,
-            constants.TOOL_FREEFORM,
+            constants.ToolType.POLYGON,
+            constants.ToolType.FREEFORM,
         ):
             # Shift: snap last segment to 45° for polygon preview bounding size
             modifiers = Qt.KeyboardModifier.NoModifier
@@ -730,7 +730,7 @@ class DesignCanvas(QGraphicsView):
             except Exception:
                 pass
             candidate = current_scene_pos
-            if self.active_tool == constants.TOOL_POLYGON and self._draw_points and (modifiers & Qt.KeyboardModifier.ShiftModifier):
+            if self.active_tool == constants.ToolType.POLYGON and self._draw_points and (modifiers & Qt.KeyboardModifier.ShiftModifier):
                 start = self._draw_points[-1]
                 v = candidate - start
                 angle = math.degrees(math.atan2(v.y(), v.x()))
@@ -978,13 +978,13 @@ class DesignCanvas(QGraphicsView):
                 self.selection_changed.emit(self.screen_id, selection_data)
 
     def mouseReleaseEvent(self, event: QMouseEvent):
-        if self.active_tool == constants.TOOL_PATH_EDIT:
+        if self.active_tool == constants.ToolType.PATH_EDIT:
             super().mouseReleaseEvent(event)
             return
-        if self.active_tool != constants.TOOL_SELECT:
+        if self.active_tool != constants.ToolType.SELECT:
             if event.button() == Qt.MouseButton.LeftButton and self._drawing:
                 scene_pos = self._snap_position(self.mapToScene(event.pos()))
-                if self.active_tool == constants.TOOL_LINE:
+                if self.active_tool == constants.ToolType.LINE:
                     # Finalize using preview endpoints so modifiers apply
                     line = self._preview_item.line() if hasattr(self._preview_item, 'line') else QLineF(self._start_pos, scene_pos)
                     p1 = line.p1()
@@ -996,16 +996,16 @@ class DesignCanvas(QGraphicsView):
                     end = {"x": int(p2.x() - min_x), "y": int(p2.y() - min_y)}
                     props = line_tool.get_default_properties()
                     props.update({"start": start, "end": end, "position": {"x": int(min_x), "y": int(min_y)}})
-                    self._add_tool_item(constants.TOOL_LINE, props)
-                elif self.active_tool == constants.TOOL_FREEFORM:
+                    self._add_tool_item(constants.ToolType.LINE, props)
+                elif self.active_tool == constants.ToolType.FREEFORM:
                     self._draw_points.append(scene_pos)
                     min_x = min(p.x() for p in self._draw_points)
                     min_y = min(p.y() for p in self._draw_points)
                     rel = [{"x": int(p.x() - min_x), "y": int(p.y() - min_y)} for p in self._draw_points]
                     props = polygon_tool.get_default_properties()
                     props.update({"points": rel, "position": {"x": int(min_x), "y": int(min_y)}})
-                    self._add_tool_item(constants.TOOL_FREEFORM, props)
-                elif self.active_tool == constants.TOOL_RECT:
+                    self._add_tool_item(constants.ToolType.FREEFORM, props)
+                elif self.active_tool == constants.ToolType.RECT:
                     # Use preview rect for final properties to include modifiers
                     rect = self._preview_item.rect() if hasattr(self._preview_item, 'rect') else QRectF(self._start_pos, scene_pos).normalized()
                     x = int(rect.left())
@@ -1020,8 +1020,8 @@ class DesignCanvas(QGraphicsView):
                         "stroke_width": 1,
                         "stroke_style": "solid",
                     }
-                    self._add_tool_item(constants.TOOL_RECT, props)
-                elif self.active_tool == constants.TOOL_CIRCLE:
+                    self._add_tool_item(constants.ToolType.RECT, props)
+                elif self.active_tool == constants.ToolType.CIRCLE:
                     rect = self._preview_item.rect() if hasattr(self._preview_item, 'rect') else QRectF(self._start_pos, scene_pos).normalized()
                     x = int(rect.left())
                     y = int(rect.top())
@@ -1035,8 +1035,8 @@ class DesignCanvas(QGraphicsView):
                         "stroke_width": 1,
                         "stroke_style": "solid",
                     }
-                    self._add_tool_item(constants.TOOL_CIRCLE, props)
-                elif self.active_tool == constants.TOOL_ARC:
+                    self._add_tool_item(constants.ToolType.CIRCLE, props)
+                elif self.active_tool == constants.ToolType.ARC:
                     x = int(min(self._start_pos.x(), scene_pos.x()))
                     y = int(min(self._start_pos.y(), scene_pos.y()))
                     w = int(abs(scene_pos.x() - self._start_pos.x()))
@@ -1050,8 +1050,8 @@ class DesignCanvas(QGraphicsView):
                         "width": 1,
                         "style": "solid",
                     }
-                    self._add_tool_item(constants.TOOL_ARC, props)
-                elif self.active_tool == constants.TOOL_SECTOR:
+                    self._add_tool_item(constants.ToolType.ARC, props)
+                elif self.active_tool == constants.ToolType.SECTOR:
                     x = int(min(self._start_pos.x(), scene_pos.x()))
                     y = int(min(self._start_pos.y(), scene_pos.y()))
                     w = int(abs(scene_pos.x() - self._start_pos.x()))
@@ -1066,8 +1066,8 @@ class DesignCanvas(QGraphicsView):
                         "stroke_style": "solid",
                         "fill_color": "#ffffff",
                     }
-                    self._add_tool_item(constants.TOOL_SECTOR, props)
-                elif self.active_tool == constants.TOOL_TABLE:
+                    self._add_tool_item(constants.ToolType.SECTOR, props)
+                elif self.active_tool == constants.ToolType.TABLE:
                     x = int(min(self._start_pos.x(), scene_pos.x()))
                     y = int(min(self._start_pos.y(), scene_pos.y()))
                     w = int(abs(scene_pos.x() - self._start_pos.x()))
@@ -1081,8 +1081,8 @@ class DesignCanvas(QGraphicsView):
                         "stroke_width": 1,
                         "fill_color": "#ffffff",
                     }
-                    self._add_tool_item(constants.TOOL_TABLE, props)
-                elif self.active_tool == constants.TOOL_SCALE:
+                    self._add_tool_item(constants.ToolType.TABLE, props)
+                elif self.active_tool == constants.ToolType.SCALE:
                     x = int(min(self._start_pos.x(), scene_pos.x()))
                     y = int(min(self._start_pos.y(), scene_pos.y()))
                     w = int(abs(scene_pos.x() - self._start_pos.x()))
@@ -1100,30 +1100,30 @@ class DesignCanvas(QGraphicsView):
                         "minor_ticks": 5,
                         "color": "#000000",
                     })
-                    self._add_tool_item(constants.TOOL_SCALE, props)
+                    self._add_tool_item(constants.ToolType.SCALE, props)
 
-                elif self.active_tool == constants.TOOL_DXF:
+                elif self.active_tool == constants.ToolType.DXF:
                     shapes = dxf_tool.prompt_for_dxf(self)
                     if shapes:
                         x = int(min(self._start_pos.x(), scene_pos.x()))
                         y = int(min(self._start_pos.y(), scene_pos.y()))
                         for shape in shapes:
-                            t = shape.get("tool_type")
+                            t = constants.tool_type_from_str(shape.get("tool_type")) or shape.get("tool_type")
                             props = shape.get("properties", {})
-                            if t == constants.TOOL_LINE:
+                            if t == constants.ToolType.LINE:
                                 props["start"]["x"] += x
                                 props["start"]["y"] += y
                                 props["end"]["x"] += x
                                 props["end"]["y"] += y
-                            elif t == constants.TOOL_ARC:
+                            elif t == constants.ToolType.ARC:
                                 props["position"]["x"] += x
                                 props["position"]["y"] += y
-                            elif t == constants.TOOL_POLYGON:
+                            elif t == constants.ToolType.POLYGON:
                                 for pt in props.get("points", []):
                                     pt["x"] += x
                                     pt["y"] += y
                             self._add_tool_item(t, props)
-                if self.active_tool != constants.TOOL_POLYGON:
+                if self.active_tool != constants.ToolType.POLYGON:
                     self._drawing = False
                     self._start_pos = None
                     self._draw_points = []
@@ -1312,31 +1312,31 @@ class DesignCanvas(QGraphicsView):
         item = None
         if 'tool_type' in data_copy:
             t = data_copy['tool_type']
-            if t == constants.TOOL_BUTTON:
+            if t == constants.ToolType.BUTTON:
                 item = ButtonItem(data_copy)
-            elif t == constants.TOOL_TEXT:
+            elif t == constants.ToolType.TEXT:
                 item = TextItem(data_copy)
-            elif t == constants.TOOL_LINE:
+            elif t == constants.ToolType.LINE:
                 item = LineItem(data_copy)
-            elif t == constants.TOOL_FREEFORM:
+            elif t == constants.ToolType.FREEFORM:
                 item = FreeformItem(data_copy)
-            elif t == constants.TOOL_RECT:
+            elif t == constants.ToolType.RECT:
                 item = RectItem(data_copy)
-            elif t == constants.TOOL_POLYGON:
+            elif t == constants.ToolType.POLYGON:
                 item = PolygonItem(data_copy)
-            elif t == constants.TOOL_CIRCLE:
+            elif t == constants.ToolType.CIRCLE:
                 item = CircleItem(data_copy)
-            elif t == constants.TOOL_ARC:
+            elif t == constants.ToolType.ARC:
                 item = ArcItem(data_copy)
-            elif t == constants.TOOL_SECTOR:
+            elif t == constants.ToolType.SECTOR:
                 item = SectorItem(data_copy)
-            elif t == constants.TOOL_TABLE:
+            elif t == constants.ToolType.TABLE:
                 item = TableItem(data_copy)
-            elif t == constants.TOOL_SCALE:
+            elif t == constants.ToolType.SCALE:
                 item = ScaleItem(data_copy)
-            elif t == constants.TOOL_IMAGE:
+            elif t == constants.ToolType.IMAGE:
                 item = ImageItem(data_copy)
-            elif t == constants.TOOL_DXF:
+            elif t == constants.ToolType.DXF:
                 item = DxfItem(data_copy)
         elif 'screen_id' in data_copy:
             item = EmbeddedScreenItem(data_copy)
@@ -1387,13 +1387,14 @@ class DesignCanvas(QGraphicsView):
                 data['instance_id'] = instance_id
                 selection_data.append(data)
         self.selection_changed.emit(self.screen_id, selection_data)
-        if self.active_tool == constants.TOOL_PATH_EDIT:
+        if self.active_tool == constants.ToolType.PATH_EDIT:
             self._update_path_edit_target()
 
-    def set_active_tool(self, tool_name: str):
-        if self.active_tool == constants.TOOL_PATH_EDIT and tool_name != constants.TOOL_PATH_EDIT:
+    def set_active_tool(self, tool_name):
+        if self.active_tool == constants.ToolType.PATH_EDIT and tool_name != constants.ToolType.PATH_EDIT:
             self.path_edit_tool.deactivate()
-        self.active_tool = tool_name
+        # Normalize to enum when possible for consistent comparisons
+        self.active_tool = constants.tool_type_from_str(tool_name) or tool_name
         if self._preview_item:
             self._remove_item_safely(self._preview_item)
             self._preview_item = None
@@ -1402,9 +1403,9 @@ class DesignCanvas(QGraphicsView):
             self._dimension_item = None
         self._drawing = False
         self._draw_points = []
-        if tool_name == constants.TOOL_SELECT:
+        if self.active_tool == constants.ToolType.SELECT:
             self.setDragMode(QGraphicsView.DragMode.NoDrag)
-        elif tool_name == constants.TOOL_PATH_EDIT:
+        elif self.active_tool == constants.ToolType.PATH_EDIT:
             self.setDragMode(QGraphicsView.DragMode.NoDrag)
             self._update_path_edit_target()
         else:
@@ -1421,10 +1422,10 @@ class DesignCanvas(QGraphicsView):
         self.path_edit_tool.activate(item)
 
     def mouseDoubleClickEvent(self, event: QMouseEvent):
-        if self.active_tool == constants.TOOL_PATH_EDIT:
+        if self.active_tool == constants.ToolType.PATH_EDIT:
             self.path_edit_tool.add_anchor(self.mapToScene(event.pos()))
             return
-        if self.active_tool == constants.TOOL_POLYGON and self._drawing:
+        if self.active_tool == constants.ToolType.POLYGON and self._drawing:
             scene_pos = self.mapToScene(event.pos())
             # If Shift is pressed on finalization, snap the last segment to 45°
             try:
@@ -1447,7 +1448,7 @@ class DesignCanvas(QGraphicsView):
             rel = [{"x": int(p.x() - min_x), "y": int(p.y() - min_y)} for p in self._draw_points]
             props = polygon_tool.get_default_properties()
             props.update({"points": rel, "position": {"x": int(min_x), "y": int(min_y)}})
-            self._add_tool_item(constants.TOOL_POLYGON, props)
+            self._add_tool_item(constants.ToolType.POLYGON, props)
             self._drawing = False
             self._draw_points = []
             if self._preview_item:
@@ -1545,7 +1546,7 @@ class DesignCanvas(QGraphicsView):
         menu.exec(event.globalPos())
 
     def keyPressEvent(self, event: QKeyEvent):
-        if self.active_tool == constants.TOOL_PATH_EDIT:
+        if self.active_tool == constants.ToolType.PATH_EDIT:
             if event.key() in (Qt.Key.Key_Delete, Qt.Key.Key_Backspace):
                 if self.path_edit_tool.delete_selected_anchor():
                     event.accept()
@@ -1784,3 +1785,4 @@ class DesignCanvas(QGraphicsView):
             item.setPos(original_pos)
             self.scene.update()
             self.viewport().update()
+

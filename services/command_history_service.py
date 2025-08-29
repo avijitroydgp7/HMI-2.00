@@ -3,7 +3,14 @@
 
 from PyQt6.QtCore import QObject, pyqtSignal
 from collections import deque
+import logging
 from .commands import Command
+
+logger = logging.getLogger(__name__)
+# Avoid emitting logs unless the app configures handlers.
+if not logger.handlers:
+    logger.addHandler(logging.NullHandler())
+logger.setLevel(logging.WARNING)
 
 class CommandHistoryService(QObject):
     """
@@ -17,26 +24,35 @@ class CommandHistoryService(QObject):
         self._undo_stack = deque(maxlen=100)
         self._redo_stack = deque(maxlen=100)
 
+    def _execute_and_notify(self, command: Command, op: str) -> bool:
+        """
+        Execute the specified operation on the command and notify observers.
+        Returns True if the operation succeeds; False if execution fails.
+        Notification failures are logged but do not fail the operation.
+        """
+        try:
+            getattr(command, op)()
+        except Exception as e:
+            logger.exception("Command %s failed: %s", op, e)
+            return False
+
+        try:
+            command._notify()
+        except Exception as e:
+            logger.exception("Command notify failed after %s: %s", op, e)
+        return True
+
     def add_command(self, command: Command):
         """
         Adds a new command to the history, executing it and clearing the redo stack.
         """
         from .project_service import project_service
         
-        try:
-            command.redo()
-        except Exception as e:
-            print(f"Command redo failed: {e}")
+        if not self._execute_and_notify(command, "redo"):
             return
 
         self._undo_stack.append(command)
         self._redo_stack.clear()
-
-        # FIX: Notify the UI that the data has changed after the initial "do"
-        try:
-            command._notify()
-        except Exception as e:
-            print(f"Command notify failed: {e}")
         
         self.history_changed.emit()
         project_service.set_dirty(True)
@@ -50,16 +66,8 @@ class CommandHistoryService(QObject):
         
         if self.can_undo():
             command = self._undo_stack[-1]
-            try:
-                command.undo()
-            except Exception as e:
-                print(f"Command undo failed: {e}")
+            if not self._execute_and_notify(command, "undo"):
                 return
-
-            try:
-                command._notify()
-            except Exception as e:
-                print(f"Command notify failed: {e}")
 
             self._undo_stack.pop()
             self._redo_stack.append(command)
@@ -75,16 +83,8 @@ class CommandHistoryService(QObject):
         
         if self.can_redo():
             command = self._redo_stack[-1]
-            try:
-                command.redo()
-            except Exception as e:
-                print(f"Command redo failed: {e}")
+            if not self._execute_and_notify(command, "redo"):
                 return
-
-            try:
-                command._notify()
-            except Exception as e:
-                print(f"Command notify failed: {e}")
 
             self._redo_stack.pop()
             self._undo_stack.append(command)

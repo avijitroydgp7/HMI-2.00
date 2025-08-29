@@ -64,17 +64,39 @@ class CustomDialog(QDialog):
 
     # --- Drag Logic ---
     def mousePressEvent(self, event):
-        # Only start a drag if the click is on the title bar
-        if self.title_bar.underMouse():
-            self.drag_pos = event.globalPosition().toPoint()
+        """
+        Start window drag only on a left-button press over the title bar.
+
+        Notes:
+        - Restricts drags to the left mouse button to avoid unintended
+          moves from middle/right-click actions.
+        - Uses QMouseEvent.position() (widget-local coords) and maps to
+          global as needed for PyQt6 compatibility.
+        """
+        # Only start a drag if the left button is pressed on the title bar
+        if event.button() == Qt.MouseButton.LeftButton and self.title_bar.underMouse():
+            # Store the offset of the click within the window (local coords)
+            self.drag_pos = event.position().toPoint()
             event.accept()
+        else:
+            # Pass through other mouse buttons/areas
+            super().mousePressEvent(event)
 
     def mouseMoveEvent(self, event):
-        # Check if a drag has been initiated
-        if not self.drag_pos.isNull():
-            self.move(self.pos() + event.globalPosition().toPoint() - self.drag_pos)
-            self.drag_pos = event.globalPosition().toPoint()
+        """
+        Move the window while dragging with the left button held down.
+
+        Uses event.position() mapped to global instead of
+        event.globalPosition() to remain friendly with PyQt6.
+        """
+        # Only move while the left button is held and a drag started
+        if not self.drag_pos.isNull() and (event.buttons() & Qt.MouseButton.LeftButton):
+            # Convert current cursor position (local) to global and move
+            global_cursor = self.mapToGlobal(event.position().toPoint())
+            self.move(global_cursor - self.drag_pos)
             event.accept()
+        else:
+            super().mouseMoveEvent(event)
 
     def mouseReleaseEvent(self, event):
         self.drag_pos = QPoint()
