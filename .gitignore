@@ -17,3 +17,5 @@ tools/button/__pycache__
 tools/button/__pycache__/conditional_style.cpython-313.pyc
 *.pyc
 *.pyc
+/tools/button/__pycache__
+/tools/button/__pycache__

@@ -86,6 +86,13 @@ class Ribbon(QToolBar):
         self.save_as_action._animated_icon = self.save_as_anim
         self.save_as_action.setShortcut(QKeySequence.StandardKey.SaveAs)
         tb.addAction(self.save_as_action)
+        # Run (launch simulator)
+        self.run_anim = IconManager.create_animated_icon('fa5s.play')
+        self.run_action = QAction(self.run_anim.icon, "Run", self)
+        self.run_anim.add_target(self.run_action)
+        self.run_action._animated_icon = self.run_anim
+        self.run_action.setShortcut(QKeySequence("F5"))
+        tb.addAction(self.run_action)
         tb.addSeparator()
         self.close_tab_anim = IconManager.create_animated_icon('fa5s.window-close')
         self.close_tab_action = QAction(self.close_tab_anim.icon, "Close Tab", self)

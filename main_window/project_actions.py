@@ -1,6 +1,8 @@
 # main_window/project_actions.py
 import os
 import copy
+import sys
+import subprocess
 from PyQt6.QtWidgets import QFileDialog, QMessageBox
 from services.project_service import project_service
 from services.command_history_service import command_history_service
@@ -128,3 +130,38 @@ def edit_project_info(win):
         if new_info_full != old_info_full:
             command = UpdateProjectInfoCommand(new_info_full, old_info_full)
             command_history_service.add_command(command)
+
+
+def run_simulator(win):
+    """Launch the runtime simulator in a separate process/window.
+
+    Ensures the project is saved, then spawns:
+        python runtime_simulator/main.py <project_path>
+    """
+    # Require an open project
+    if not project_service.is_project_open():
+        QMessageBox.information(win, "Run Simulator", "Open or create a project first.")
+        return
+
+    # Prompt to save unsaved changes
+    if not prompt_to_save_if_dirty(win):
+        return
+
+    # If still not persisted, force Save As
+    project_path = project_service.project_file_path
+    if not project_path or project_path == "New Project":
+        if not save_project_as(win):
+            return
+        project_path = project_service.project_file_path
+
+    # Spawn runtime simulator as a separate process via -m for reliable imports
+    cmd = [sys.executable, "-m", "runtime_simulator.main", project_path]
+    try:
+        # Start detached; do not block the designer
+        subprocess.Popen(cmd, cwd=os.getcwd())
+    except Exception as e:
+        msg_box = QMessageBox(win)
+        msg_box.setWindowTitle("Error Launching Simulator")
+        msg_box.setText(f"Could not start simulator:\n{e}")
+        msg_box.setIcon(QMessageBox.Icon.Critical)
+        msg_box.exec()

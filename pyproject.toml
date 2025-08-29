@@ -1,0 +1,17 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "hmi-runtime-simulator"
+version = "0.0.0"
+description = "PC Runtime Simulator for the PyHMI Designer (PyQt6)"
+readme = "readme.md"
+requires-python = ">=3.10"
+license = { text = "Proprietary" }
+authors = [{ name = "HMI Project" }]
+dependencies = []
+
+[project.scripts]
+hmi-sim = "runtime_simulator.main:main"
+

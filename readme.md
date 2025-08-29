@@ -43,11 +43,21 @@ python -m venv .venv
 # Linux/macOS
 source .venv/bin/activate
 
-# 2) Install
+# 2) Install deps + local package (exposes `hmi-sim` CLI)
 pip install -r requirements.txt
 
-# 3) Run
+# 3) Run (Designer)
 python main.py
+
+# Simulator (independent executable)
+# From designer use Project → Run (F5), or run directly:
+python runtime_simulator/main.py <path-to-project.hmi>
+
+# Or via module
+python -m runtime_simulator --project <path-to-project.hmi>
+
+# Or after editable install (entry point from requirements.txt)
+hmi-sim <path-to-project.hmi>
 ```
 
 ## Project Structure (Current)
@@ -483,3 +493,24 @@ if read('MotorRun'):
 # action kind: run_snippet
 write('AlarmBlink', True)
 ```
+
+---
+
+## Designer vs Simulator
+
+- Independent executables: the designer (`main.py`) and the runtime simulator (`runtime_simulator/main.py`) run in separate processes and windows.
+- From the designer, use Project → Run (F5) to spawn the simulator for the currently open project.
+- You can also launch the simulator directly from a shell: `python runtime_simulator/main.py <path-to-project.hmi>`.
+- The simulator never shares in‑process state with the designer; project data flows via the saved `.hmi` JSON file.
+
+### Typical Flow
+
+- Design in the designer UI, Save.
+- Press Run (F5) → a separate simulator window opens and loads the saved project.
+- Iterate: edit in designer → Save → relaunch Run to test again.
+\n---
+\n## Shared Services (Designer + Runtime)
+
+- Both applications import from `services/` for project parsing and data access (screens, tags, comments).
+- `services/serialization.py` offers `load_from_file()` / `save_to_file()` helpers for consistent JSON I/O.
+- Runtime resolves tags using `[DB_NAME]::TAG_NAME` format to match exported references and avoid ambiguity.

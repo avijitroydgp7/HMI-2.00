@@ -159,6 +159,7 @@ class MainWindow(QMainWindow):
         self.ribbon.save_action.triggered.connect(lambda: project_actions.save_project(self))
         self.quick_access_toolbar.save_action.triggered.connect(lambda: project_actions.save_project(self))
         self.ribbon.save_as_action.triggered.connect(lambda: project_actions.save_project_as(self))
+        self.ribbon.run_action.triggered.connect(lambda: project_actions.run_simulator(self))
         self.ribbon.close_tab_action.triggered.connect(lambda: tabs.close_current_tab(self))
         self.ribbon.exit_action.triggered.connect(self.close)
         

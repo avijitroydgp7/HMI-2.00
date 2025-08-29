@@ -16,7 +16,6 @@ from PyQt6.QtCore import QRectF, Qt, QPointF, QLineF
 import copy
 
 from services.screen_data_service import screen_service
-from services.tag_service import tag_service
 
 
 def _apply_pen_style_from_name(pen: QPen, style_name: str):
@@ -145,12 +144,12 @@ class ButtonItem(BaseGraphicsItem):
         super().__init__(instance_data, parent)
         self.is_resizable = True
         self._conditional_style_manager = None
-        self._current_tag_values = tag_service.get_all_tag_values()
+        # Design-time only: do not bind to live tag updates in the designer
+        # Runtime tag-driven behavior lives in runtime_simulator widgets
+        self._current_tag_values = {}
         self._state = 'normal'
         self._tooltip = ''
-
-        tag_service.tag_values_changed.connect(self.update_tag_values)
-        # Initialize tooltip based on current style
+        # Initialize tooltip based on current style (with empty tag values)
         self._get_active_style_properties(self._state)
 
     def boundingRect(self) -> QRectF:
@@ -289,37 +288,9 @@ class ButtonItem(BaseGraphicsItem):
     
     def update_tag_values(self, tag_values):
         """Update tag values and re-evaluate conditional styles"""
-        self._current_tag_values.update(tag_values)
-        # Update tooltip and appearance based on new tag values
-        self._get_active_style_properties(self._state)
-        self.update()
-
-    def hoverEnterEvent(self, event):
-        self._state = 'hover'
-        self._get_active_style_properties(self._state)
-        self.update()
-        super().hoverEnterEvent(event)
-
-    def hoverLeaveEvent(self, event):
-        self._state = 'normal'
-        self._get_active_style_properties(self._state)
-        self.update()
-        super().hoverLeaveEvent(event)
-
-    def mousePressEvent(self, event):
-        self._state = 'click'
-        self._get_active_style_properties(self._state)
-        self.update()
-        super().mousePressEvent(event)
-
-    def mouseReleaseEvent(self, event):
-        if self.isUnderMouse():
-            self._state = 'hover'
-        else:
-            self._state = 'normal'
-        self._get_active_style_properties(self._state)
-        self.update()
-        super().mouseReleaseEvent(event)
+        # In designer mode we do not consume tag updates nor animate states
+        # Leave visuals static; interactive runtime lives in simulator
+        return
 
 
 class TextItem(BaseGraphicsItem):
