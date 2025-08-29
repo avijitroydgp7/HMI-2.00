@@ -11,7 +11,7 @@ from PyQt6.QtWidgets import (
     QComboBox,
 )
 from PyQt6.QtGui import QIcon
-from PyQt6.QtCore import pyqtSlot
+from PyQt6.QtCore import pyqtSlot, QSignalBlocker
 import copy
 from services.command_history_service import command_history_service
 # FIX: Removed unused MoveChildCommand import
@@ -30,6 +30,8 @@ class PropertyEditor(QStackedWidget):
         self.current_parent_id = None
         self.current_properties = {}
         self.active_tool = constants.TOOL_SELECT
+        # Guard to avoid refresh loops while applying edits
+        self._is_editing = False
 
         # --- Create Pages ---
         self.blank_page = QWidget()
@@ -51,6 +53,9 @@ class PropertyEditor(QStackedWidget):
     @pyqtSlot(str)
     def _on_screen_modified(self, screen_id: str):
         """Refresh the editor when the parent screen's data changes."""
+        # Skip refreshes while we are applying a local edit
+        if getattr(self, "_is_editing", False):
+            return
         if screen_id != self.current_parent_id:
             return
         if self.current_object_id:
@@ -204,48 +209,69 @@ class PropertyEditor(QStackedWidget):
         layout.addRow("Background Color:", bg_color_edit)
         layout.addRow("Text Color:", text_color_edit)
 
-        def on_property_changed():
-            new_props = copy.deepcopy(self.current_properties)
-            new_props["label"] = label_edit.text()
-            new_props["background_color"] = bg_color_edit.text()
-            new_props["text_color"] = text_color_edit.text()
-            
-            selected_style_id = style_combo.currentData()
-            if selected_style_id != new_props.get('style_id'):
-                new_props['style_id'] = selected_style_id
-                style_def = button_styles.get_style_by_id(selected_style_id)
-                new_props.update(style_def['properties'])
-                if 'hover_properties' in style_def:
-                    new_props['hover_properties'] = copy.deepcopy(style_def['hover_properties'])
-                if 'click_properties' in style_def:
-                    new_props['click_properties'] = copy.deepcopy(style_def['click_properties'])
-                if style_def.get('icon'):
-                    new_props['icon'] = style_def['icon']
-                if style_def.get('hover_icon'):
-                    new_props['hover_icon'] = style_def['hover_icon']
-                if style_def.get('click_icon'):
-                    new_props['click_icon'] = style_def['click_icon']
-                # Update UI to reflect style change
-                bg_color_edit.setText(new_props.get('background_color', ''))
-                text_color_edit.setText(new_props.get('text_color', ''))
+        # Update UI fields that are derived from a style definition
+        def _apply_style_field_updates(style_id: str):
+            style_def = button_styles.get_style_by_id(style_id) or {}
+            style_props = style_def.get('properties', {})
+            # Block signals to avoid recursive emissions while programmatically updating
+            blocker_bg = QSignalBlocker(bg_color_edit)
+            blocker_text = QSignalBlocker(text_color_edit)
+            try:
+                bg_color_edit.setText(style_props.get('background_color', ''))
+                text_color_edit.setText(style_props.get('text_color', ''))
+            finally:
+                # Explicitly delete blockers to restore signal state now
+                del blocker_bg
+                del blocker_text
 
-            if new_props != self.current_properties:
-                if self.current_object_id:
-                    command = UpdateChildPropertiesCommand(
-                        self.current_parent_id,
-                        self.current_object_id,
-                        new_props,
-                        self.current_properties,
-                    )
-                    command_history_service.add_command(command)
-                else:
-                    button.set_default_properties(new_props)
-                self.current_properties = new_props
+        def on_property_changed():
+            self._is_editing = True
+            try:
+                new_props = copy.deepcopy(self.current_properties)
+                new_props["label"] = label_edit.text()
+                new_props["background_color"] = bg_color_edit.text()
+                new_props["text_color"] = text_color_edit.text()
+                
+                selected_style_id = style_combo.currentData()
+                if selected_style_id != new_props.get('style_id'):
+                    new_props['style_id'] = selected_style_id
+                    style_def = button_styles.get_style_by_id(selected_style_id)
+                    new_props.update(style_def['properties'])
+                    if 'hover_properties' in style_def:
+                        new_props['hover_properties'] = copy.deepcopy(style_def['hover_properties'])
+                    if 'click_properties' in style_def:
+                        new_props['click_properties'] = copy.deepcopy(style_def['click_properties'])
+                    if style_def.get('icon'):
+                        new_props['icon'] = style_def['icon']
+                    if style_def.get('hover_icon'):
+                        new_props['hover_icon'] = style_def['hover_icon']
+                    if style_def.get('click_icon'):
+                        new_props['click_icon'] = style_def['click_icon']
+
+                if new_props != self.current_properties:
+                    if self.current_object_id:
+                        command = UpdateChildPropertiesCommand(
+                            self.current_parent_id,
+                            self.current_object_id,
+                            new_props,
+                            self.current_properties,
+                        )
+                        command_history_service.add_command(command)
+                    else:
+                        button.set_default_properties(new_props)
+                    self.current_properties = new_props
+            finally:
+                self._is_editing = False
         
-        label_edit.textChanged.connect(on_property_changed)
-        style_combo.currentIndexChanged.connect(on_property_changed)
-        bg_color_edit.textChanged.connect(on_property_changed)
-        text_color_edit.textChanged.connect(on_property_changed)
+        label_edit.editingFinished.connect(on_property_changed)
+        # When style changes, first update derived UI fields, then apply property change
+        def _on_style_activated(_=None):
+            selected_style_id = style_combo.currentData()
+            _apply_style_field_updates(selected_style_id)
+            on_property_changed()
+        style_combo.activated.connect(_on_style_activated)
+        bg_color_edit.editingFinished.connect(on_property_changed)
+        text_color_edit.editingFinished.connect(on_property_changed)
 
         return editor_widget
 
@@ -275,33 +301,37 @@ class PropertyEditor(QStackedWidget):
         layout.addRow('Style:', style_edit)
 
         def on_property_changed():
-            new_props = copy.deepcopy(self.current_properties)
-            new_props['start'] = {
-                'x': int(start_x.text() or 0),
-                'y': int(start_y.text() or 0),
-            }
-            new_props['end'] = {
-                'x': int(end_x.text() or 0),
-                'y': int(end_y.text() or 0),
-            }
-            new_props['color'] = color_edit.text()
-            new_props['width'] = int(width_edit.text() or 0)
-            new_props['style'] = style_edit.text()
-            if new_props != self.current_properties:
-                if self.current_object_id:
-                    command = UpdateChildPropertiesCommand(
-                        self.current_parent_id,
-                        self.current_object_id,
-                        new_props,
-                        self.current_properties,
-                    )
-                    command_history_service.add_command(command)
-                else:
-                    line_tool.set_default_properties(new_props)
-                self.current_properties = new_props
+            self._is_editing = True
+            try:
+                new_props = copy.deepcopy(self.current_properties)
+                new_props['start'] = {
+                    'x': int(start_x.text() or 0),
+                    'y': int(start_y.text() or 0),
+                }
+                new_props['end'] = {
+                    'x': int(end_x.text() or 0),
+                    'y': int(end_y.text() or 0),
+                }
+                new_props['color'] = color_edit.text()
+                new_props['width'] = int(width_edit.text() or 0)
+                new_props['style'] = style_edit.text()
+                if new_props != self.current_properties:
+                    if self.current_object_id:
+                        command = UpdateChildPropertiesCommand(
+                            self.current_parent_id,
+                            self.current_object_id,
+                            new_props,
+                            self.current_properties,
+                        )
+                        command_history_service.add_command(command)
+                    else:
+                        line_tool.set_default_properties(new_props)
+                    self.current_properties = new_props
+            finally:
+                self._is_editing = False
 
         for widget in (start_x, start_y, end_x, end_y, color_edit, width_edit, style_edit):
-            widget.textChanged.connect(on_property_changed)
+            widget.editingFinished.connect(on_property_changed)
 
         return editor_widget
 
@@ -333,34 +363,38 @@ class PropertyEditor(QStackedWidget):
         layout.addRow('Color:', color_edit)
 
         def on_property_changed():
-            new_props = copy.deepcopy(self.current_properties)
-            new_props['content'] = content_edit.text()
-            new_props['font'] = {
-                'family': font_family.text(),
-                'size': int(font_size.text() or 0),
-                'bold': bold_combo.currentText() == 'True',
-                'italic': italic_combo.currentText() == 'True',
-            }
-            new_props['color'] = color_edit.text()
-            if new_props != self.current_properties:
-                if self.current_object_id:
-                    command = UpdateChildPropertiesCommand(
-                        self.current_parent_id,
-                        self.current_object_id,
-                        new_props,
-                        self.current_properties,
-                    )
-                    command_history_service.add_command(command)
-                else:
-                    text_tool.set_default_properties(new_props)
-                self.current_properties = new_props
+            self._is_editing = True
+            try:
+                new_props = copy.deepcopy(self.current_properties)
+                new_props['content'] = content_edit.text()
+                new_props['font'] = {
+                    'family': font_family.text(),
+                    'size': int(font_size.text() or 0),
+                    'bold': bold_combo.currentText() == 'True',
+                    'italic': italic_combo.currentText() == 'True',
+                }
+                new_props['color'] = color_edit.text()
+                if new_props != self.current_properties:
+                    if self.current_object_id:
+                        command = UpdateChildPropertiesCommand(
+                            self.current_parent_id,
+                            self.current_object_id,
+                            new_props,
+                            self.current_properties,
+                        )
+                        command_history_service.add_command(command)
+                    else:
+                        text_tool.set_default_properties(new_props)
+                    self.current_properties = new_props
+            finally:
+                self._is_editing = False
 
-        content_edit.textChanged.connect(on_property_changed)
-        font_family.textChanged.connect(on_property_changed)
-        font_size.textChanged.connect(on_property_changed)
-        bold_combo.currentIndexChanged.connect(on_property_changed)
-        italic_combo.currentIndexChanged.connect(on_property_changed)
-        color_edit.textChanged.connect(on_property_changed)
+        content_edit.editingFinished.connect(on_property_changed)
+        font_family.editingFinished.connect(on_property_changed)
+        font_size.editingFinished.connect(on_property_changed)
+        bold_combo.activated.connect(lambda _=None: on_property_changed())
+        italic_combo.activated.connect(lambda _=None: on_property_changed())
+        color_edit.editingFinished.connect(on_property_changed)
 
         return editor_widget
 
@@ -384,26 +418,30 @@ class PropertyEditor(QStackedWidget):
         layout.addRow('Stroke Style:', stroke_style)
 
         def on_property_changed():
-            new_props = copy.deepcopy(self.current_properties)
-            new_props['fill_color'] = fill_color.text()
-            new_props['stroke_color'] = stroke_color.text()
-            new_props['stroke_width'] = int(stroke_width.text() or 0)
-            new_props['stroke_style'] = stroke_style.text()
-            if new_props != self.current_properties:
-                if self.current_object_id:
-                    command = UpdateChildPropertiesCommand(
-                        self.current_parent_id,
-                        self.current_object_id,
-                        new_props,
-                        self.current_properties,
-                    )
-                    command_history_service.add_command(command)
-                else:
-                    polygon_tool.set_default_properties(new_props)
-                self.current_properties = new_props
+            self._is_editing = True
+            try:
+                new_props = copy.deepcopy(self.current_properties)
+                new_props['fill_color'] = fill_color.text()
+                new_props['stroke_color'] = stroke_color.text()
+                new_props['stroke_width'] = int(stroke_width.text() or 0)
+                new_props['stroke_style'] = stroke_style.text()
+                if new_props != self.current_properties:
+                    if self.current_object_id:
+                        command = UpdateChildPropertiesCommand(
+                            self.current_parent_id,
+                            self.current_object_id,
+                            new_props,
+                            self.current_properties,
+                        )
+                        command_history_service.add_command(command)
+                    else:
+                        polygon_tool.set_default_properties(new_props)
+                    self.current_properties = new_props
+            finally:
+                self._is_editing = False
 
         for widget in (fill_color, stroke_color, stroke_width, stroke_style):
-            widget.textChanged.connect(on_property_changed)
+            widget.editingFinished.connect(on_property_changed)
 
         return editor_widget
 
@@ -425,27 +463,31 @@ class PropertyEditor(QStackedWidget):
         layout.addRow('Height:', height_edit)
 
         def on_property_changed():
-            new_props = copy.deepcopy(self.current_properties)
-            new_props['path'] = path_edit.text()
-            new_props['size'] = {
-                'width': int(width_edit.text() or 0),
-                'height': int(height_edit.text() or 0),
-            }
-            if new_props != self.current_properties:
-                if self.current_object_id:
-                    command = UpdateChildPropertiesCommand(
-                        self.current_parent_id,
-                        self.current_object_id,
-                        new_props,
-                        self.current_properties,
-                    )
-                    command_history_service.add_command(command)
-                else:
-                    image_tool.set_default_properties(new_props)
-                self.current_properties = new_props
+            self._is_editing = True
+            try:
+                new_props = copy.deepcopy(self.current_properties)
+                new_props['path'] = path_edit.text()
+                new_props['size'] = {
+                    'width': int(width_edit.text() or 0),
+                    'height': int(height_edit.text() or 0),
+                }
+                if new_props != self.current_properties:
+                    if self.current_object_id:
+                        command = UpdateChildPropertiesCommand(
+                            self.current_parent_id,
+                            self.current_object_id,
+                            new_props,
+                            self.current_properties,
+                        )
+                        command_history_service.add_command(command)
+                    else:
+                        image_tool.set_default_properties(new_props)
+                    self.current_properties = new_props
+            finally:
+                self._is_editing = False
 
         for widget in (path_edit, width_edit, height_edit):
-            widget.textChanged.connect(on_property_changed)
+            widget.editingFinished.connect(on_property_changed)
 
         return editor_widget
 
@@ -479,29 +521,33 @@ class PropertyEditor(QStackedWidget):
         layout.addRow('Color:', color_edit)
 
         def on_property_changed():
-            new_props = copy.deepcopy(self.current_properties)
-            new_props['orientation'] = orientation_combo.currentText()
-            new_props['length'] = int(length_edit.text() or 0)
-            new_props['thickness'] = int(thickness_edit.text() or 0)
-            new_props['major_ticks'] = int(major_ticks.text() or 0)
-            new_props['minor_ticks'] = int(minor_ticks.text() or 0)
-            new_props['tick_spacing'] = int(tick_spacing.text() or 0)
-            new_props['units'] = units_edit.text()
-            new_props['color'] = color_edit.text()
-            if new_props != self.current_properties:
-                if self.current_object_id:
-                    command = UpdateChildPropertiesCommand(
-                        self.current_parent_id,
-                        self.current_object_id,
-                        new_props,
-                        self.current_properties,
-                    )
-                    command_history_service.add_command(command)
-                else:
-                    scale_tool.set_default_properties(new_props)
-                self.current_properties = new_props
+            self._is_editing = True
+            try:
+                new_props = copy.deepcopy(self.current_properties)
+                new_props['orientation'] = orientation_combo.currentText()
+                new_props['length'] = int(length_edit.text() or 0)
+                new_props['thickness'] = int(thickness_edit.text() or 0)
+                new_props['major_ticks'] = int(major_ticks.text() or 0)
+                new_props['minor_ticks'] = int(minor_ticks.text() or 0)
+                new_props['tick_spacing'] = int(tick_spacing.text() or 0)
+                new_props['units'] = units_edit.text()
+                new_props['color'] = color_edit.text()
+                if new_props != self.current_properties:
+                    if self.current_object_id:
+                        command = UpdateChildPropertiesCommand(
+                            self.current_parent_id,
+                            self.current_object_id,
+                            new_props,
+                            self.current_properties,
+                        )
+                        command_history_service.add_command(command)
+                    else:
+                        scale_tool.set_default_properties(new_props)
+                    self.current_properties = new_props
+            finally:
+                self._is_editing = False
 
-        orientation_combo.currentIndexChanged.connect(on_property_changed)
+        orientation_combo.activated.connect(lambda _=None: on_property_changed())
         for widget in (
             length_edit,
             thickness_edit,
@@ -511,6 +557,6 @@ class PropertyEditor(QStackedWidget):
             units_edit,
             color_edit,
         ):
-            widget.textChanged.connect(on_property_changed)
+            widget.editingFinished.connect(on_property_changed)
 
         return editor_widget

@@ -4,7 +4,7 @@
         "company": "",
         "description": "",
         "creation_date": "2025-08-26 17:51:48",
-        "modification_date": "2025-08-28 17:09:30",
+        "modification_date": "2025-08-28 23:42:15",
         "save_history": [
             "Project Created on 2025-08-26 17:51:48",
             "Saved on 2025-08-26 17:54:13",
@@ -16,7 +16,8 @@
             "Saved on 2025-08-28 14:20:49",
             "Saved on 2025-08-28 14:41:56",
             "Saved on 2025-08-28 14:44:13",
-            "Saved on 2025-08-28 17:09:30"
+            "Saved on 2025-08-28 17:09:30",
+            "Saved on 2025-08-28 23:42:15"
         ]
     },
     "screens": {
@@ -135,6 +136,27 @@
                     "position": {
                         "x": 388.0,
                         "y": 252.0
+                    }
+                },
+                {
+                    "instance_id": "277f853a-d969-4ddd-85e6-42817bdc8c9f",
+                    "tool_type": "line",
+                    "properties": {
+                        "start": {
+                            "x": 0,
+                            "y": 0
+                        },
+                        "end": {
+                            "x": 271,
+                            "y": 192
+                        },
+                        "color": "#000000",
+                        "width": 2,
+                        "style": "solid",
+                        "position": {
+                            "x": 618,
+                            "y": 149
+                        }
                     }
                 }
             ]
