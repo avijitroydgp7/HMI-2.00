@@ -10,3 +10,10 @@
 /tests/__pycache__
 /__pycache__
 /.vscode
+/tools/button/__pycache__
+/tools/button/__pycache__
+tools/button/__pycache__
+/tools/button/__pycache__/conditional_style.cpython-313.pyc
+tools/button/__pycache__/conditional_style.cpython-313.pyc
+*.pyc
+*.pyc

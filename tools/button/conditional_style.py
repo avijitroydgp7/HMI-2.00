@@ -325,174 +325,20 @@ _GRADIENT_STYLES = {
     "Diagonal BL-TR": (0, 1, 1, 0),
 }
 
-# ---------------------------------------------------------------------------
-# Built-in button styles
-# ---------------------------------------------------------------------------
-_DEFAULT_STYLES = [
-    {
-        "id": "default_rounded",
-        "name": "Default Rounded",
-        "properties": {
-            "background_color": "#5a6270",
-            "text_color": "#ffffff",
-            "border_radius": 20,
-        },
-        "hover_properties": {
-            "background_color": "#6b7383",
-            "text_color": "#ffffff",
-        },
-        "click_properties": {
-            "background_color": "#4a515c",
-            "text_color": "#ffffff",
-        },
-    },
-    {
-        "id": "success_square",
-        "name": "Success Square",
-        "properties": {
-            "background_color": "#4CAF50",
-            "text_color": "#ffffff",
-            "border_radius": 5,
-        },
-        "hover_properties": {
-            "background_color": "#45a049",
-            "text_color": "#ffffff",
-        },
-        "click_properties": {
-            "background_color": "#388e3c",
-            "text_color": "#ffffff",
-        },
-    },
-    {
-        "id": "warning_pill",
-        "name": "Warning Pill",
-        "properties": {
-            "background_color": "#ff9800",
-            "text_color": "#000000",
-            "border_radius": 20,  # Height will make it a pill
-        },
-        "hover_properties": {
-            "background_color": "#ffb74d",
-            "text_color": "#000000",
-        },
-        "click_properties": {
-            "background_color": "#e68900",
-            "text_color": "#000000",
-        },
-    },
-    {
-        "id": "danger_flat",
-        "name": "Danger Flat",
-        "properties": {
-            "background_color": "#f44336",
-            "text_color": "#ffffff",
-            "border_radius": 0,
-        },
-        "hover_properties": {
-            "background_color": "#e53935",
-            "text_color": "#ffffff",
-        },
-        "click_properties": {
-            "background_color": "#d32f2f",
-            "text_color": "#ffffff",
-        },
-    },
-    {
-        "id": "gradient_blue",
-        "name": "Gradient Blue",
-        "properties": {
-            "background_type": "Linear Gradient",
-            "background_color": "#4facfe",
-            "background_color2": "#00f2fe",
-            "gradient_type": "Top to Bottom",
-            "text_color": "#ffffff",
-            "border_radius": 10,
-            "border_width": 2,
-            "border_style": "solid",
-            "border_color": "#4facfe",
-        },
-        "hover_properties": {
-            "background_color": "#00f2fe",
-            "text_color": "#ffffff",
-        },
-        "click_properties": {
-            "background_color": "#0099cc",
-            "text_color": "#ffffff",
-        },
-    },
-    {
-        "id": "outline_primary",
-        "name": "Outline Primary",
-        "properties": {
-            "background_color": "transparent",
-            "text_color": "#1976d2",
-            "border_radius": 5,
-            "border_width": 2,
-            "border_style": "solid",
-            "border_color": "#1976d2",
-        },
-        "hover_properties": {
-            "background_color": "#1976d2",
-            "text_color": "#ffffff",
-        },
-        "click_properties": {
-            "background_color": "#0d47a1",
-            "text_color": "#ffffff",
-        },
-    },
-    {
-        "id": "neumorphic_soft",
-        "name": "Neumorphic Soft",
-        "properties": {
-            "background_color": "#e0e0e0",
-            "text_color": "#333333",
-            "border_radius": 15,
-            "shape_style": "Neumorphic",
-        },
-        "hover_properties": {
-            "background_color": "#e8e8e8",
-            "text_color": "#333333",
-        },
-        "click_properties": {
-            "background_color": "#d0d0d0",
-            "text_color": "#333333",
-        },
-    },
-    {
-        "id": "icon_play",
-        "name": "Icon Play",
-        "icon": "lib/icon/bolt-circle-svgrepo-com.svg",
-        "click_icon": "lib/icon/bolt-circle-svgrepo-com.svg",
-        "properties": {
-            "background_color": "#ffffff",
-            "text_color": "#333333",
-            "border_radius": 50,
-            "border_width": 1,
-            "border_style": "solid",
-            "border_color": "#cccccc",
-            "icon_size": 32,
-        },
-        "hover_properties": {
-            "background_color": "#f0f0f0",
-        },
-        "click_properties": {
-            "background_color": "#e0e0e0",
-        },
-    },
-]
+from tools.button.default_styles import (
+    get_all_styles as _get_all_styles,
+    get_style_by_id as _get_style_by_id,
+)
 
 
 def get_styles() -> List[Dict[str, Any]]:
     """Return the list of built-in button style definitions."""
-    return _DEFAULT_STYLES
+    return _get_all_styles()
 
 
 def get_style_by_id(style_id: str) -> Dict[str, Any]:
     """Return a style definition by its unique ID."""
-    for style in _DEFAULT_STYLES:
-        if style["id"] == style_id:
-            return style
-    return _DEFAULT_STYLES[0]
+    return _get_style_by_id(style_id)
 
 
 @dataclass
