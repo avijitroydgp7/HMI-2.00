@@ -900,7 +900,8 @@ class ConditionalStyleEditorDialog(QDialog):
         self._border_color = QColor()
 
         main_layout = QGridLayout(self)
-        main_layout.setColumnStretch(0, 1)
+        # Give the options area more space than the preview pane
+        main_layout.setColumnStretch(0, 3)
         main_layout.setColumnStretch(1, 1)
         main_layout.setRowStretch(2, 1)
 
@@ -1170,7 +1171,8 @@ class ConditionalStyleEditorDialog(QDialog):
         self._validate_condition_section()
 
         preview_group = QGroupBox("Preview")
-        preview_group_layout = QVBoxLayout(); preview_group_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        preview_group_layout = QVBoxLayout()
+        preview_group_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.preview_stack = QStackedWidget()
         self.preview_button = PreviewButton("Preview")
         self.preview_button.setMinimumSize(200, 100)
@@ -1181,6 +1183,7 @@ class ConditionalStyleEditorDialog(QDialog):
         self.preview_stack.addWidget(self.preview_led)
         preview_group_layout.addWidget(self.preview_stack)
         preview_group.setLayout(preview_group_layout)
+        preview_group.setFixedWidth(250)
         main_layout.addWidget(preview_group, 1, 1)
 
         # Ensure group boxes line up neatly
@@ -1206,7 +1209,8 @@ class ConditionalStyleEditorDialog(QDialog):
         self.update_controls_state()
         self.update_preview()
 
-        self.resize(1000, 500)
+        # Use a taller, narrower default size that fits typical screens
+        self.resize(580, 850)
 
     def _create_alignment_widget(self, options, current):
         widget = QWidget()
