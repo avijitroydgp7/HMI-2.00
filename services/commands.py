@@ -1,90 +1,108 @@
-# services/commands.py
-# Defines the command classes for the undo/redo framework.
+"""
+services/commands.py
+
+Command classes implementing undo/redo operations. Each concrete command
+encapsulates the data necessary to perform and revert an action, and emits
+the appropriate notifications via a consistent notify() method.
+"""
+
+from __future__ import annotations
 
 import copy
 from abc import ABC, abstractmethod
+from typing import Any, Dict, List, Optional, Tuple, Callable
+
+# Hoisted recurring imports to module level to avoid repeated per-method imports
+from PyQt6.QtCore import Qt
+from services.project_service import project_service
+from services.screen_data_service import screen_service
+from services.tag_data_service import tag_data_service
+from services.comment_data_service import comment_data_service
 
 
 class Command(ABC):
-    def __init__(self):
+    """Abstract base for all undo/redo commands."""
+
+    def __init__(self) -> None:
         pass
 
     @abstractmethod
-    def redo(self):
-        pass
+    def redo(self) -> None:
+        """Apply the command's effect."""
+        raise NotImplementedError
 
     @abstractmethod
-    def undo(self):
-        pass
+    def undo(self) -> None:
+        """Revert the command's effect."""
+        raise NotImplementedError
 
-    def _notify(self):
-        pass
+    def notify(self) -> None:
+        """
+        Emit any relevant notifications/signals after redo/undo.
+        Subclasses override to notify the appropriate services/UI.
+        """
+        # Default: no notification
+        return
 
 # --- Project Commands ---
 class UpdateProjectInfoCommand(Command):
-    def __init__(self, new_info_partial, old_info_full):
+    """Updates partial project info and supports undo back to the full original."""
+
+    def __init__(self, new_info_partial: Dict[str, Any], old_info_full: Dict[str, Any]):
         super().__init__()
-        self.new_info_partial = copy.deepcopy(new_info_partial)
-        self.old_info_full = copy.deepcopy(old_info_full)
+        # Keep originals safe in case external code mutates the input dicts
+        self.new_info_partial: Dict[str, Any] = copy.deepcopy(new_info_partial)
+        self.old_info_full: Dict[str, Any] = copy.deepcopy(old_info_full)
 
-    def redo(self):
-        from services.project_service import project_service
-
-        full_new_info = copy.deepcopy(self.old_info_full)
+    def redo(self) -> None:
+        # Shallow clone is sufficient for merge, originals kept via deepcopy above
+        full_new_info: Dict[str, Any] = dict(self.old_info_full)
         full_new_info.update(self.new_info_partial)
         project_service._perform_update_project_info(full_new_info)
 
-    def undo(self):
-        from services.project_service import project_service
-
+    def undo(self) -> None:
         project_service._perform_update_project_info(self.old_info_full)
 
-    def _notify(self):
-        from services.project_service import project_service
-
+    def notify(self) -> None:
         project_service.project_state_changed.emit()
 
 # --- Screen Commands ---
 class AddScreenCommand(Command):
-    def __init__(self, screen_data):
+    """Adds a new screen to the project."""
+
+    def __init__(self, screen_data: Dict[str, Any]):
         super().__init__()
-        self.screen_data = copy.deepcopy(screen_data)
-        self.screen_id = None
+        self.screen_data: Dict[str, Any] = copy.deepcopy(screen_data)
+        self.screen_id: Optional[str] = None
 
-    def redo(self):
-        from services.screen_data_service import screen_service
-
+    def redo(self) -> None:
         self.screen_id = screen_service._perform_add_screen(self.screen_data)
         self.screen_data['id'] = self.screen_id
 
-    def undo(self):
-        from services.screen_data_service import screen_service
-
+    def undo(self) -> None:
         if self.screen_id:
             screen_service._perform_remove_screen(self.screen_id)
 
-    def _notify(self):
-        from services.screen_data_service import screen_service
-
+    def notify(self) -> None:
         screen_service.screen_list_changed.emit()
 
 class RemoveScreenCommand(Command):
-    def __init__(self, screen_id):
-        from services.screen_data_service import screen_service
+    """Removes a screen and restores it with its references on undo."""
 
+    def __init__(self, screen_id: str):
         super().__init__()
-        self.screen_id = screen_id
-        self.screen_data = copy.deepcopy(screen_service.get_screen(screen_id))
-        self.child_references = screen_service._find_child_references(screen_id)
+        self.screen_id: str = screen_id
+        self.screen_data: Optional[Dict[str, Any]] = copy.deepcopy(
+            screen_service.get_screen(screen_id)
+        )
+        self.child_references: List[Tuple[str, Dict[str, Any]]] = (
+            screen_service._find_child_references(screen_id)
+        )
 
-    def redo(self):
-        from services.screen_data_service import screen_service
-
+    def redo(self) -> None:
         screen_service._perform_remove_screen(self.screen_id)
 
-    def undo(self):
-        from services.screen_data_service import screen_service
-
+    def undo(self) -> None:
         if self.screen_data:
             screen_service._perform_add_screen(self.screen_data, self.screen_id)
             for parent_id, instance_data in self.child_references:
@@ -93,122 +111,108 @@ class RemoveScreenCommand(Command):
                     parent_screen['children'].append(instance_data)
             screen_service.rebuild_reverse_index()
 
-    def _notify(self):
-        from services.screen_data_service import screen_service
-
+    def notify(self) -> None:
         screen_service.screen_list_changed.emit()
         for parent_id, _ in self.child_references:
             screen_service.screen_modified.emit(parent_id)
 
 class UpdateScreenPropertiesCommand(Command):
-    def __init__(self, screen_id, new_data, old_data):
+    """Replaces a screen's data with new_data; undo restores old_data."""
+
+    def __init__(self, screen_id: str, new_data: Dict[str, Any], old_data: Dict[str, Any]):
         super().__init__()
-        self.screen_id = screen_id
-        self.new_data = copy.deepcopy(new_data)
-        self.old_data = copy.deepcopy(old_data)
+        self.screen_id: str = screen_id
+        self.new_data: Dict[str, Any] = copy.deepcopy(new_data)
+        self.old_data: Dict[str, Any] = copy.deepcopy(old_data)
 
-    def redo(self):
-        from services.screen_data_service import screen_service
-
+    def redo(self) -> None:
         screen_service._perform_update_screen(self.screen_id, self.new_data)
 
-    def undo(self):
-        from services.screen_data_service import screen_service
-
+    def undo(self) -> None:
         screen_service._perform_update_screen(self.screen_id, self.old_data)
 
-    def _notify(self):
-        from services.screen_data_service import screen_service
-
+    def notify(self) -> None:
         screen_service.screen_list_changed.emit()
         screen_service.notify_screen_update(self.screen_id)
 
 # --- Child/Tool Instance Commands ---
 class AddChildCommand(Command):
-    def __init__(self, parent_id, child_data):
+    """Adds a child instance to a parent screen."""
+
+    def __init__(self, parent_id: str, child_data: Dict[str, Any]):
         super().__init__()
-        self.parent_id = parent_id
-        self.child_data = copy.deepcopy(child_data)
-        self.instance_id = self.child_data['instance_id']
+        self.parent_id: str = parent_id
+        self.child_data: Dict[str, Any] = copy.deepcopy(child_data)
+        self.instance_id: Any = self.child_data['instance_id']
 
-    def redo(self):
-        from services.screen_data_service import screen_service
-
+    def redo(self) -> None:
         screen_service._perform_add_child(self.parent_id, self.child_data)
 
-    def undo(self):
-        from services.screen_data_service import screen_service
-
+    def undo(self) -> None:
         screen_service._perform_remove_child(self.parent_id, self.instance_id)
 
-    def _notify(self):
-        from services.screen_data_service import screen_service
-
+    def notify(self) -> None:
         screen_service.screen_modified.emit(self.parent_id)
 
 class RemoveChildCommand(Command):
-    def __init__(self, parent_id, instance_data):
+    """Removes a child instance from a parent screen."""
+
+    def __init__(self, parent_id: str, instance_data: Dict[str, Any]):
         super().__init__()
-        self.parent_id = parent_id
-        self.instance_data = copy.deepcopy(instance_data)
-        self.instance_id = self.instance_data['instance_id']
+        self.parent_id: str = parent_id
+        self.instance_data: Dict[str, Any] = copy.deepcopy(instance_data)
+        self.instance_id: Any = self.instance_data['instance_id']
 
-    def redo(self):
-        from services.screen_data_service import screen_service
-
+    def redo(self) -> None:
         screen_service._perform_remove_child(self.parent_id, self.instance_id)
 
-    def undo(self):
-        from services.screen_data_service import screen_service
-
+    def undo(self) -> None:
         screen_service._perform_add_child(self.parent_id, self.instance_data)
 
-    def _notify(self):
-        from services.screen_data_service import screen_service
-
+    def notify(self) -> None:
         screen_service.screen_modified.emit(self.parent_id)
 
 # MODIFIED: Re-added the missing MoveChildCommand
 class MoveChildCommand(Command):
-    def __init__(self, parent_id, instance_id, new_pos, old_pos):
+    """Moves a child to a new position; undo restores the previous position."""
+
+    def __init__(self, parent_id: str, instance_id: Any, new_pos: Dict[str, Any], old_pos: Dict[str, Any]):
         super().__init__()
-        self.parent_id = parent_id
-        self.instance_id = instance_id
-        self.new_pos = copy.deepcopy(new_pos)
-        self.old_pos = copy.deepcopy(old_pos)
+        self.parent_id: str = parent_id
+        self.instance_id: Any = instance_id
+        # Shallow copies are sufficient for simple position dicts
+        self.new_pos: Dict[str, Any] = dict(new_pos)
+        self.old_pos: Dict[str, Any] = dict(old_pos)
 
-    def redo(self):
-        from services.screen_data_service import screen_service
-
+    def redo(self) -> None:
         screen_service._perform_update_child_position(
             self.parent_id,
             self.instance_id,
             self.new_pos,
         )
 
-    def undo(self):
-        from services.screen_data_service import screen_service
-
+    def undo(self) -> None:
         screen_service._perform_update_child_position(
             self.parent_id,
             self.instance_id,
             self.old_pos,
         )
 
-    def _notify(self):
-        from services.screen_data_service import screen_service
-
+    def notify(self) -> None:
         screen_service.screen_modified.emit(self.parent_id)
 
 class BulkMoveChildCommand(Command):
-    def __init__(self, parent_id, move_list):
-        super().__init__()
-        self.parent_id = parent_id
-        # move_list is a list of tuples: (instance_id, new_pos, old_pos)
-        self.move_list = copy.deepcopy(move_list)
+    """Moves multiple children; undo restores their previous positions."""
 
-    def redo(self):
-        from services.screen_data_service import screen_service
+    def __init__(self, parent_id: str, move_list: List[Tuple[Any, Dict[str, Any], Dict[str, Any]]]):
+        super().__init__()
+        self.parent_id: str = parent_id
+        # Shallow copies for simple position dicts to avoid unnecessary deep clones
+        self.move_list: List[Tuple[Any, Dict[str, Any], Dict[str, Any]]] = [
+            (iid, dict(new_pos), dict(old_pos)) for iid, new_pos, old_pos in move_list
+        ]
+
+    def redo(self) -> None:
         for instance_id, new_pos, _ in self.move_list:
             screen_service._perform_update_child_position(
                 self.parent_id,
@@ -216,8 +220,7 @@ class BulkMoveChildCommand(Command):
                 new_pos,
             )
 
-    def undo(self):
-        from services.screen_data_service import screen_service
+    def undo(self) -> None:
         for instance_id, _, old_pos in self.move_list:
             screen_service._perform_update_child_position(
                 self.parent_id,
@@ -225,49 +228,45 @@ class BulkMoveChildCommand(Command):
                 old_pos,
             )
 
-    def _notify(self):
-        from services.screen_data_service import screen_service
+    def notify(self) -> None:
         screen_service.screen_modified.emit(self.parent_id)
 
 class UpdateChildPropertiesCommand(Command):
-    def __init__(self, screen_id, instance_id, new_props, old_props):
+    """Updates properties of a child instance; undo restores previous props."""
+
+    def __init__(self, screen_id: str, instance_id: Any, new_props: Dict[str, Any], old_props: Dict[str, Any]):
         super().__init__()
-        self.screen_id = screen_id
-        self.instance_id = instance_id
-        self.new_props = copy.deepcopy(new_props)
-        self.old_props = copy.deepcopy(old_props)
+        self.screen_id: str = screen_id
+        self.instance_id: Any = instance_id
+        self.new_props: Dict[str, Any] = copy.deepcopy(new_props)
+        self.old_props: Dict[str, Any] = copy.deepcopy(old_props)
 
-    def redo(self):
-        from services.screen_data_service import screen_service
-
+    def redo(self) -> None:
         screen_service._perform_update_child_properties(
             self.screen_id,
             self.instance_id,
             self.new_props,
         )
 
-    def undo(self):
-        from services.screen_data_service import screen_service
-
+    def undo(self) -> None:
         screen_service._perform_update_child_properties(
             self.screen_id,
             self.instance_id,
             self.old_props,
         )
 
-    def _notify(self):
-        from services.screen_data_service import screen_service
-
+    def notify(self) -> None:
         screen_service.screen_modified.emit(self.screen_id)
 
 class BulkUpdateChildPropertiesCommand(Command):
-    def __init__(self, screen_id, update_list):
-        super().__init__()
-        self.screen_id = screen_id
-        self.update_list = copy.deepcopy(update_list)
+    """Applies multiple child property updates; undo restores old properties."""
 
-    def redo(self):
-        from services.screen_data_service import screen_service
+    def __init__(self, screen_id: str, update_list: List[Tuple[Any, Dict[str, Any], Dict[str, Any]]]):
+        super().__init__()
+        self.screen_id: str = screen_id
+        self.update_list: List[Tuple[Any, Dict[str, Any], Dict[str, Any]]] = copy.deepcopy(update_list)
+
+    def redo(self) -> None:
         for instance_id, new_props, _ in self.update_list:
             screen_service._perform_update_child_properties(
                 self.screen_id,
@@ -275,8 +274,7 @@ class BulkUpdateChildPropertiesCommand(Command):
                 new_props,
             )
 
-    def undo(self):
-        from services.screen_data_service import screen_service
+    def undo(self) -> None:
         for instance_id, _, old_props in self.update_list:
             screen_service._perform_update_child_properties(
                 self.screen_id,
@@ -284,361 +282,317 @@ class BulkUpdateChildPropertiesCommand(Command):
                 old_props,
             )
 
-    def _notify(self):
-        from services.screen_data_service import screen_service
+    def notify(self) -> None:
         screen_service.screen_modified.emit(self.screen_id)
 
 
 class AddAnchorCommand(Command):
-    def __init__(self, screen_id, instance_id, index, point, props):
+    """Inserts an anchor point into a polygon-like child's points array."""
+
+    def __init__(self, screen_id: str, instance_id: Any, index: int, point: Dict[str, Any], props: Dict[str, Any]):
         super().__init__()
-        self.screen_id = screen_id
-        self.instance_id = instance_id
-        self.index = index
-        self.old_props = copy.deepcopy(props)
-        self.new_props = copy.deepcopy(props)
+        self.screen_id: str = screen_id
+        self.instance_id: Any = instance_id
+        self.index: int = index
+        self.old_props: Dict[str, Any] = copy.deepcopy(props)
+        self.new_props: Dict[str, Any] = copy.deepcopy(props)
         pts = self.new_props.get('points', [])
         pts.insert(index, copy.deepcopy(point))
         self.new_props['points'] = pts
 
-    def redo(self):
-        from services.screen_data_service import screen_service
+    def redo(self) -> None:
         screen_service._perform_update_child_properties(
             self.screen_id,
             self.instance_id,
             self.new_props,
         )
 
-    def undo(self):
-        from services.screen_data_service import screen_service
+    def undo(self) -> None:
         screen_service._perform_update_child_properties(
             self.screen_id,
             self.instance_id,
             self.old_props,
         )
 
-    def _notify(self):
-        from services.screen_data_service import screen_service
+    def notify(self) -> None:
         screen_service.screen_modified.emit(self.screen_id)
 
 
 class RemoveAnchorCommand(Command):
-    def __init__(self, screen_id, instance_id, index, props):
+    """Removes an anchor point at the given index from a points array."""
+
+    def __init__(self, screen_id: str, instance_id: Any, index: int, props: Dict[str, Any]):
         super().__init__()
-        self.screen_id = screen_id
-        self.instance_id = instance_id
-        self.index = index
-        self.old_props = copy.deepcopy(props)
-        self.new_props = copy.deepcopy(props)
+        self.screen_id: str = screen_id
+        self.instance_id: Any = instance_id
+        self.index: int = index
+        self.old_props: Dict[str, Any] = copy.deepcopy(props)
+        self.new_props: Dict[str, Any] = copy.deepcopy(props)
         pts = self.new_props.get('points', [])
         if 0 <= index < len(pts):
             pts.pop(index)
         self.new_props['points'] = pts
 
-    def redo(self):
-        from services.screen_data_service import screen_service
+    def redo(self) -> None:
         screen_service._perform_update_child_properties(
             self.screen_id,
             self.instance_id,
             self.new_props,
         )
 
-    def undo(self):
-        from services.screen_data_service import screen_service
+    def undo(self) -> None:
         screen_service._perform_update_child_properties(
             self.screen_id,
             self.instance_id,
             self.old_props,
         )
 
-    def _notify(self):
-        from services.screen_data_service import screen_service
+    def notify(self) -> None:
         screen_service.screen_modified.emit(self.screen_id)
 
 
 class MoveAnchorCommand(Command):
-    def __init__(self, screen_id, instance_id, index, point, props):
+    """Moves an existing anchor point to a new position."""
+
+    def __init__(self, screen_id: str, instance_id: Any, index: int, point: Dict[str, Any], props: Dict[str, Any]):
         super().__init__()
-        self.screen_id = screen_id
-        self.instance_id = instance_id
-        self.index = index
-        self.old_props = copy.deepcopy(props)
-        self.new_props = copy.deepcopy(props)
+        self.screen_id: str = screen_id
+        self.instance_id: Any = instance_id
+        self.index: int = index
+        self.old_props: Dict[str, Any] = copy.deepcopy(props)
+        self.new_props: Dict[str, Any] = copy.deepcopy(props)
         pts = self.new_props.get('points', [])
         if 0 <= index < len(pts):
             pts[index] = copy.deepcopy(point)
         self.new_props['points'] = pts
 
-    def redo(self):
-        from services.screen_data_service import screen_service
+    def redo(self) -> None:
         screen_service._perform_update_child_properties(
             self.screen_id,
             self.instance_id,
             self.new_props,
         )
 
-    def undo(self):
-        from services.screen_data_service import screen_service
+    def undo(self) -> None:
         screen_service._perform_update_child_properties(
             self.screen_id,
             self.instance_id,
             self.old_props,
         )
 
-    def _notify(self):
-        from services.screen_data_service import screen_service
+    def notify(self) -> None:
         screen_service.screen_modified.emit(self.screen_id)
 
 # --- Comment Group Commands ---
 class AddCommentGroupCommand(Command):
-    def __init__(self, group_data, group_id=None):
+    """Adds a new comment group."""
+
+    def __init__(self, group_data: Dict[str, Any], group_id: Optional[str] = None):
         super().__init__()
-        self.group_data = copy.deepcopy(group_data)
-        self.group_id = group_id
+        self.group_data: Dict[str, Any] = copy.deepcopy(group_data)
+        self.group_id: Optional[str] = group_id
 
-    def redo(self):
-        from services.comment_data_service import comment_data_service
-
+    def redo(self) -> None:
         self.group_id = comment_data_service._perform_add_group(
             self.group_data,
             self.group_id,
         )
         self.group_data['id'] = self.group_id
 
-    def undo(self):
-        from services.comment_data_service import comment_data_service
-
+    def undo(self) -> None:
         if self.group_id:
             comment_data_service._perform_remove_group(self.group_id)
 
-    def _notify(self):
-        from services.comment_data_service import comment_data_service
-
+    def notify(self) -> None:
         comment_data_service.comment_group_list_changed.emit()
 
 class RemoveCommentGroupCommand(Command):
-    def __init__(self, group_id):
-        from services.comment_data_service import comment_data_service
+    """Removes an existing comment group; undo re-adds it."""
 
+    def __init__(self, group_id: str):
         super().__init__()
-        self.group_id = group_id
-        self.group_data = copy.deepcopy(comment_data_service.get_group(group_id))
+        self.group_id: str = group_id
+        self.group_data: Optional[Dict[str, Any]] = copy.deepcopy(
+            comment_data_service.get_group(group_id)
+        )
 
-    def redo(self):
-        from services.comment_data_service import comment_data_service
-
+    def redo(self) -> None:
         comment_data_service._perform_remove_group(self.group_id)
 
-    def undo(self):
-        from services.comment_data_service import comment_data_service
-
+    def undo(self) -> None:
         if self.group_data:
             comment_data_service._perform_add_group(self.group_data, self.group_id)
 
-    def _notify(self):
-        from services.comment_data_service import comment_data_service
-
+    def notify(self) -> None:
         comment_data_service.comment_group_list_changed.emit()
 
 class RenameCommentGroupCommand(Command):
-    def __init__(self, group_id, new_name, new_number, old_name, old_number):
+    """Renames a comment group and updates its number; undo restores previous."""
+
+    def __init__(self, group_id: str, new_name: str, new_number: Any, old_name: str, old_number: Any):
         super().__init__()
-        self.group_id = group_id
-        self.new_name = new_name
-        self.new_number = new_number
-        self.old_name = old_name
-        self.old_number = old_number
+        self.group_id: str = group_id
+        self.new_name: str = new_name
+        self.new_number: Any = new_number
+        self.old_name: str = old_name
+        self.old_number: Any = old_number
 
-    def redo(self):
-        from services.comment_data_service import comment_data_service
-
+    def redo(self) -> None:
         comment_data_service._perform_rename_group(
             self.group_id,
             self.new_name,
             self.new_number,
         )
 
-    def undo(self):
-        from services.comment_data_service import comment_data_service
-
+    def undo(self) -> None:
         comment_data_service._perform_rename_group(
             self.group_id,
             self.old_name,
             self.old_number,
         )
 
-    def _notify(self):
-        from services.comment_data_service import comment_data_service
-
+    def notify(self) -> None:
         comment_data_service.comment_group_list_changed.emit()
 
 # --- Tag Database Commands ---
 class AddTagDatabaseCommand(Command):
-    def __init__(self, db_data, db_id=None):
+    """Adds a new tag database; undo removes it."""
+
+    def __init__(self, db_data: Dict[str, Any], db_id: Optional[str] = None):
         super().__init__()
-        self.db_data = copy.deepcopy(db_data)
-        self.db_id = db_id
+        self.db_data: Dict[str, Any] = copy.deepcopy(db_data)
+        self.db_id: Optional[str] = db_id
 
-    def redo(self):
-        from services.tag_data_service import tag_data_service
-
+    def redo(self) -> None:
         self.db_id = tag_data_service._perform_add_tag_database(
             self.db_data,
             self.db_id,
         )
         self.db_data['id'] = self.db_id
 
-    def undo(self):
-        from services.tag_data_service import tag_data_service
-
+    def undo(self) -> None:
         if self.db_id:
             tag_data_service._perform_remove_tag_database(self.db_id)
 
-    def _notify(self):
-        from services.tag_data_service import tag_data_service
-
+    def notify(self) -> None:
         tag_data_service.database_list_changed.emit()
 
 class RemoveTagDatabaseCommand(Command):
-    def __init__(self, db_id):
-        from services.tag_data_service import tag_data_service
+    """Removes a tag database; undo re-adds it."""
 
+    def __init__(self, db_id: str):
         super().__init__()
-        self.db_id = db_id
-        self.db_data = copy.deepcopy(tag_data_service.get_tag_database(db_id))
+        self.db_id: str = db_id
+        self.db_data: Optional[Dict[str, Any]] = copy.deepcopy(
+            tag_data_service.get_tag_database(db_id)
+        )
 
-    def redo(self):
-        from services.tag_data_service import tag_data_service
-
+    def redo(self) -> None:
         tag_data_service._perform_remove_tag_database(self.db_id)
 
-    def undo(self):
-        from services.tag_data_service import tag_data_service
-
+    def undo(self) -> None:
         if self.db_data:
             tag_data_service._perform_add_tag_database(self.db_data, self.db_id)
 
-    def _notify(self):
-        from services.tag_data_service import tag_data_service
-
+    def notify(self) -> None:
         tag_data_service.database_list_changed.emit()
 
 class RenameTagDatabaseCommand(Command):
-    def __init__(self, db_id, new_name, old_name):
+    """Renames a tag database; undo restores previous name."""
+
+    def __init__(self, db_id: str, new_name: str, old_name: str):
         super().__init__()
-        self.db_id = db_id
-        self.new_name = new_name
-        self.old_name = old_name
+        self.db_id: str = db_id
+        self.new_name: str = new_name
+        self.old_name: str = old_name
 
-    def redo(self):
-        from services.tag_data_service import tag_data_service
-
+    def redo(self) -> None:
         tag_data_service._perform_rename_tag_database(self.db_id, self.new_name)
 
-    def undo(self):
-        from services.tag_data_service import tag_data_service
-
+    def undo(self) -> None:
         tag_data_service._perform_rename_tag_database(self.db_id, self.old_name)
 
-    def _notify(self):
-        from services.tag_data_service import tag_data_service
-
+    def notify(self) -> None:
         tag_data_service.database_list_changed.emit()
 
 # --- Tag Commands ---
 class AddTagCommand(Command):
-    def __init__(self, db_id, tag_data):
+    """Adds a tag to a database; undo removes it."""
+
+    def __init__(self, db_id: str, tag_data: Dict[str, Any]):
         super().__init__()
-        self.db_id = db_id
-        self.tag_data = copy.deepcopy(tag_data)
+        self.db_id: str = db_id
+        self.tag_data: Dict[str, Any] = copy.deepcopy(tag_data)
 
-    def redo(self):
-        from services.tag_data_service import tag_data_service
-
+    def redo(self) -> None:
         tag_data_service._perform_add_tag(self.db_id, self.tag_data)
 
-    def undo(self):
-        from services.tag_data_service import tag_data_service
-
+    def undo(self) -> None:
         tag_data_service._perform_remove_tag(self.db_id, self.tag_data['name'])
 
-    def _notify(self):
-        from services.tag_data_service import tag_data_service
-
+    def notify(self) -> None:
         tag_data_service.tags_changed.emit()
         
 class BulkAddTagsCommand(Command):
-    def __init__(self, db_id, tags_data):
+    """Adds multiple tags; undo removes them."""
+
+    def __init__(self, db_id: str, tags_data: List[Dict[str, Any]]):
         super().__init__()
-        self.db_id = db_id
-        self.tags_data = copy.deepcopy(tags_data)
+        self.db_id: str = db_id
+        self.tags_data: List[Dict[str, Any]] = copy.deepcopy(tags_data)
 
-    def redo(self):
-        from services.tag_data_service import tag_data_service
-
+    def redo(self) -> None:
         for tag_data in self.tags_data:
             tag_data_service._perform_add_tag(self.db_id, tag_data)
 
-    def undo(self):
-        from services.tag_data_service import tag_data_service
-
+    def undo(self) -> None:
         for tag_data in self.tags_data:
             tag_data_service._perform_remove_tag(self.db_id, tag_data['name'])
 
-    def _notify(self):
-        from services.tag_data_service import tag_data_service
-
+    def notify(self) -> None:
         tag_data_service.tags_changed.emit()
 
 class RemoveTagCommand(Command):
-    def __init__(self, db_id, tag_name):
-        from services.tag_data_service import tag_data_service
+    """Removes a tag; undo re-adds it."""
 
+    def __init__(self, db_id: str, tag_name: str):
         super().__init__()
-        self.db_id = db_id
-        self.tag_name = tag_name
-        self.tag_data = copy.deepcopy(tag_data_service.get_tag(db_id, tag_name))
+        self.db_id: str = db_id
+        self.tag_name: str = tag_name
+        self.tag_data: Optional[Dict[str, Any]] = copy.deepcopy(
+            tag_data_service.get_tag(db_id, tag_name)
+        )
 
-    def redo(self):
-        from services.tag_data_service import tag_data_service
-
+    def redo(self) -> None:
         tag_data_service._perform_remove_tag(self.db_id, self.tag_name)
 
-    def undo(self):
-        from services.tag_data_service import tag_data_service
-
+    def undo(self) -> None:
         if self.tag_data:
             tag_data_service._perform_add_tag(self.db_id, self.tag_data)
 
-    def _notify(self):
-        from services.tag_data_service import tag_data_service
-
+    def notify(self) -> None:
         tag_data_service.tags_changed.emit()
 
 class UpdateTagCommand(Command):
-    def __init__(self, db_id, original_tag_name, new_tag_data):
-        from services.tag_data_service import tag_data_service
+    """Updates a tag's data; undo restores the previous tag data."""
 
+    def __init__(self, db_id: str, original_tag_name: str, new_tag_data: Dict[str, Any]):
         super().__init__()
-        self.db_id = db_id
-        self.original_tag_name = original_tag_name
-        self.new_tag_data = copy.deepcopy(new_tag_data)
-        self.old_tag_data = copy.deepcopy(
+        self.db_id: str = db_id
+        self.original_tag_name: str = original_tag_name
+        self.new_tag_data: Dict[str, Any] = copy.deepcopy(new_tag_data)
+        self.old_tag_data: Optional[Dict[str, Any]] = copy.deepcopy(
             tag_data_service.get_tag(db_id, original_tag_name)
         )
 
-    def redo(self):
-        from services.tag_data_service import tag_data_service
-
+    def redo(self) -> None:
         tag_data_service._perform_update_tag(
             self.db_id,
             self.original_tag_name,
             self.new_tag_data,
         )
 
-    def undo(self):
-        from services.tag_data_service import tag_data_service
-
+    def undo(self) -> None:
         if self.old_tag_data:
             tag_data_service._perform_update_tag(
                 self.db_id,
@@ -646,23 +600,21 @@ class UpdateTagCommand(Command):
                 self.old_tag_data,
             )
 
-    def _notify(self):
-        from services.tag_data_service import tag_data_service
-
+    def notify(self) -> None:
         tag_data_service.tags_changed.emit()
 
 class UpdateTagValueCommand(Command):
-    def __init__(self, db_id, tag_name, indices, new_value, old_value):
+    """Updates a single element value in a tag array; undo restores it."""
+
+    def __init__(self, db_id: str, tag_name: str, indices: List[int], new_value: Any, old_value: Any):
         super().__init__()
-        self.db_id = db_id
-        self.tag_name = tag_name
-        self.indices = indices
-        self.new_value = new_value
-        self.old_value = old_value
+        self.db_id: str = db_id
+        self.tag_name: str = tag_name
+        self.indices: List[int] = indices
+        self.new_value: Any = new_value
+        self.old_value: Any = old_value
 
-    def redo(self):
-        from services.tag_data_service import tag_data_service
-
+    def redo(self) -> None:
         tag_data_service._perform_update_tag_element_value(
             self.db_id,
             self.tag_name,
@@ -670,9 +622,7 @@ class UpdateTagValueCommand(Command):
             self.new_value,
         )
 
-    def undo(self):
-        from services.tag_data_service import tag_data_service
-
+    def undo(self) -> None:
         tag_data_service._perform_update_tag_element_value(
             self.db_id,
             self.tag_name,
@@ -680,69 +630,74 @@ class UpdateTagValueCommand(Command):
             self.old_value,
         )
 
-    def _notify(self):
-        from services.tag_data_service import tag_data_service
-
+    def notify(self) -> None:
         tag_data_service.tags_changed.emit()
 
 # --- Comment Table Commands ---
 class UpdateCommentCellCommand(Command):
-    def __init__(self, model, row, col, new_value, old_value, notify):
-        super().__init__()
-        self.model = model
-        self.row = row
-        self.col = col
-        self.new_value = new_value
-        self.old_value = old_value
-        self.notify = notify
+    """Updates a single cell in the comment table model."""
 
-    def redo(self):
+    def __init__(self, model: Any, row: int, col: int, new_value: Any, old_value: Any, notify: Optional[Callable[[], None]]):
+        super().__init__()
+        self.model: Any = model
+        self.row: int = row
+        self.col: int = col
+        self.new_value: Any = new_value
+        self.old_value: Any = old_value
+        self._notify_cb: Optional[Callable[[], None]] = notify
+
+    def redo(self) -> None:
         self.model._suspend_history = True
         self.model.setData(self.model.index(self.row, self.col), self.new_value)
         self.model._suspend_history = False
 
-    def undo(self):
+    def undo(self) -> None:
         self.model._suspend_history = True
         self.model.setData(self.model.index(self.row, self.col), self.old_value)
         self.model._suspend_history = False
 
-    def _notify(self):
-        if self.notify:
-            self.notify()
+    def notify(self) -> None:
+        if self._notify_cb:
+            self._notify_cb()
 
 class UpdateCommentFormatCommand(Command):
-    def __init__(self, model, row, col, new_fmt, old_fmt, notify):
-        super().__init__()
-        self.model = model
-        self.row = row
-        self.col = col
-        self.new_fmt = copy.deepcopy(new_fmt)
-        self.old_fmt = copy.deepcopy(old_fmt)
-        self.notify = notify
+    """Updates the format payload for a comment table cell."""
 
-    def redo(self):
+    def __init__(self, model: Any, row: int, col: int, new_fmt: Dict[str, Any], old_fmt: Dict[str, Any], notify: Optional[Callable[[], None]]):
+        super().__init__()
+        self.model: Any = model
+        self.row: int = row
+        self.col: int = col
+        self.new_fmt: Dict[str, Any] = copy.deepcopy(new_fmt)
+        self.old_fmt: Dict[str, Any] = copy.deepcopy(old_fmt)
+        self._notify_cb: Optional[Callable[[], None]] = notify
+
+        
+    def redo(self) -> None:
         self.model._suspend_history = True
         self.model.set_cell_format(self.row, self.col, self.new_fmt)
         self.model._suspend_history = False
 
-    def undo(self):
+    def undo(self) -> None:
         self.model._suspend_history = True
         self.model.set_cell_format(self.row, self.col, self.old_fmt)
         self.model._suspend_history = False
 
-    def _notify(self):
-        if self.notify:
-            self.notify()
+    def notify(self) -> None:
+        if self._notify_cb:
+            self._notify_cb()
 
 class InsertCommentRowCommand(Command):
-    def __init__(self, model, row, values, notify):
-        super().__init__()
-        self.model = model
-        self.row = row
-        self.values = copy.deepcopy(values)
-        self.notify = notify
+    """Inserts a row with provided values into the comment table."""
 
-    def redo(self):
+    def __init__(self, model: Any, row: int, values: List[Dict[str, Any]], notify: Optional[Callable[[], None]]):
+        super().__init__()
+        self.model: Any = model
+        self.row: int = row
+        self.values: List[Dict[str, Any]] = copy.deepcopy(values)
+        self._notify_cb: Optional[Callable[[], None]] = notify
+
+    def redo(self) -> None:
         self.model._suspend_history = True
         self.model.insertRow(self.row)
         for c, cell in enumerate(self.values, start=1):
@@ -752,30 +707,32 @@ class InsertCommentRowCommand(Command):
                 self.model.set_cell_format(self.row, c, fmt)
         self.model._suspend_history = False
 
-    def undo(self):
+    def undo(self) -> None:
         self.model._suspend_history = True
         self.model.removeRow(self.row)
         self.model._suspend_history = False
 
-    def _notify(self):
-        if self.notify:
-            self.notify()
+    def notify(self) -> None:
+        if self._notify_cb:
+            self._notify_cb()
 
 class RemoveCommentRowsCommand(Command):
-    def __init__(self, model, rows, rows_data, notify):
-        super().__init__()
-        self.model = model
-        self.rows = rows
-        self.rows_data = copy.deepcopy(rows_data)
-        self.notify = notify
+    """Removes multiple rows from the comment table; undo re-inserts them."""
 
-    def redo(self):
+    def __init__(self, model: Any, rows: List[int], rows_data: List[List[Dict[str, Any]]], notify: Optional[Callable[[], None]]):
+        super().__init__()
+        self.model: Any = model
+        self.rows: List[int] = rows
+        self.rows_data: List[List[Dict[str, Any]]] = copy.deepcopy(rows_data)
+        self._notify_cb: Optional[Callable[[], None]] = notify
+
+    def redo(self) -> None:
         self.model._suspend_history = True
         for r in sorted(self.rows, reverse=True):
             self.model.removeRow(r)
         self.model._suspend_history = False
 
-    def undo(self):
+    def undo(self) -> None:
         self.model._suspend_history = True
         for r, data in sorted(zip(self.rows, self.rows_data)):
             self.model.insertRow(r)
@@ -786,22 +743,22 @@ class RemoveCommentRowsCommand(Command):
                     self.model.set_cell_format(r, c, fmt)
         self.model._suspend_history = False
 
-    def _notify(self):
-        if self.notify:
-            self.notify()
+    def notify(self) -> None:
+        if self._notify_cb:
+            self._notify_cb()
 
 class InsertCommentColumnCommand(Command):
-    def __init__(self, model, column, header, columns_list, notify):
+    """Inserts a column into the comment table and updates headers list."""
+
+    def __init__(self, model: Any, column: int, header: str, columns_list: List[str], notify: Optional[Callable[[], None]]):
         super().__init__()
-        self.model = model
-        self.column = column
-        self.header = header
-        self.columns_list = columns_list
-        self.notify = notify
+        self.model: Any = model
+        self.column: int = column
+        self.header: str = header
+        self.columns_list: List[str] = columns_list
+        self._notify_cb: Optional[Callable[[], None]] = notify
 
-    def redo(self):
-        from PyQt6.QtCore import Qt
-
+    def redo(self) -> None:
         self.model._suspend_history = True
         self.model.insertColumn(self.column)
         self.model.setHeaderData(
@@ -812,35 +769,35 @@ class InsertCommentColumnCommand(Command):
         self.model._suspend_history = False
         self.columns_list.insert(self.column - 1, self.header)
 
-    def undo(self):
+    def undo(self) -> None:
         self.model._suspend_history = True
         self.model.removeColumn(self.column)
         self.model._suspend_history = False
         self.columns_list.pop(self.column - 1)
 
-    def _notify(self):
-        if self.notify:
-            self.notify()
+    def notify(self) -> None:
+        if self._notify_cb:
+            self._notify_cb()
 
 class RemoveCommentColumnCommand(Command):
-    def __init__(self, model, column, header, column_data, columns_list, notify):
-        super().__init__()
-        self.model = model
-        self.column = column
-        self.header = header
-        self.column_data = copy.deepcopy(column_data)
-        self.columns_list = columns_list
-        self.notify = notify
+    """Removes a column from the comment table; undo re-inserts it with data."""
 
-    def redo(self):
+    def __init__(self, model: Any, column: int, header: str, column_data: List[Dict[str, Any]], columns_list: List[str], notify: Optional[Callable[[], None]]):
+        super().__init__()
+        self.model: Any = model
+        self.column: int = column
+        self.header: str = header
+        self.column_data: List[Dict[str, Any]] = copy.deepcopy(column_data)
+        self.columns_list: List[str] = columns_list
+        self._notify_cb: Optional[Callable[[], None]] = notify
+
+    def redo(self) -> None:
         self.model._suspend_history = True
         self.model.removeColumn(self.column)
         self.model._suspend_history = False
         self.columns_list.pop(self.column - 1)
 
-    def undo(self):
-        from PyQt6.QtCore import Qt
-
+    def undo(self) -> None:
         self.model._suspend_history = True
         self.model.insertColumn(self.column)
         self.model.setHeaderData(
@@ -859,29 +816,31 @@ class RemoveCommentColumnCommand(Command):
         self.model._suspend_history = False
         self.columns_list.insert(self.column - 1, self.header)
 
-    def _notify(self):
-        if self.notify:
-            self.notify()
+    def notify(self) -> None:
+        if self._notify_cb:
+            self._notify_cb()
 
 class BulkUpdateCellsCommand(Command):
-    def __init__(self, model, updates, notify):
-        super().__init__()
-        self.model = model
-        self.updates = updates
-        self.notify = notify
+    """Applies multiple cell value updates in the comment table."""
 
-    def redo(self):
+    def __init__(self, model: Any, updates: List[Tuple[int, int, Any, Any]], notify: Optional[Callable[[], None]]):
+        super().__init__()
+        self.model: Any = model
+        self.updates: List[Tuple[int, int, Any, Any]] = updates
+        self._notify_cb: Optional[Callable[[], None]] = notify
+
+    def redo(self) -> None:
         self.model._suspend_history = True
         for row, col, new_val, _ in self.updates:
             self.model.setData(self.model.index(row, col), new_val)
         self.model._suspend_history = False
 
-    def undo(self):
+    def undo(self) -> None:
         self.model._suspend_history = True
         for row, col, _, old_val in self.updates:
             self.model.setData(self.model.index(row, col), old_val)
         self.model._suspend_history = False
 
-    def _notify(self):
-        if self.notify:
-            self.notify()
+    def notify(self) -> None:
+        if self._notify_cb:
+            self._notify_cb()

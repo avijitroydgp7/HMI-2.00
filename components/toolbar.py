@@ -6,6 +6,106 @@ from PyQt6.QtGui import QAction, QActionGroup, QKeySequence
 from utils.icon_manager import IconManager
 from utils import constants
 
+def build_actions(actions_config, toolbar: QToolBar, group: QActionGroup | None = None):
+    """Build QActions from a configuration and add them to a toolbar.
+
+    Supports both a flat list of action dicts or a list of lists to create
+    grouped actions with separators between groups.
+
+    Each action config may include:
+    - name: Text label for the action (required)
+    - icon: qtawesome icon name (required)
+    - animated: Use animated icon helper (bool, default False)
+    - id: Arbitrary data stored via action.setData
+    - shortcut: Shortcut string (e.g., "Ctrl+T")
+    - standard_shortcut: QKeySequence.StandardKey for platform-specific text
+    - apply_shortcut: Whether to apply the shortcut to the action (default True)
+    - checkable: Whether the action is checkable (default True if group provided)
+    - checked: Initial checked state (bool)
+    - triggered: Optional callable connected to action.triggered
+
+    Returns a flat list of created QActions in creation order.
+    """
+
+    def _process_group(items):
+        created = []
+        icon_sz = toolbar.iconSize().width()
+        for cfg in items:
+            if isinstance(cfg, dict) and cfg.get("separator", False):
+                toolbar.addSeparator()
+                continue
+
+            name = cfg.get("name", "")
+            icon_name = cfg.get("icon")
+            if not icon_name:
+                continue
+
+            if cfg.get("animated", False):
+                anim = IconManager.create_animated_icon(icon_name, size=icon_sz)
+                action = QAction(anim.icon, name, toolbar)
+                anim.add_target(action)
+                # Keep a reference to prevent GC
+                action._animated_icon = anim  # type: ignore[attr-defined]
+            else:
+                action = QAction(IconManager.create_icon(icon_name, size=icon_sz), name, toolbar)
+
+            # Shortcut handling and tooltip text
+            apply_shortcut = cfg.get("apply_shortcut", True)
+            shortcut_text = cfg.get("tooltip_shortcut_text")
+            std_key = cfg.get("standard_shortcut")
+            shortcut = cfg.get("shortcut")
+
+            if apply_shortcut:
+                if shortcut:
+                    action.setShortcut(shortcut)
+                elif std_key is not None:
+                    action.setShortcut(QKeySequence(std_key))
+
+            if shortcut_text is None:
+                if shortcut:
+                    shortcut_text = shortcut
+                elif std_key is not None:
+                    shortcut_text = QKeySequence(std_key).toString()
+
+            if shortcut_text:
+                action.setToolTip(f"{name} ({shortcut_text})")
+            else:
+                action.setToolTip(name)
+
+            # Checkable state
+            checkable_default = group is not None
+            if cfg.get("checkable", checkable_default):
+                action.setCheckable(True)
+                if cfg.get("checked", False):
+                    action.setChecked(True)
+
+            # Data payload
+            if "id" in cfg:
+                action.setData(cfg["id"])
+
+            # Optional per-action signal wiring
+            on_triggered = cfg.get("triggered")
+            if callable(on_triggered):
+                action.triggered.connect(on_triggered)
+
+            # Add to group and toolbar
+            if group is not None:
+                group.addAction(action)
+            toolbar.addAction(action)
+            created.append(action)
+        return created
+
+    created_actions: list[QAction] = []
+    if isinstance(actions_config, list) and actions_config and isinstance(actions_config[0], list):
+        for i, grp in enumerate(actions_config):
+            created_actions.extend(_process_group(grp))
+            if i < len(actions_config) - 1:
+                toolbar.addSeparator()
+    else:
+        created_actions.extend(_process_group(actions_config or []))
+
+    return created_actions
+
 class QuickAccessToolBar(QToolBar):
     """A customizable toolbar for frequently used actions, typically at the top
     of the window."""
@@ -16,30 +116,34 @@ class QuickAccessToolBar(QToolBar):
         self.setMovable(True)
         self.setIconSize(QSize(20, 20))
 
-        icon_sz = self.iconSize().width()
-        self.new_icon = IconManager.create_animated_icon('fa5s.file', size=icon_sz)
-        self.new_action = QAction(self.new_icon.icon, "New", self)
-        self.new_icon.add_target(self.new_action)
-        self.new_action._animated_icon = self.new_icon
         # Do not set shortcuts here to avoid duplicates with Ribbon actions
-        new_sc_text = QKeySequence(QKeySequence.StandardKey.New).toString()
-        self.new_action.setToolTip(f"New ({new_sc_text})")
-        self.open_icon = IconManager.create_animated_icon('fa5s.folder-open', size=icon_sz)
-        self.open_action = QAction(self.open_icon.icon, "Open", self)
-        self.open_icon.add_target(self.open_action)
-        self.open_action._animated_icon = self.open_icon
-        open_sc_text = QKeySequence(QKeySequence.StandardKey.Open).toString()
-        self.open_action.setToolTip(f"Open ({open_sc_text})")
-        self.save_icon = IconManager.create_animated_icon('fa5s.save', size=icon_sz)
-        self.save_action = QAction(self.save_icon.icon, "Save", self)
-        self.save_icon.add_target(self.save_action)
-        self.save_action._animated_icon = self.save_icon
-        save_sc_text = QKeySequence(QKeySequence.StandardKey.Save).toString()
-        self.save_action.setToolTip(f"Save ({save_sc_text})")
+        qa_config = [
+            {
+                "name": "New",
+                "icon": "fa5s.file",
+                "animated": True,
+                "standard_shortcut": QKeySequence.StandardKey.New,
+                "apply_shortcut": False,
+            },
+            {
+                "name": "Open",
+                "icon": "fa5s.folder-open",
+                "animated": True,
+                "standard_shortcut": QKeySequence.StandardKey.Open,
+                "apply_shortcut": False,
+            },
+            {
+                "name": "Save",
+                "icon": "fa5s.save",
+                "animated": True,
+                "standard_shortcut": QKeySequence.StandardKey.Save,
+                "apply_shortcut": False,
+            },
+        ]
 
-        self.addAction(self.new_action)
-        self.addAction(self.open_action)
-        self.addAction(self.save_action)
+        actions = build_actions(qa_config, self)
+        # Keep explicit handles used elsewhere in the app
+        self.new_action, self.open_action, self.save_action = actions
         self.addSeparator()
 
     def add_clipboard_actions(self, cut_action, copy_action, paste_action):
@@ -87,16 +191,7 @@ class ToolsToolbar(QToolBar):
             {"id": constants.ToolType.BUTTON, "name": "Button Tool", "icon": "mdi.gesture-tap-box", "shortcut": "B", "checked": False},
         ]
 
-        icon_sz = self.iconSize().width()
-        for tool in tools:
-            action = QAction(IconManager.create_icon(tool["icon"], size=icon_sz), tool["name"], self)
-            action.setToolTip(f"{tool['name']} ({tool['shortcut']})")
-            action.setShortcut(tool["shortcut"])
-            action.setCheckable(True)
-            action.setChecked(tool["checked"])
-            action.setData(tool["id"])
-            self._action_group.addAction(action)
-            self.addAction(action)
+        build_actions(tools, self, group=self._action_group)
 
     def set_active_tool(self, tool_id):
         """Programmatically sets the active tool in the toolbar."""
@@ -153,18 +248,7 @@ class DrawingToolbar(QToolBar):
             ],
         ]
 
-        icon_sz = self.iconSize().width()
-        for i, group in enumerate(tool_groups):
-            for tool in group:
-                action = QAction(IconManager.create_icon(tool["icon"], size=icon_sz), tool["name"], self)
-                action.setToolTip(f"{tool['name']} ({tool['shortcut']})")
-                action.setShortcut(tool["shortcut"])
-                action.setCheckable(True)
-                action.setData(tool["id"])
-                self._action_group.addAction(action)
-                self.addAction(action)
-            if i < len(tool_groups) - 1:
-                self.addSeparator()
+        build_actions(tool_groups, self, group=self._action_group)
 
     def set_active_tool(self, tool_id):
         """Programmatically sets the active drawing tool in the toolbar."""

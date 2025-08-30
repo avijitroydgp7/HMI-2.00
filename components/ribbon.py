@@ -62,51 +62,50 @@ class Ribbon(QToolBar):
 
     def _populate_project_tab(self):
         tb = self.project_tab.toolbar
-        self.new_anim = IconManager.create_animated_icon('fa5s.file')
-        self.new_action = QAction(self.new_anim.icon, "New", self)
-        self.new_anim.add_target(self.new_action)
-        self.new_action._animated_icon = self.new_anim
-        self.new_action.setShortcut(QKeySequence.StandardKey.New)
+        self.new_action, self.new_anim = self._create_action('fa5s.file', "New", QKeySequence.StandardKey.New)
         tb.addAction(self.new_action)
-        self.open_anim = IconManager.create_animated_icon('fa5s.folder-open')
-        self.open_action = QAction(self.open_anim.icon, "Open", self)
-        self.open_anim.add_target(self.open_action)
-        self.open_action._animated_icon = self.open_anim
-        self.open_action.setShortcut(QKeySequence.StandardKey.Open)
+        self.open_action, self.open_anim = self._create_action('fa5s.folder-open', "Open", QKeySequence.StandardKey.Open)
         tb.addAction(self.open_action)
-        self.save_anim = IconManager.create_animated_icon('fa5s.save')
-        self.save_action = QAction(self.save_anim.icon, "Save", self)
-        self.save_anim.add_target(self.save_action)
-        self.save_action._animated_icon = self.save_anim
-        self.save_action.setShortcut(QKeySequence.StandardKey.Save)
+        self.save_action, self.save_anim = self._create_action('fa5s.save', "Save", QKeySequence.StandardKey.Save)
         tb.addAction(self.save_action)
-        self.save_as_anim = IconManager.create_animated_icon('fa5s.save')
-        self.save_as_action = QAction(self.save_as_anim.icon, "Save As...", self)
-        self.save_as_anim.add_target(self.save_as_action)
-        self.save_as_action._animated_icon = self.save_as_anim
-        self.save_as_action.setShortcut(QKeySequence.StandardKey.SaveAs)
+        self.save_as_action, self.save_as_anim = self._create_action('fa5s.save', "Save As...", QKeySequence.StandardKey.SaveAs)
         tb.addAction(self.save_as_action)
         # Run (launch simulator)
-        self.run_anim = IconManager.create_animated_icon('fa5s.play')
-        self.run_action = QAction(self.run_anim.icon, "Run", self)
-        self.run_anim.add_target(self.run_action)
-        self.run_action._animated_icon = self.run_anim
-        self.run_action.setShortcut(QKeySequence("F5"))
+        self.run_action, self.run_anim = self._create_action('fa5s.play', "Run", QKeySequence("F5"))
         tb.addAction(self.run_action)
         tb.addSeparator()
-        self.close_tab_anim = IconManager.create_animated_icon('fa5s.window-close')
-        self.close_tab_action = QAction(self.close_tab_anim.icon, "Close Tab", self)
-        self.close_tab_anim.add_target(self.close_tab_action)
-        self.close_tab_action._animated_icon = self.close_tab_anim
-        self.close_tab_action.setShortcut(QKeySequence.StandardKey.Close)
+        self.close_tab_action, self.close_tab_anim = self._create_action('fa5s.window-close', "Close Tab", QKeySequence.StandardKey.Close)
         tb.addAction(self.close_tab_action)
         tb.addSeparator()
-        self.exit_anim = IconManager.create_animated_icon('fa5s.sign-out-alt')
-        self.exit_action = QAction(self.exit_anim.icon, "Exit", self)
-        self.exit_anim.add_target(self.exit_action)
-        self.exit_action._animated_icon = self.exit_anim
-        self.exit_action.setShortcut(QKeySequence.StandardKey.Quit)
+        self.exit_action, self.exit_anim = self._create_action('fa5s.sign-out-alt', "Exit", QKeySequence.StandardKey.Quit)
         tb.addAction(self.exit_action)
+
+    def _create_action(self, icon_name, text, shortcut=None):
+        """
+        Create a QAction with an animated icon and optional shortcut.
+
+        Parameters:
+        - icon_name: qtawesome icon name (e.g., 'fa5s.file') or a path to an animated
+          image (GIF/APNG). Passed to IconManager.create_animated_icon.
+        - text: Action label shown in the UI.
+        - shortcut: Optional keyboard shortcut. Accepts QKeySequence,
+          QKeySequence.StandardKey, or a string like 'F5'.
+
+        Returns:
+        (QAction, AnimatedIcon): The configured action and its AnimatedIcon.
+        The AnimatedIcon is also attached to the action as "_animated_icon" to
+        keep the animation alive.
+        """
+        anim = IconManager.create_animated_icon(icon_name)
+        action = QAction(anim.icon, text, self)
+        anim.add_target(action)
+        action._animated_icon = anim  # keep reference alive
+        if shortcut is not None:
+            if isinstance(shortcut, str):
+                action.setShortcut(QKeySequence(shortcut))
+            else:
+                action.setShortcut(shortcut)
+        return action, anim
 
     def add_clipboard_actions(self, cut_action, copy_action, paste_action):
         """Adds the centralized clipboard actions to the Edit tab."""

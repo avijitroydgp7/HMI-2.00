@@ -14,6 +14,27 @@ class CsvService:
     Provides functionality to import and export tag data using the CSV format.
     Arrays are "flattened" so that each element has its own row.
     """
+    def _parse_value(self, data_type: str, val_str: str):
+        """Convert a CSV string into the appropriate typed value for the given data type.
+
+        Rules (kept consistent with prior inline logic):
+        - BOOL: case-insensitive 'true' or '1' => True, else False
+        - INT/DINT: empty string => 0, else int(val_str)
+        - REAL: empty string => 0.0, else float(val_str)
+        - default: return the original string
+        """
+        # Normalize None to empty string to keep previous semantics
+        if val_str is None:
+            val_str = ""
+        if data_type == 'BOOL':
+            return str(val_str).strip().lower() in ('true', '1')
+        if data_type in ('INT', 'DINT'):
+            s = str(val_str).strip()
+            return int(s) if s else 0
+        if data_type == 'REAL':
+            s = str(val_str).strip()
+            return float(s) if s else 0.0
+        return val_str
     def _flatten_and_write_array(self, writer, tag_info, data_slice, indices_prefix=""):
         """Recursively traverses a nested list and writes a row for each element."""
         for i, value in enumerate(data_slice):
@@ -107,10 +128,7 @@ class CsvService:
                             # Convert value to correct type
                             val_str = row.get('InitialValue', '')
                             data_type = tags_to_import[base_name]['data_type']
-                            if data_type == 'BOOL': value = val_str.lower() in ('true', '1')
-                            elif data_type in ('INT', 'DINT'): value = int(val_str) if val_str else 0
-                            elif data_type == 'REAL': value = float(val_str) if val_str else 0.0
-                            else: value = val_str
+                            value = self._parse_value(data_type, val_str)
                             
                             value_ptr[indices[-1]] = value
                     else:
@@ -133,10 +151,7 @@ class CsvService:
                         else:
                             tag_data['array_dims'] = []
                             val_str = row.get('InitialValue', '')
-                            if data_type == 'BOOL': tag_data['value'] = val_str.lower() in ('true', '1')
-                            elif data_type in ('INT', 'DINT'): tag_data['value'] = int(val_str) if val_str else 0
-                            elif data_type == 'REAL': tag_data['value'] = float(val_str) if val_str else 0.0
-                            else: tag_data['value'] = val_str
+                            tag_data['value'] = self._parse_value(data_type, val_str)
 
                         tags_to_import[base_name] = tag_data
             

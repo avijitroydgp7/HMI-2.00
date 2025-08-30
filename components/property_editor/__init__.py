@@ -30,6 +30,15 @@ import copy
 from services.screen_data_service import screen_service
 from utils import constants
 from utils.editing_guard import EditingGuard
+from .factory import get_editor
+
+# Module-level tool imports (dispatch via mapping below)
+from tools import button as button_tool
+from tools import line as line_tool
+from tools import text as text_tool
+from tools import polygon as polygon_tool
+from tools import image as image_tool
+from tools import scale as scale_tool
 
 
 @dataclass(frozen=True)
@@ -101,75 +110,48 @@ class PropertyEditor(QStackedWidget):
 
     def _init_schemas(self):
         """Build the tool schema registry to reduce branching."""
-
-        def _merge(defaults: dict, incoming: dict) -> dict:
-            merged = copy.deepcopy(defaults)
-            merged.update(incoming or {})
-            return merged
-
-        # Lazily import inside closures to avoid import cycles at module import time
-        def _button_defaults(incoming: dict) -> dict:
-            from tools import button as _button
-
-            return _merge(_button.get_default_properties(), incoming)
-
-        def _line_defaults(incoming: dict) -> dict:
-            from tools import line as _line
-
-            return _merge(_line.get_default_properties(), incoming)
-
-        def _text_defaults(incoming: dict) -> dict:
-            from tools import text as _text
-
-            return _merge(_text.get_default_properties(), incoming)
-
-        def _polygon_defaults(incoming: dict) -> dict:
-            from tools import polygon as _polygon
-
-            return _merge(_polygon.get_default_properties(), incoming)
-
-        def _image_defaults(incoming: dict) -> dict:
-            from tools import image as _image
-
-            return _merge(_image.get_default_properties(incoming.get("path", "")), incoming)
-
-        def _scale_defaults(incoming: dict) -> dict:
-            from tools import scale as _scale
-
-            return _merge(_scale.get_default_properties(), incoming)
-
-        # Import here to avoid circular import at module load time
-        from .factory import get_editor
-
         self._schemas = {
             constants.ToolType.BUTTON: ToolSchema(
                 constants.ToolType.BUTTON.value,
-                _button_defaults,
+                lambda incoming: self._merge_properties(
+                    button_tool.get_default_properties(), incoming
+                ),
                 lambda: get_editor(constants.ToolType.BUTTON).build(self),
             ),
             constants.ToolType.LINE: ToolSchema(
                 constants.ToolType.LINE.value,
-                _line_defaults,
+                lambda incoming: self._merge_properties(
+                    line_tool.get_default_properties(), incoming
+                ),
                 lambda: get_editor(constants.ToolType.LINE).build(self),
             ),
             constants.ToolType.TEXT: ToolSchema(
                 constants.ToolType.TEXT.value,
-                _text_defaults,
+                lambda incoming: self._merge_properties(
+                    text_tool.get_default_properties(), incoming
+                ),
                 lambda: get_editor(constants.ToolType.TEXT).build(self),
             ),
             constants.ToolType.POLYGON: ToolSchema(
                 constants.ToolType.POLYGON.value,
-                _polygon_defaults,
+                lambda incoming: self._merge_properties(
+                    polygon_tool.get_default_properties(), incoming
+                ),
                 lambda: get_editor(constants.ToolType.POLYGON).build(self),
             ),
             constants.ToolType.IMAGE: ToolSchema(
                 constants.ToolType.IMAGE.value,
-                _image_defaults,
+                lambda incoming: self._merge_properties(
+                    image_tool.get_default_properties(incoming.get("path", "")),
+                    incoming,
+                ),
                 lambda: get_editor(constants.ToolType.IMAGE).build(self),
             ),
             constants.ToolType.SCALE: ToolSchema(
                 constants.ToolType.SCALE.value,
-                _scale_defaults,
+                lambda incoming: self._merge_properties(
+                    scale_tool.get_default_properties(), incoming
+                ),
                 lambda: get_editor(constants.ToolType.SCALE).build(self),
             ),
         }
@@ -196,7 +178,13 @@ class PropertyEditor(QStackedWidget):
                 self.current_parent_id, self.current_object_id
             )
             if instance is not None:
-                self.set_current_object(self.current_parent_id, copy.deepcopy(instance))
+                # Pass only minimal fields and deep copy properties to avoid shared mutations
+                minimal = {
+                    "instance_id": instance.get("instance_id"),
+                    "tool_type": instance.get("tool_type"),
+                    "properties": copy.deepcopy(instance.get("properties") or {}),
+                }
+                self.set_current_object(self.current_parent_id, minimal)
             else:
                 self.set_current_object(None, None)
 
@@ -314,7 +302,7 @@ class PropertyEditor(QStackedWidget):
             return
 
         # Build editor using schema
-        self._build_editor_for_instance(
+        self._build_editor(
             new_tool_type, incoming_props, restore_name, restore_cursor
         )
 
@@ -347,7 +335,7 @@ class PropertyEditor(QStackedWidget):
             return True
         return False
 
-    def _build_editor_for_instance(
+    def _build_editor(
         self, tool_type, incoming_props: dict, restore_name=None, restore_cursor=None
     ):
         schema = self._schemas.get(tool_type)
@@ -386,10 +374,22 @@ class PropertyEditor(QStackedWidget):
         editor = self.widget(2) if self.count() > 2 else None
         if editor is None:
             return
-        from .factory import get_editor
-
         adapter = get_editor(tool_type)
         if adapter is not None:
             adapter.update_fields(editor, props)
         # If adapter is None, do nothing (unknown tool)
 
+    # --- Property merging helper ---
+    def _merge_properties(self, defaults: dict, incoming: dict | None) -> dict:
+        """Merge incoming properties over defaults with minimal copying.
+
+        Assumptions:
+        - Default getters in tools.* already return fresh copies, so we avoid
+          extra deep copies here.
+        - We perform a shallow overlay; nested dicts are replaced if provided
+          by incoming, matching prior behavior.
+        """
+        merged = defaults.copy() if isinstance(defaults, dict) else dict(defaults or {})
+        if incoming:
+            merged.update(incoming)
+        return merged

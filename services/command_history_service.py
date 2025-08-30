@@ -5,6 +5,7 @@ from PyQt6.QtCore import QObject, pyqtSignal
 from collections import deque
 import logging
 from .commands import Command
+from .project_service import project_service  # Safe: project_service only imports this module at runtime inside a method
 
 logger = logging.getLogger(__name__)
 # Avoid emitting logs unless the app configures handlers.
@@ -24,31 +25,32 @@ class CommandHistoryService(QObject):
         self._undo_stack = deque(maxlen=100)
         self._redo_stack = deque(maxlen=100)
 
-    def _execute_and_notify(self, command: Command, op: str) -> bool:
+    def _execute(self, command: Command, action: str) -> bool:
         """
-        Execute the specified operation on the command and notify observers.
-        Returns True if the operation succeeds; False if execution fails.
-        Notification failures are logged but do not fail the operation.
+        Executes the given action ("undo"/"redo") on the command and then
+        calls its notify().
+
+        - Returns True if the action executes successfully.
+        - Returns False if action execution raises; _notify is skipped then.
+        - Any exceptions from _notify are logged but do not fail the action.
         """
         try:
-            getattr(command, op)()
+            getattr(command, action)()
         except Exception as e:
-            logger.exception("Command %s failed: %s", op, e)
+            logger.exception("Command %s failed: %s", action, e)
             return False
 
         try:
-            command._notify()
+            command.notify()
         except Exception as e:
-            logger.exception("Command notify failed after %s: %s", op, e)
+            logger.exception("Command notify failed after %s: %s", action, e)
         return True
 
     def add_command(self, command: Command):
         """
         Adds a new command to the history, executing it and clearing the redo stack.
         """
-        from .project_service import project_service
-        
-        if not self._execute_and_notify(command, "redo"):
+        if not self._execute(command, "redo"):
             return
 
         self._undo_stack.append(command)
@@ -62,11 +64,9 @@ class CommandHistoryService(QObject):
         Pops a command from the undo stack, executes its undo method,
         and pushes it to the redo stack.
         """
-        from .project_service import project_service
-        
         if self.can_undo():
             command = self._undo_stack[-1]
-            if not self._execute_and_notify(command, "undo"):
+            if not self._execute(command, "undo"):
                 return
 
             self._undo_stack.pop()
@@ -79,11 +79,9 @@ class CommandHistoryService(QObject):
         Pops a command from the redo stack, executes its redo method,
         and pushes it back to the undo stack.
         """
-        from .project_service import project_service
-        
         if self.can_redo():
             command = self._redo_stack[-1]
-            if not self._execute_and_notify(command, "redo"):
+            if not self._execute(command, "redo"):
                 return
 
             self._redo_stack.pop()
