@@ -75,6 +75,7 @@ logger = logging.getLogger(__name__)
 _AST_CACHE: "OrderedDict[str, ast.AST]" = OrderedDict()
 _AST_CACHE_MAXSIZE = 128
 
+
 def _get_parsed_ast(expr: str) -> ast.AST:
     node = _AST_CACHE.get(expr)
     if node is not None:
@@ -188,6 +189,7 @@ def _safe_eval(expr: str, variables: Dict[str, Any]) -> Tuple[Any, Optional[str]
     except Exception as exc:
         logger.debug("Condition evaluation error for '%s': %s", expr, exc)
         return None, str(exc)
+
 
 # ---------------------------------------------------------------------------
 # Helper widgets previously provided by button_creator
@@ -391,11 +393,16 @@ class IconButton(QPushButton):
                 painter.drawPixmap(x, y, pm)
                 return
         if pixmap:
-            pm = pixmap.scaled(self.icon_size, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
+            pm = pixmap.scaled(
+                self.icon_size,
+                Qt.AspectRatioMode.KeepAspectRatio,
+                Qt.TransformationMode.SmoothTransformation,
+            )
             painter = QPainter(self)
             x = icon_rect.x() + (icon_rect.width() - pm.width()) // 2
             y = icon_rect.y() + (icon_rect.height() - pm.height()) // 2
             painter.drawPixmap(x, y, pm)
+
 
 # Predefined gradient orientations used for visual selection
 _GRADIENT_STYLES = {
@@ -426,6 +433,7 @@ def get_style_by_id(style_id: str) -> Dict[str, Any]:
 @dataclass
 class AnimationProperties:
     """Basic animation configuration for button styles."""
+
     enabled: bool = False
     type: str = "pulse"
     intensity: float = 1.0
@@ -458,9 +466,12 @@ class ConditionalStyle:
         with tag names available as variables, while callables receive the
         ``tag_values`` dictionary.  ``None`` means the style always applies.
     """
+
     style_id: str = ""
     condition: Optional[Union[str, Callable[[Dict[str, Any]], bool]]] = None
-    condition_data: Dict[str, Any] = field(default_factory=lambda: {"mode": TriggerMode.ORDINARY.value})
+    condition_data: Dict[str, Any] = field(
+        default_factory=lambda: {"mode": TriggerMode.ORDINARY.value}
+    )
     # core text/style attributes
     text_type: str = "Text"
     text_value: str = ""
@@ -534,107 +545,120 @@ class ConditionalStyle:
         for key in normalized.keys():
             normalized[key] = data.get(key, normalized[key])
         return normalized
-    
+
     def to_dict(self) -> Dict[str, Any]:
         cond = copy.deepcopy(self.condition_data)
         return {
-            'style_id': self.style_id,
-            'condition': self.condition if isinstance(self.condition, str) else None,
-            'condition_data': cond,
-            'tooltip': self.tooltip,
-            'text_type': self.text_type,
-            'text_value': self.text_value,
-            'comment_ref': self.comment_ref,
-            'font_family': self.font_family,
-            'font_size': self.font_size,
-            'bold': self.bold,
-            'italic': self.italic,
-            'underline': self.underline,
-            'background_color': self.background_color,
-            'text_color': self.text_color,
-            'h_align': self.h_align,
-            'v_align': self.v_align,
-            'offset': self.offset,
-            'icon': self.icon,
-            'hover_icon': self.hover_icon,
-            'click_icon': self.click_icon,
-            'properties': self.properties,
-            'hover_properties': self._normalize_state(self.hover_properties),
-            'click_properties': self._normalize_state(self.click_properties),
-            'animation': self.animation.to_dict(),
-            'style_sheet': self.style_sheet,
+            "style_id": self.style_id,
+            "condition": self.condition if isinstance(self.condition, str) else None,
+            "condition_data": cond,
+            "tooltip": self.tooltip,
+            "text_type": self.text_type,
+            "text_value": self.text_value,
+            "comment_ref": self.comment_ref,
+            "font_family": self.font_family,
+            "font_size": self.font_size,
+            "bold": self.bold,
+            "italic": self.italic,
+            "underline": self.underline,
+            "background_color": self.background_color,
+            "text_color": self.text_color,
+            "h_align": self.h_align,
+            "v_align": self.v_align,
+            "offset": self.offset,
+            "icon": self.icon,
+            "hover_icon": self.hover_icon,
+            "click_icon": self.click_icon,
+            "properties": self.properties,
+            "hover_properties": self._normalize_state(self.hover_properties),
+            "click_properties": self._normalize_state(self.click_properties),
+            "animation": self.animation.to_dict(),
+            "style_sheet": self.style_sheet,
         }
-    
+
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> 'ConditionalStyle':
-        props = data.get('properties', {})
-        hover = cls._normalize_state(data.get('hover_properties', {}))
-        click = cls._normalize_state(data.get('click_properties', {}))
+    def from_dict(cls, data: Dict[str, Any]) -> "ConditionalStyle":
+        props = data.get("properties", {})
+        hover = cls._normalize_state(data.get("hover_properties", {}))
+        click = cls._normalize_state(data.get("click_properties", {}))
         style = cls(
-            style_id=data.get('style_id', ''),
-            condition=data.get('condition'),
-            tooltip=data.get('tooltip', ''),
-            icon=data.get('icon', data.get('svg_icon', '')),
-            hover_icon=data.get('hover_icon', ''),
-            click_icon=data.get('click_icon', data.get('svg_icon_clicked', '')),
-            text_type=data.get('text_type', props.get('text_type', 'Text')),
-            text_value=data.get('text_value', props.get('text', '')),
+            style_id=data.get("style_id", ""),
+            condition=data.get("condition"),
+            tooltip=data.get("tooltip", ""),
+            icon=data.get("icon", data.get("svg_icon", "")),
+            hover_icon=data.get("hover_icon", ""),
+            click_icon=data.get("click_icon", data.get("svg_icon_clicked", "")),
+            text_type=data.get("text_type", props.get("text_type", "Text")),
+            text_value=data.get("text_value", props.get("text", "")),
             comment_ref=data.get(
-                'comment_ref',
-                {
-                    'number': props.get('comment_number', 0),
-                    'column': props.get('comment_column', 0),
-                    'row': props.get('comment_row', 0),
-                } if props.get('text_type') == 'Comment' else {},
+                "comment_ref",
+                (
+                    {
+                        "number": props.get("comment_number", 0),
+                        "column": props.get("comment_column", 0),
+                        "row": props.get("comment_row", 0),
+                    }
+                    if props.get("text_type") == "Comment"
+                    else {}
+                ),
             ),
-            font_family=data.get('font_family', props.get('font_family', '')),
-            font_size=data.get('font_size', props.get('font_size', 0)),
-            bold=data.get('bold', props.get('bold', False)),
-            italic=data.get('italic', props.get('italic', False)),
-            underline=data.get('underline', props.get('underline', False)),
-            background_color=data.get('background_color', props.get('background_color', '')),
-            text_color=data.get('text_color', props.get('text_color', '')),
-            h_align=data.get('h_align', props.get('horizontal_align', 'center')),
-            v_align=data.get('v_align', props.get('vertical_align', 'middle')),
-            offset=data.get('offset', props.get('offset_to_frame', 0)),
+            font_family=data.get("font_family", props.get("font_family", "")),
+            font_size=data.get("font_size", props.get("font_size", 0)),
+            bold=data.get("bold", props.get("bold", False)),
+            italic=data.get("italic", props.get("italic", False)),
+            underline=data.get("underline", props.get("underline", False)),
+            background_color=data.get(
+                "background_color", props.get("background_color", "")
+            ),
+            text_color=data.get("text_color", props.get("text_color", "")),
+            h_align=data.get("h_align", props.get("horizontal_align", "center")),
+            v_align=data.get("v_align", props.get("vertical_align", "middle")),
+            offset=data.get("offset", props.get("offset_to_frame", 0)),
             properties=props,
             hover_properties=hover,
             click_properties=click,
-            style_sheet=data.get('style_sheet', ''),
+            style_sheet=data.get("style_sheet", ""),
         )
-        cond = data.get('condition_data', {"mode": TriggerMode.ORDINARY.value})
-        if cond.get('mode') in (TriggerMode.ON.value, TriggerMode.OFF.value):
-            if 'operand1' not in cond and 'tag' in cond:
-                cond['operand1'] = cond.pop('tag')
-        if cond.get('mode') == TriggerMode.RANGE.value:
-            if 'operand1' not in cond and 'tag' in cond:
-                cond['operand1'] = cond.pop('tag')
-            if 'operand2' not in cond and 'operand' in cond:
-                cond['operand2'] = cond.pop('operand')
-            if 'lower_bound' not in cond and 'lower' in cond:
-                cond['lower_bound'] = cond.pop('lower')
-            if 'upper_bound' not in cond and 'upper' in cond:
-                cond['upper_bound'] = cond.pop('upper')
-            if 'operator' not in cond:
-                if cond.get('lower_bound') is not None or cond.get('upper_bound') is not None:
-                    cond['operator'] = 'between'
+        cond = data.get("condition_data", {"mode": TriggerMode.ORDINARY.value})
+        if cond.get("mode") in (TriggerMode.ON.value, TriggerMode.OFF.value):
+            if "operand1" not in cond and "tag" in cond:
+                cond["operand1"] = cond.pop("tag")
+        if cond.get("mode") == TriggerMode.RANGE.value:
+            if "operand1" not in cond and "tag" in cond:
+                cond["operand1"] = cond.pop("tag")
+            if "operand2" not in cond and "operand" in cond:
+                cond["operand2"] = cond.pop("operand")
+            if "lower_bound" not in cond and "lower" in cond:
+                cond["lower_bound"] = cond.pop("lower")
+            if "upper_bound" not in cond and "upper" in cond:
+                cond["upper_bound"] = cond.pop("upper")
+            if "operator" not in cond:
+                if (
+                    cond.get("lower_bound") is not None
+                    or cond.get("upper_bound") is not None
+                ):
+                    cond["operator"] = "between"
                 else:
-                    cond['operator'] = '=='
+                    cond["operator"] = "=="
 
-        if cond.get('mode') in (TriggerMode.ON.value, TriggerMode.OFF.value, TriggerMode.RANGE.value):
-            op1 = cond.get('operand1')
-            if op1 and 'main_tag' not in op1 and 'source' in op1:
-                cond['operand1'] = {'main_tag': op1, 'indices': []}
+        if cond.get("mode") in (
+            TriggerMode.ON.value,
+            TriggerMode.OFF.value,
+            TriggerMode.RANGE.value,
+        ):
+            op1 = cond.get("operand1")
+            if op1 and "main_tag" not in op1 and "source" in op1:
+                cond["operand1"] = {"main_tag": op1, "indices": []}
         style.condition_data = cond
-        if 'animation' in data:
-            style.animation = AnimationProperties.from_dict(data['animation'])
+        if "animation" in data:
+            style.animation = AnimationProperties.from_dict(data["animation"])
         return style
-
 
 
 @dataclass
 class ConditionalStyleManager(QObject):
     """Manages conditional styles for buttons"""
+
     styles_changed: ClassVar[pyqtSignal] = pyqtSignal()
     # Emitted when a condition fails to evaluate; payload is an error message.
     condition_error: ClassVar[pyqtSignal] = pyqtSignal(str)
@@ -644,7 +668,7 @@ class ConditionalStyleManager(QObject):
 
     def __post_init__(self):
         super().__init__(self.parent)
-    
+
     def _generate_unique_style_id(self, base_id: str) -> str:
         existing = {s.style_id for s in self.conditional_styles}
         if base_id not in existing:
@@ -661,20 +685,22 @@ class ConditionalStyleManager(QObject):
         style.style_id = self._generate_unique_style_id(style.style_id)
         self.conditional_styles.append(style)
         self.styles_changed.emit()
-    
+
     def remove_style(self, index: int):
         """Remove a conditional style by index"""
         if 0 <= index < len(self.conditional_styles):
             del self.conditional_styles[index]
             self.styles_changed.emit()
-    
+
     def update_style(self, index: int, style: ConditionalStyle):
         """Update an existing conditional style"""
         if 0 <= index < len(self.conditional_styles):
             self.conditional_styles[index] = style
             self.styles_changed.emit()
-    
-    def get_active_style(self, tag_values: Optional[Dict[str, Any]] = None, state: Optional[str] = None) -> Dict[str, Any]:
+
+    def get_active_style(
+        self, tag_values: Optional[Dict[str, Any]] = None, state: Optional[str] = None
+    ) -> Dict[str, Any]:
         """Determine which style should be active based on tag values.
 
         Styles are checked in the order they appear in ``conditional_styles``.
@@ -695,9 +721,16 @@ class ConditionalStyleManager(QObject):
         tag_values = tag_values or {}
 
         for style in self.conditional_styles:
-            cond_cfg = getattr(style, 'condition_data', {"mode": TriggerMode.ORDINARY.value})
+            cond_cfg = getattr(
+                style, "condition_data", {"mode": TriggerMode.ORDINARY.value}
+            )
             cond = style.condition
-            condition = cond_cfg if cond_cfg.get('mode', TriggerMode.ORDINARY.value) != TriggerMode.ORDINARY.value else cond
+            condition = (
+                cond_cfg
+                if cond_cfg.get("mode", TriggerMode.ORDINARY.value)
+                != TriggerMode.ORDINARY.value
+                else cond
+            )
             match, err = self._evaluate_condition(condition, tag_values)
             if err:
                 # Surface via signal and log, but continue to next style.
@@ -710,23 +743,25 @@ class ConditionalStyleManager(QObject):
 
             if match:
                 props = dict(style.properties)
-                props['icon'] = style.icon
-                props['hover_icon'] = style.hover_icon
-                props['click_icon'] = style.click_icon
+                props["icon"] = style.icon
+                props["hover_icon"] = style.hover_icon
+                props["click_icon"] = style.click_icon
                 if state:
                     props.update(getattr(style, f"{state}_properties", {}))
-                    if state == 'hover' and style.hover_icon:
-                        props['icon'] = style.hover_icon
-                    if state == 'click' and style.click_icon:
-                        props['icon'] = style.click_icon
+                    if state == "hover" and style.hover_icon:
+                        props["icon"] = style.hover_icon
+                    if state == "click" and style.click_icon:
+                        props["icon"] = style.click_icon
                 if style.tooltip:
 
-                    props['tooltip'] = style.tooltip
+                    props["tooltip"] = style.tooltip
                 return props
 
         return dict(self.default_style)
 
-    def _evaluate_condition(self, condition: Any, tag_values: Dict[str, Any]) -> Tuple[bool, Optional[str]]:
+    def _evaluate_condition(
+        self, condition: Any, tag_values: Dict[str, Any]
+    ) -> Tuple[bool, Optional[str]]:
         """Evaluate a condition using tag values.
 
         ``condition`` may be one of the following:
@@ -742,47 +777,55 @@ class ConditionalStyleManager(QObject):
 
         if isinstance(condition, dict):
             cfg = condition
-            mode = cfg.get('mode', TriggerMode.ORDINARY.value)
+            mode = cfg.get("mode", TriggerMode.ORDINARY.value)
             if mode == TriggerMode.ORDINARY.value:
                 return True, None
             if mode in (TriggerMode.ON.value, TriggerMode.OFF.value):
-                op1 = cfg.get('operand1', cfg.get('tag'))
+                op1 = cfg.get("operand1", cfg.get("tag"))
                 tag_val = self._extract_value(op1, tag_values)
                 if tag_val is None:
                     return False, "ON/OFF condition: operand1 tag value not found"
-                return (bool(tag_val) if mode == TriggerMode.ON.value else not bool(tag_val)), None
+                return (
+                    bool(tag_val) if mode == TriggerMode.ON.value else not bool(tag_val)
+                ), None
             if mode == TriggerMode.RANGE.value:
-                op1 = cfg.get('operand1', cfg.get('tag'))
+                op1 = cfg.get("operand1", cfg.get("tag"))
                 tag_val = self._extract_value(op1, tag_values)
                 if tag_val is None:
                     return False, "RANGE condition: operand1 tag value not found"
-                operator = cfg.get('operator', '==')
-                if operator in ['between', 'outside']:
-                    lower = self._extract_value(cfg.get('lower_bound', cfg.get('lower')), tag_values)
-                    upper = self._extract_value(cfg.get('upper_bound', cfg.get('upper')), tag_values)
+                operator = cfg.get("operator", "==")
+                if operator in ["between", "outside"]:
+                    lower = self._extract_value(
+                        cfg.get("lower_bound", cfg.get("lower")), tag_values
+                    )
+                    upper = self._extract_value(
+                        cfg.get("upper_bound", cfg.get("upper")), tag_values
+                    )
                     try:
-                        if operator == 'between':
+                        if operator == "between":
                             return (lower <= tag_val <= upper), None
                         else:
                             return (tag_val < lower or tag_val > upper), None
                     except Exception as exc:
                         return False, f"RANGE condition error: {exc}"
                 else:
-                    operand = self._extract_value(cfg.get('operand2', cfg.get('operand')), tag_values)
+                    operand = self._extract_value(
+                        cfg.get("operand2", cfg.get("operand")), tag_values
+                    )
                     if operand is None:
                         return False, "RANGE condition: operand2 value not found"
                     try:
-                        if operator == '==':
+                        if operator == "==":
                             return (tag_val == operand), None
-                        if operator == '!=':
+                        if operator == "!=":
                             return (tag_val != operand), None
-                        if operator == '>':
+                        if operator == ">":
                             return (tag_val > operand), None
-                        if operator == '>=':
+                        if operator == ">=":
                             return (tag_val >= operand), None
-                        if operator == '<':
+                        if operator == "<":
                             return (tag_val < operand), None
-                        if operator == '<=':
+                        if operator == "<=":
                             return (tag_val <= operand), None
                     except Exception as exc:
                         return False, f"RANGE comparison error: {exc}"
@@ -806,43 +849,46 @@ class ConditionalStyleManager(QObject):
         except Exception as exc:
             return False, f"Invalid condition type: {exc}"
 
-    def _extract_value(self, data: Optional[Dict[str, Any]], tag_values: Dict[str, Any]):
+    def _extract_value(
+        self, data: Optional[Dict[str, Any]], tag_values: Dict[str, Any]
+    ):
         if not data:
             return None
-        if 'source' in data:
-            source = data.get('source')
-            value = data.get('value')
+        if "source" in data:
+            source = data.get("source")
+            value = data.get("value")
         else:
-            main = data.get('main_tag', {})
-            source = main.get('source')
-            value = main.get('value')
-        if source == 'constant':
+            main = data.get("main_tag", {})
+            source = main.get("source")
+            value = main.get("value")
+        if source == "constant":
             try:
                 return float(value)
             except Exception:
                 return None
-        if source == 'tag' and isinstance(value, dict):
-            return tag_values.get(value.get('tag_name'))
+        if source == "tag" and isinstance(value, dict):
+            return tag_values.get(value.get("tag_name"))
         return None
-    
+
     def to_dict(self) -> Dict[str, Any]:
         """Serialize to dictionary"""
         return {
-            'conditional_styles': [style.to_dict() for style in self.conditional_styles],
-            'default_style': self.default_style
+            "conditional_styles": [
+                style.to_dict() for style in self.conditional_styles
+            ],
+            "default_style": self.default_style,
         }
-    
+
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> 'ConditionalStyleManager':
+    def from_dict(cls, data: Dict[str, Any]) -> "ConditionalStyleManager":
         """Deserialize from dictionary"""
         manager = cls()
         manager.conditional_styles = [
             ConditionalStyle.from_dict(style_data)
-            for style_data in data.get('conditional_styles', [])
+            for style_data in data.get("conditional_styles", [])
         ]
-        manager.default_style = data.get('default_style', {})
+        manager.default_style = data.get("default_style", {})
         return manager
-
 
 
 class PreviewButton(IconButton):
@@ -900,6 +946,10 @@ class ConditionalStyleEditorDialog(QDialog):
         self._border_color = QColor()
 
         main_layout = QGridLayout(self)
+        # Provide consistent padding around the dialog and space between cells
+        main_layout.setContentsMargins(10, 10, 10, 10)
+        main_layout.setHorizontalSpacing(10)
+        main_layout.setVerticalSpacing(10)
         # Give the options area more space than the preview pane
         main_layout.setColumnStretch(0, 3)
         main_layout.setColumnStretch(1, 1)
@@ -912,62 +962,114 @@ class ConditionalStyleEditorDialog(QDialog):
             # If Qt not fully initialized or signal unavailable, ignore
             pass
 
+        info_group = QGroupBox("General")
         info_layout = QGridLayout()
+        info_layout.setContentsMargins(5, 5, 5, 5)
+        info_layout.setHorizontalSpacing(8)
+        tooltip_label = QLabel("Tooltip:")
+        tooltip_label.setAlignment(
+            Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter
+        )
         self.tooltip_edit = QLineEdit(self.style.tooltip)
-        info_layout.addWidget(QLabel("Tooltip:"), 0, 0)
+        info_layout.addWidget(tooltip_label, 0, 0)
         info_layout.addWidget(self.tooltip_edit, 0, 1)
-        main_layout.addLayout(info_layout, 0, 0, 1, 2)
+        info_layout.setColumnStretch(1, 1)
+        info_group.setLayout(info_layout)
+        main_layout.addWidget(info_group, 0, 0, 1, 2)
 
         self.init_colors()
 
         style_group = QGroupBox("Component Style & background")
         style_layout = QGridLayout()
-        style_layout.addWidget(QLabel("Component Type:"), 0, 0)
+        style_layout.setContentsMargins(5, 5, 5, 5)
+        style_layout.setHorizontalSpacing(8)
+        style_layout.setVerticalSpacing(6)
+        style_layout.setColumnStretch(1, 1)
+
+        component_label = QLabel("Component Type:")
+        component_label.setAlignment(
+            Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter
+        )
+        style_layout.addWidget(component_label, 0, 0)
         self.component_type_combo = QComboBox()
-        self.component_type_combo.addItems([
-            "Standard Button",
-            "Circle Button",
-            "Square Button",
-            "Toggle Switch",
-            "Image Button",
-            "Icon-Only Button",
-            "LED Indicator",
-        ])
-        self.component_type_combo.setCurrentText(self.style.properties.get("component_type", "Standard Button"))
+        self.component_type_combo.addItems(
+            [
+                "Standard Button",
+                "Circle Button",
+                "Square Button",
+                "Toggle Switch",
+                "Image Button",
+                "Icon-Only Button",
+                "LED Indicator",
+            ]
+        )
+        self.component_type_combo.setCurrentText(
+            self.style.properties.get("component_type", "Standard Button")
+        )
         self.component_type_combo.currentTextChanged.connect(self.update_controls_state)
         style_layout.addWidget(self.component_type_combo, 0, 1)
 
         self.shape_style_label = QLabel("Shape Style:")
+        self.shape_style_label.setAlignment(
+            Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter
+        )
         style_layout.addWidget(self.shape_style_label, 1, 0)
         self.shape_style_combo = QComboBox()
-        self.shape_style_combo.addItems(["Flat", "3D", "Glass", "Neumorphic", "Outline"])
-        self.shape_style_combo.setCurrentText(self.style.properties.get("shape_style", "Flat"))
+        self.shape_style_combo.addItems(
+            ["Flat", "3D", "Glass", "Neumorphic", "Outline"]
+        )
+        self.shape_style_combo.setCurrentText(
+            self.style.properties.get("shape_style", "Flat")
+        )
         self.shape_style_combo.currentTextChanged.connect(self.update_preview)
         style_layout.addWidget(self.shape_style_combo, 1, 1)
 
-        style_layout.addWidget(QLabel("Background Type:"), 2, 0)
+        bg_type_label = QLabel("Background Type:")
+        bg_type_label.setAlignment(
+            Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter
+        )
+        style_layout.addWidget(bg_type_label, 2, 0)
         self.bg_type_combo = QComboBox()
         self.bg_type_combo.addItems(["Solid", "Linear Gradient"])
-        self.bg_type_combo.setCurrentText(self.style.properties.get("background_type", "Solid"))
+        self.bg_type_combo.setCurrentText(
+            self.style.properties.get("background_type", "Solid")
+        )
         self.bg_type_combo.currentTextChanged.connect(self.update_controls_state)
         style_layout.addWidget(self.bg_type_combo, 2, 1)
 
-        style_layout.addWidget(QLabel("Main Color:"), 3, 0)
-        self.bg_base_color_combo, self.bg_shade_combo = self.create_color_selection_widgets(
-            self.on_bg_color_changed, emit_initial=False
+        main_color_label = QLabel("Main Color:")
+        main_color_label.setAlignment(
+            Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter
+        )
+        style_layout.addWidget(main_color_label, 3, 0)
+        self.bg_base_color_combo, self.bg_shade_combo = (
+            self.create_color_selection_widgets(
+                self.on_bg_color_changed, emit_initial=False
+            )
         )
         style_layout.addWidget(self.bg_base_color_combo, 3, 1)
         style_layout.addWidget(self.bg_shade_combo, 4, 1)
 
         # Hidden coordinate spin boxes used internally to build the QSS gradient
-        self.x1_spin = self.create_coord_spinbox(self.style.properties.get("gradient_x1", 0))
-        self.y1_spin = self.create_coord_spinbox(self.style.properties.get("gradient_y1", 0))
-        self.x2_spin = self.create_coord_spinbox(self.style.properties.get("gradient_x2", 0))
-        self.y2_spin = self.create_coord_spinbox(self.style.properties.get("gradient_y2", 1))
+        self.x1_spin = self.create_coord_spinbox(
+            self.style.properties.get("gradient_x1", 0)
+        )
+        self.y1_spin = self.create_coord_spinbox(
+            self.style.properties.get("gradient_y1", 0)
+        )
+        self.x2_spin = self.create_coord_spinbox(
+            self.style.properties.get("gradient_x2", 0)
+        )
+        self.y2_spin = self.create_coord_spinbox(
+            self.style.properties.get("gradient_y2", 1)
+        )
         for w in [self.x1_spin, self.y1_spin, self.x2_spin, self.y2_spin]:
             w.setVisible(False)
 
         self.gradient_dir_label = QLabel("Gradient Direction:")
+        self.gradient_dir_label.setAlignment(
+            Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter
+        )
         style_layout.addWidget(self.gradient_dir_label, 5, 0)
         self.gradient_type_combo = QComboBox()
         self._init_gradient_type_combo()
@@ -978,6 +1080,11 @@ class ConditionalStyleEditorDialog(QDialog):
 
         options_group = QGroupBox("Style Options")
         options_layout = QGridLayout()
+        options_layout.setContentsMargins(5, 5, 5, 5)
+        options_layout.setHorizontalSpacing(10)
+        options_layout.setVerticalSpacing(10)
+        options_layout.setColumnStretch(0, 1)
+        options_layout.setColumnStretch(1, 1)
         options_group.setLayout(options_layout)
 
         scroll_area = QScrollArea()
@@ -986,13 +1093,17 @@ class ConditionalStyleEditorDialog(QDialog):
 
         self.border_group = QGroupBox("Border")
         border_layout = QGridLayout()
+        border_layout.setContentsMargins(5, 5, 5, 5)
+        border_layout.setHorizontalSpacing(8)
+        border_layout.setVerticalSpacing(6)
+        border_layout.setColumnStretch(1, 1)
 
         # Corner radius table
         self.corner_frame = QFrame()
         self.corner_frame.setStyleSheet("QFrame { border: 1px solid #666; }")
         corner_layout = QGridLayout(self.corner_frame)
-        corner_layout.setContentsMargins(0, 0, 0, 0)
-        corner_layout.setSpacing(0)
+        corner_layout.setContentsMargins(2, 2, 2, 2)
+        corner_layout.setSpacing(2)
 
         header = QLabel("Corner radius")
         header.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -1030,7 +1141,14 @@ class ConditionalStyleEditorDialog(QDialog):
         self.br_radius_spin.setValue(self.style.properties.get("border_radius_br", 0))
         corner_layout.addWidget(self.br_radius_spin, 3, 2)
 
-        for w in [header, self.link_radius_btn, left_label, right_label, top_label, bottom_label]:
+        for w in [
+            header,
+            self.link_radius_btn,
+            left_label,
+            right_label,
+            top_label,
+            bottom_label,
+        ]:
             w.setStyleSheet("border: 1px solid #666;")
 
         self.corner_spins = {
@@ -1040,7 +1158,9 @@ class ConditionalStyleEditorDialog(QDialog):
             "bl": self.bl_radius_spin,
         }
         for key, spin in self.corner_spins.items():
-            spin.valueChanged.connect(lambda val, k=key: self.on_corner_radius_changed(k, val))
+            spin.valueChanged.connect(
+                lambda val, k=key: self.on_corner_radius_changed(k, val)
+            )
         self.link_radius_btn.toggled.connect(self.on_link_radius_toggled)
         # Initialize icon without forcing values to unify on startup
         init_icon = "fa5s.link" if self.link_radius_btn.isChecked() else "fa5s.unlink"
@@ -1048,8 +1168,11 @@ class ConditionalStyleEditorDialog(QDialog):
 
         border_layout.addWidget(self.corner_frame, 0, 0, 1, 2)
 
-
-        border_layout.addWidget(QLabel("Border Width (px):"), 2, 0)
+        border_width_label = QLabel("Border Width (px):")
+        border_width_label.setAlignment(
+            Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter
+        )
+        border_layout.addWidget(border_width_label, 2, 0)
         self.border_width_spin = QSpinBox()
         # Allow border width up to 20px, final limit is adjusted dynamically
         self.border_width_spin.setRange(0, 20)
@@ -1058,6 +1181,9 @@ class ConditionalStyleEditorDialog(QDialog):
         border_layout.addWidget(self.border_width_spin, 2, 1)
 
         self.border_style_label = QLabel("Border Style:")
+        self.border_style_label.setAlignment(
+            Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter
+        )
         border_layout.addWidget(self.border_style_label, 1, 0)
         self.border_style_combo = QComboBox()
         self.border_style_combo.setIconSize(QSize(60, 12))
@@ -1069,23 +1195,30 @@ class ConditionalStyleEditorDialog(QDialog):
         current_style = self.style.properties.get("border_style", "solid")
         if current_style in _styles:
             self.border_style_combo.setCurrentIndex(_styles.index(current_style))
-        self.border_style_combo.currentIndexChanged.connect(self.on_border_style_changed)
+        self.border_style_combo.currentIndexChanged.connect(
+            self.on_border_style_changed
+        )
         border_layout.addWidget(self.border_style_combo, 1, 1)
 
         self.border_group.setLayout(border_layout)
-        options_layout.addWidget(self.border_group, 0, 0)
 
         # Style tabs
         style_tabs = QTabWidget()
 
-        self.base_tab, self.base_controls = self._build_state_tab(self.style.properties, "base")
+        self.base_tab, self.base_controls = self._build_state_tab(
+            self.style.properties, "base"
+        )
 
         style_tabs.addTab(self.base_tab, "Base")
 
-        self.hover_tab, self.hover_controls = self._build_state_tab(self.style.hover_properties, "hover")
+        self.hover_tab, self.hover_controls = self._build_state_tab(
+            self.style.hover_properties, "hover"
+        )
         style_tabs.addTab(self.hover_tab, "Hover")
 
-        self.click_tab, self.click_controls = self._build_state_tab(self.style.click_properties, "click")
+        self.click_tab, self.click_controls = self._build_state_tab(
+            self.style.click_properties, "click"
+        )
         style_tabs.addTab(self.click_tab, "Click")
 
         self.base_controls["icon_edit"].setText(self.style.icon)
@@ -1107,7 +1240,8 @@ class ConditionalStyleEditorDialog(QDialog):
         # Condition configuration
         self.condition_group = QGroupBox("Condition")
         condition_layout = QVBoxLayout()
-        condition_layout.setContentsMargins(5, 10, 5, 5)
+        condition_layout.setContentsMargins(5, 5, 5, 5)
+        condition_layout.setSpacing(8)
 
         self.condition_mode_combo = QComboBox()
         self.condition_mode_combo.addItems(TriggerMode.values())
@@ -1117,9 +1251,10 @@ class ConditionalStyleEditorDialog(QDialog):
         condition_layout.addWidget(self.condition_options_container)
 
         self.condition_group.setLayout(condition_layout)
-        options_layout.addWidget(self.condition_group, 0, 1)
 
-        self.condition_mode_combo.currentTextChanged.connect(self._on_condition_mode_changed)
+        self.condition_mode_combo.currentTextChanged.connect(
+            self._on_condition_mode_changed
+        )
 
         initial_mode = self.style.condition_data.get("mode", TriggerMode.ORDINARY.value)
         self.condition_mode_combo.setCurrentText(initial_mode)
@@ -1153,9 +1288,17 @@ class ConditionalStyleEditorDialog(QDialog):
                     self.range_operand_selector.set_data(operand)
         self._validate_condition_section()
 
+        # Tab widget to switch between border and condition options
+        config_tabs = QTabWidget()
+        config_tabs.addTab(self.border_group, "Border")
+        config_tabs.addTab(self.condition_group, "Condition")
+        options_layout.addWidget(config_tabs, 0, 0, 1, 2)
+
         options_layout.addWidget(style_tabs, 1, 0, 1, 2)
 
         cb_layout = QHBoxLayout()
+        cb_layout.setContentsMargins(0, 0, 0, 0)
+        cb_layout.setSpacing(6)
         cb_layout.addStretch()
         cb_layout.addWidget(self.copy_hover_chk)
         cb_layout.addWidget(self.copy_click_chk)
@@ -1164,7 +1307,9 @@ class ConditionalStyleEditorDialog(QDialog):
 
         main_layout.addWidget(scroll_area, 2, 0, 1, 2)
 
-        self.button_box = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
+        self.button_box = QDialogButtonBox(
+            QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel
+        )
         self.button_box.accepted.connect(self.accept)
         self.button_box.rejected.connect(self.reject)
         main_layout.addWidget(self.button_box, 3, 0, 1, 2)
@@ -1172,6 +1317,8 @@ class ConditionalStyleEditorDialog(QDialog):
 
         preview_group = QGroupBox("Preview")
         preview_group_layout = QVBoxLayout()
+        preview_group_layout.setContentsMargins(5, 5, 5, 5)
+        preview_group_layout.setSpacing(8)
         preview_group_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.preview_stack = QStackedWidget()
         self.preview_button = PreviewButton("Preview")
@@ -1190,7 +1337,13 @@ class ConditionalStyleEditorDialog(QDialog):
         preview_group.setMinimumHeight(style_group.sizeHint().height())
         self.condition_group.setMinimumHeight(self.border_group.sizeHint().height())
 
-        for w in [self.border_width_spin, self.x1_spin, self.y1_spin, self.x2_spin, self.y2_spin]:
+        for w in [
+            self.border_width_spin,
+            self.x1_spin,
+            self.y1_spin,
+            self.x2_spin,
+            self.y2_spin,
+        ]:
             w.valueChanged.connect(self.update_preview)
         self.component_type_combo.currentTextChanged.connect(self.update_preview)
 
@@ -1202,14 +1355,12 @@ class ConditionalStyleEditorDialog(QDialog):
 
         # Ensure border width enablement reflects current style selection
 
-
         self.on_border_style_changed()
-
 
         self.update_controls_state()
         self.update_preview()
 
-        # Use a taller, narrower default size that fits typical screens
+        # Use a wider default size to accommodate grouped controls and tabs
         self.resize(580, 850)
 
     def _create_alignment_widget(self, options, current):
@@ -1319,8 +1470,12 @@ class ConditionalStyleEditorDialog(QDialog):
         _update_comment_number_suggestions()
         _update_column_row_suggestions()
         try:
-            comment_data_service.comment_group_list_changed.connect(_update_comment_number_suggestions)
-            comment_data_service.comments_changed.connect(lambda _gid: _update_column_row_suggestions())
+            comment_data_service.comment_group_list_changed.connect(
+                _update_comment_number_suggestions
+            )
+            comment_data_service.comments_changed.connect(
+                lambda _gid: _update_column_row_suggestions()
+            )
         except Exception:
             pass
         # Also react when the number selector changes
@@ -1527,8 +1682,12 @@ class ConditionalStyleEditorDialog(QDialog):
         bc["bg_shade_combo"].currentIndexChanged.connect(self.on_base_text_changed)
         bc["text_base_combo"].currentIndexChanged.connect(self.on_base_text_changed)
         bc["text_shade_combo"].currentIndexChanged.connect(self.on_base_text_changed)
-        bc["v_align_group"].buttonToggled.connect(lambda *_: self.on_base_text_changed())
-        bc["h_align_group"].buttonToggled.connect(lambda *_: self.on_base_text_changed())
+        bc["v_align_group"].buttonToggled.connect(
+            lambda *_: self.on_base_text_changed()
+        )
+        bc["h_align_group"].buttonToggled.connect(
+            lambda *_: self.on_base_text_changed()
+        )
         bc["offset_spin"].valueChanged.connect(self.on_base_text_changed)
         bc["icon_edit"].textChanged.connect(self.on_base_text_changed)
 
@@ -1544,7 +1703,12 @@ class ConditionalStyleEditorDialog(QDialog):
                 w.setEnabled(enabled)
 
     def _enable_color_controls(self, controls):
-        for key in ("bg_base_combo", "bg_shade_combo", "text_base_combo", "text_shade_combo"):
+        for key in (
+            "bg_base_combo",
+            "bg_shade_combo",
+            "text_base_combo",
+            "text_shade_combo",
+        ):
             w = controls.get(key)
             if w:
                 w.setEnabled(True)
@@ -1582,8 +1746,8 @@ class ConditionalStyleEditorDialog(QDialog):
                 t.set_data(s.get_data())
             elif key == "text_edit":
                 t.setPlainText(s.toPlainText())
-        if 'icon_edit' in src and 'icon_edit' in target:
-            target['icon_edit'].setText(src['icon_edit'].text())
+        if "icon_edit" in src and "icon_edit" in target:
+            target["icon_edit"].setText(src["icon_edit"].text())
 
     def _on_condition_mode_changed(self, mode: str):
         self.condition_options_container.setVisible(False)
@@ -1619,7 +1783,9 @@ class ConditionalStyleEditorDialog(QDialog):
             self.condition_tag_selector = TagSelector()
             self.condition_tag_selector.set_allowed_tag_types(["BOOL"])
             self.condition_tag_selector.main_tag_selector.set_mode_fixed("Tag")
-            self.condition_tag_selector.inputChanged.connect(self._validate_condition_section)
+            self.condition_tag_selector.inputChanged.connect(
+                self._validate_condition_section
+            )
             layout.addWidget(self.condition_tag_selector)
         elif mode == TriggerMode.RANGE.value:
             self._build_range_condition_options(layout)
@@ -1644,7 +1810,9 @@ class ConditionalStyleEditorDialog(QDialog):
 
         op_layout = QVBoxLayout()
         self.range_operator_combo = QComboBox()
-        self.range_operator_combo.addItems(["==", "!=", ">", ">=", "<", "<=", "between", "outside"])
+        self.range_operator_combo.addItems(
+            ["==", "!=", ">", ">=", "<", "<=", "between", "outside"]
+        )
         op_layout.addWidget(QLabel("Operator"))
         op_layout.addWidget(self.range_operator_combo)
         op_layout.addStretch(1)
@@ -1674,15 +1842,21 @@ class ConditionalStyleEditorDialog(QDialog):
 
         layout.addLayout(tag_layout, 0, 0)
         layout.addLayout(op_layout, 0, 1)
-        layout.addWidget(self.range_rhs_stack, 0, 2, alignment=Qt.AlignmentFlag.AlignTop)
+        layout.addWidget(
+            self.range_rhs_stack, 0, 2, alignment=Qt.AlignmentFlag.AlignTop
+        )
         layout.setColumnStretch(0, 1)
         layout.setColumnStretch(2, 1)
 
         parent_layout.addWidget(range_group)
 
         self.range_tag_selector.inputChanged.connect(self._validate_condition_section)
-        self.range_operator_combo.currentTextChanged.connect(self._on_range_operator_changed)
-        self.range_operand_selector.inputChanged.connect(self._validate_condition_section)
+        self.range_operator_combo.currentTextChanged.connect(
+            self._on_range_operator_changed
+        )
+        self.range_operand_selector.inputChanged.connect(
+            self._validate_condition_section
+        )
         self.range_lower_selector.inputChanged.connect(self._validate_condition_section)
         self.range_upper_selector.inputChanged.connect(self._validate_condition_section)
 
@@ -1690,29 +1864,47 @@ class ConditionalStyleEditorDialog(QDialog):
 
     def _on_range_operator_changed(self, operator: str):
         if hasattr(self, "range_rhs_stack"):
-            self.range_rhs_stack.setCurrentIndex(1 if operator in ["between", "outside"] else 0)
+            self.range_rhs_stack.setCurrentIndex(
+                1 if operator in ["between", "outside"] else 0
+            )
         self._validate_condition_section()
 
     def _validate_condition_section(self, *args):
         mode = self.condition_mode_combo.currentText()
         valid = True
         if mode in (TriggerMode.ON.value, TriggerMode.OFF.value):
-            valid = hasattr(self, 'condition_tag_selector') and self.condition_tag_selector.get_data() is not None
+            valid = (
+                hasattr(self, "condition_tag_selector")
+                and self.condition_tag_selector.get_data() is not None
+            )
         elif mode == TriggerMode.RANGE.value:
-            operator = self.range_operator_combo.currentText() if hasattr(self, 'range_operator_combo') else ""
+            operator = (
+                self.range_operator_combo.currentText()
+                if hasattr(self, "range_operator_combo")
+                else ""
+            )
             if operator in ["between", "outside"]:
-                valid = all([
-                    hasattr(self, 'range_tag_selector') and self.range_tag_selector.get_data() is not None,
-                    hasattr(self, 'range_lower_selector') and self.range_lower_selector.get_data() is not None,
-                    hasattr(self, 'range_upper_selector') and self.range_upper_selector.get_data() is not None,
-                ])
+                valid = all(
+                    [
+                        hasattr(self, "range_tag_selector")
+                        and self.range_tag_selector.get_data() is not None,
+                        hasattr(self, "range_lower_selector")
+                        and self.range_lower_selector.get_data() is not None,
+                        hasattr(self, "range_upper_selector")
+                        and self.range_upper_selector.get_data() is not None,
+                    ]
+                )
             else:
-                valid = all([
-                    hasattr(self, 'range_tag_selector') and self.range_tag_selector.get_data() is not None,
-                    hasattr(self, 'range_operand_selector') and self.range_operand_selector.get_data() is not None,
-                ])
+                valid = all(
+                    [
+                        hasattr(self, "range_tag_selector")
+                        and self.range_tag_selector.get_data() is not None,
+                        hasattr(self, "range_operand_selector")
+                        and self.range_operand_selector.get_data() is not None,
+                    ]
+                )
         ok_btn = None
-        if hasattr(self, 'button_box'):
+        if hasattr(self, "button_box"):
             ok_btn = self.button_box.button(QDialogButtonBox.StandardButton.Ok)
         if ok_btn:
             ok_btn.setEnabled(valid)
@@ -1741,6 +1933,7 @@ class ConditionalStyleEditorDialog(QDialog):
             self.copy_base_to_state(self.hover_controls, copy_colors=False)
         if self.copy_click_chk.isChecked():
             self.copy_base_to_state(self.click_controls, copy_colors=False)
+
     def on_state_bg_color_changed(self, state, color):
         if state == "base":
             self._bg_color = color
@@ -1785,28 +1978,99 @@ class ConditionalStyleEditorDialog(QDialog):
 
     def init_colors(self):
         self.color_schemes = {
-            "Blue": {"main": QColor("#3498db"), "hover": QColor("#5dade2"), "border": QColor("#2980b9"), "gradient2": QColor("#8e44ad")},
-            "Red": {"main": QColor("#e74c3c"), "hover": QColor("#ec7063"), "border": QColor("#c0392b"), "gradient2": QColor("#d35400")},
-            "Green": {"main": QColor("#2ecc71"), "hover": QColor("#58d68d"), "border": QColor("#27ae60"), "gradient2": QColor("#16a085")},
-            "Orange": {"main": QColor("#e67e22"), "hover": QColor("#eb984e"), "border": QColor("#d35400"), "gradient2": QColor("#f39c12")},
-            "Cyan": {"main": QColor("#1abc9c"), "hover": QColor("#48c9b0"), "border": QColor("#16a085"), "gradient2": QColor("#1abc9c")},
-            "Purple": {"main": QColor("#9b59b6"), "hover": QColor("#af7ac5"), "border": QColor("#8e44ad"), "gradient2": QColor("#3498db")},
-            "Pink": {"main": QColor("#fd79a8"), "hover": QColor("#fd9db4"), "border": QColor("#e75c90"), "gradient2": QColor("#9b59b6")},
-            "Teal": {"main": QColor("#008080"), "hover": QColor("#009688"), "border": QColor("#00695C"), "gradient2": QColor("#4DB6AC")},
-            "Indigo": {"main": QColor("#3F51B5"), "hover": QColor("#5C6BC0"), "border": QColor("#303F9F"), "gradient2": QColor("#7986CB")},
-            "Crimson": {"main": QColor("#DC143C"), "hover": QColor("#E53935"), "border": QColor("#C62828"), "gradient2": QColor("#EF5350")},
-            "Gray": {"main": QColor("#95a5a6"), "hover": QColor("#bdc3c7"), "border": QColor("#7f8c8d"), "gradient2": QColor("#bdc3c7")},
-            "Black": {"main": QColor("#34495e"), "hover": QColor("#4a6276"), "border": QColor("#2c3e50"), "gradient2": QColor("#2c3e50")},
-            "White": {"main": QColor("#ecf0f1"), "hover": QColor("#ffffff"), "border": QColor("#bdc3c7"), "gradient2": QColor("#bdc3c7")},
+            "Blue": {
+                "main": QColor("#3498db"),
+                "hover": QColor("#5dade2"),
+                "border": QColor("#2980b9"),
+                "gradient2": QColor("#8e44ad"),
+            },
+            "Red": {
+                "main": QColor("#e74c3c"),
+                "hover": QColor("#ec7063"),
+                "border": QColor("#c0392b"),
+                "gradient2": QColor("#d35400"),
+            },
+            "Green": {
+                "main": QColor("#2ecc71"),
+                "hover": QColor("#58d68d"),
+                "border": QColor("#27ae60"),
+                "gradient2": QColor("#16a085"),
+            },
+            "Orange": {
+                "main": QColor("#e67e22"),
+                "hover": QColor("#eb984e"),
+                "border": QColor("#d35400"),
+                "gradient2": QColor("#f39c12"),
+            },
+            "Cyan": {
+                "main": QColor("#1abc9c"),
+                "hover": QColor("#48c9b0"),
+                "border": QColor("#16a085"),
+                "gradient2": QColor("#1abc9c"),
+            },
+            "Purple": {
+                "main": QColor("#9b59b6"),
+                "hover": QColor("#af7ac5"),
+                "border": QColor("#8e44ad"),
+                "gradient2": QColor("#3498db"),
+            },
+            "Pink": {
+                "main": QColor("#fd79a8"),
+                "hover": QColor("#fd9db4"),
+                "border": QColor("#e75c90"),
+                "gradient2": QColor("#9b59b6"),
+            },
+            "Teal": {
+                "main": QColor("#008080"),
+                "hover": QColor("#009688"),
+                "border": QColor("#00695C"),
+                "gradient2": QColor("#4DB6AC"),
+            },
+            "Indigo": {
+                "main": QColor("#3F51B5"),
+                "hover": QColor("#5C6BC0"),
+                "border": QColor("#303F9F"),
+                "gradient2": QColor("#7986CB"),
+            },
+            "Crimson": {
+                "main": QColor("#DC143C"),
+                "hover": QColor("#E53935"),
+                "border": QColor("#C62828"),
+                "gradient2": QColor("#EF5350"),
+            },
+            "Gray": {
+                "main": QColor("#95a5a6"),
+                "hover": QColor("#bdc3c7"),
+                "border": QColor("#7f8c8d"),
+                "gradient2": QColor("#bdc3c7"),
+            },
+            "Black": {
+                "main": QColor("#34495e"),
+                "hover": QColor("#4a6276"),
+                "border": QColor("#2c3e50"),
+                "gradient2": QColor("#2c3e50"),
+            },
+            "White": {
+                "main": QColor("#ecf0f1"),
+                "hover": QColor("#ffffff"),
+                "border": QColor("#bdc3c7"),
+                "gradient2": QColor("#bdc3c7"),
+            },
         }
-        self.base_colors = {name: scheme["main"] for name, scheme in self.color_schemes.items()}
+        self.base_colors = {
+            name: scheme["main"] for name, scheme in self.color_schemes.items()
+        }
 
     def get_shades(self, color_name):
         base_color = self.base_colors.get(color_name, QColor("#000000"))
         shades = []
         for i in range(16):
             factor = 1.2 - (i / 15.0) * 0.6
-            shades.append(base_color.lighter(int(100 * factor)) if factor > 1.0 else base_color.darker(int(100 / factor)))
+            shades.append(
+                base_color.lighter(int(100 * factor))
+                if factor > 1.0
+                else base_color.darker(int(100 / factor))
+            )
 
         return shades
 
@@ -1815,7 +2079,9 @@ class ConditionalStyleEditorDialog(QDialog):
         luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255
         return QColor("#000000") if luminance > 0.55 else QColor("#ffffff")
 
-    def create_color_selection_widgets(self, final_slot, initial_color=None, emit_initial=True):
+    def create_color_selection_widgets(
+        self, final_slot, initial_color=None, emit_initial=True
+    ):
         base_combo = QComboBox()
         for color_name, color_value in self.base_colors.items():
             pixmap = QPixmap(16, 16)
@@ -2001,14 +2267,18 @@ class ConditionalStyleEditorDialog(QDialog):
         return spinbox
 
     def _select_icon_file(self, edit: QLineEdit):
-        path, _ = QFileDialog.getOpenFileName(self, "Select Icon", "", "Images (*.svg *.png *.jpg *.jpeg)")
+        path, _ = QFileDialog.getOpenFileName(
+            self, "Select Icon", "", "Images (*.svg *.png *.jpg *.jpeg)"
+        )
         if path:
             edit.setText(path)
 
     def _open_icon_picker(self, edit: QLineEdit):
         # Restrict SVG selection to lib/icon directory, and allow QtAwesome icons.
         try:
-            base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+            base_dir = os.path.abspath(
+                os.path.join(os.path.dirname(__file__), "..", "..")
+            )
             icons_root = os.path.join(base_dir, "lib", "icon")
         except Exception:
             icons_root = os.path.join(os.getcwd(), "lib", "icon")
@@ -2031,11 +2301,13 @@ class ConditionalStyleEditorDialog(QDialog):
         icon_name = "fa5s.link" if checked else "fa5s.unlink"
         self.link_radius_btn.setIcon(IconManager.create_icon(icon_name))
         if checked:
-            self.on_corner_radius_changed('tl', self.tl_radius_spin.value())
+            self.on_corner_radius_changed("tl", self.tl_radius_spin.value())
 
     def _create_gradient_icon(self, coords):
         pixmap = QPixmap(40, 20)
-        gradient = QLinearGradient(coords[0] * 40, coords[1] * 20, coords[2] * 40, coords[3] * 20)
+        gradient = QLinearGradient(
+            coords[0] * 40, coords[1] * 20, coords[2] * 40, coords[3] * 20
+        )
         gradient.setColorAt(0, QColor("#000000"))
         gradient.setColorAt(1, QColor("#ffffff"))
         painter = QPainter(pixmap)
@@ -2082,6 +2354,7 @@ class ConditionalStyleEditorDialog(QDialog):
         if not allow_width:
             self.border_width_spin.setValue(0)
         self.update_preview()
+
     def _init_gradient_type_combo(self):
         for name, coords in _GRADIENT_STYLES.items():
             self.gradient_type_combo.addItem(self._create_gradient_icon(coords), name)
@@ -2091,8 +2364,12 @@ class ConditionalStyleEditorDialog(QDialog):
             self._set_gradient_coords(_GRADIENT_STYLES[default_type])
         else:
             # Set from existing coordinates and detect matching type
-            current = (self.x1_spin.value(), self.y1_spin.value(),
-                       self.x2_spin.value(), self.y2_spin.value())
+            current = (
+                self.x1_spin.value(),
+                self.y1_spin.value(),
+                self.x2_spin.value(),
+                self.y2_spin.value(),
+            )
             for name, coords in _GRADIENT_STYLES.items():
                 if coords == current:
                     self.gradient_type_combo.setCurrentText(name)
@@ -2100,7 +2377,9 @@ class ConditionalStyleEditorDialog(QDialog):
             else:
                 self.gradient_type_combo.setCurrentText("Top to Bottom")
                 self._set_gradient_coords(_GRADIENT_STYLES["Top to Bottom"])
-        self.gradient_type_combo.currentTextChanged.connect(self._on_gradient_type_changed)
+        self.gradient_type_combo.currentTextChanged.connect(
+            self._on_gradient_type_changed
+        )
 
     def _set_gradient_coords(self, coords):
         self.x1_spin.setValue(coords[0])
@@ -2135,7 +2414,11 @@ class ConditionalStyleEditorDialog(QDialog):
         for w in [self.gradient_dir_label, self.gradient_type_combo]:
             w.setEnabled(is_gradient)
 
-        is_textless = component_type in {"Image Button", "Icon-Only Button", "LED Indicator"}
+        is_textless = component_type in {
+            "Image Button",
+            "Icon-Only Button",
+            "LED Indicator",
+        }
         for controls in [self.base_controls, self.hover_controls, self.click_controls]:
             self._set_state_controls_enabled(controls, not is_textless)
 
@@ -2149,7 +2432,12 @@ class ConditionalStyleEditorDialog(QDialog):
         radius_limit = min(width, height) // 2
         # Border widths are limited to 10% of the smaller dimension, capped at 20px.
         border_limit = min(20, max(1, min(width, height) // 10))
-        for s in [self.tl_radius_spin, self.tr_radius_spin, self.br_radius_spin, self.bl_radius_spin]:
+        for s in [
+            self.tl_radius_spin,
+            self.tr_radius_spin,
+            self.br_radius_spin,
+            self.bl_radius_spin,
+        ]:
             s.setMaximum(radius_limit)
         self.border_width_spin.setMaximum(border_limit)
 
@@ -2169,14 +2457,21 @@ class ConditionalStyleEditorDialog(QDialog):
         hover_bg_color = self._hover_bg_color
         click_bg_color = self._click_bg_color
         border_color = self._border_color
-        text_color = self._text_color or self.palette().color(QPalette.ColorRole.ButtonText).name()
+        text_color = (
+            self._text_color
+            or self.palette().color(QPalette.ColorRole.ButtonText).name()
+        )
         hover_text_color = self._hover_text_color or text_color
         click_text_color = self._click_text_color or text_color
         font_size = self.font_size_spin.value()
         font_family = self.base_controls["font_family_combo"].currentText()
         font_weight = "bold" if self.base_controls["bold_btn"].isChecked() else "normal"
-        font_style = "italic" if self.base_controls["italic_btn"].isChecked() else "normal"
-        text_decoration = "underline" if self.base_controls["underline_btn"].isChecked() else "none"
+        font_style = (
+            "italic" if self.base_controls["italic_btn"].isChecked() else "normal"
+        )
+        text_decoration = (
+            "underline" if self.base_controls["underline_btn"].isChecked() else "none"
+        )
 
         if component_type == "Circle Button":
             size = max(width, height)
@@ -2202,19 +2497,21 @@ class ConditionalStyleEditorDialog(QDialog):
             self.preview_button.setFixedSize(width, height)
 
         main_qss, hover_qss, pressed_qss = [], [], []
-        main_qss.extend([
-            f"padding: {padding}px;",
-            f"border-top-left-radius: {tl_radius}px;",
-            f"border-top-right-radius: {tr_radius}px;",
-            f"border-bottom-right-radius: {br_radius}px;",
-            f"border-bottom-left-radius: {bl_radius}px;",
-            f"color: {text_color};",
-            f"font-size: {font_size}pt;",
-            f"font-family: '{font_family}';",
-            f"font-weight: {font_weight};",
-            f"font-style: {font_style};",
-            f"text-decoration: {text_decoration};",
-        ])
+        main_qss.extend(
+            [
+                f"padding: {padding}px;",
+                f"border-top-left-radius: {tl_radius}px;",
+                f"border-top-right-radius: {tr_radius}px;",
+                f"border-bottom-right-radius: {br_radius}px;",
+                f"border-bottom-left-radius: {bl_radius}px;",
+                f"color: {text_color};",
+                f"font-size: {font_size}pt;",
+                f"font-family: '{font_family}';",
+                f"font-weight: {font_weight};",
+                f"font-style: {font_style};",
+                f"text-decoration: {text_decoration};",
+            ]
+        )
 
         if shape_style == "Glass":
             light_color, dark_color = bg_color.lighter(150).name(), bg_color.name()
@@ -2223,71 +2520,118 @@ class ConditionalStyleEditorDialog(QDialog):
                 f"background-color: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 {light_color}, stop:1 {dark_color});"
             )
             main_qss.append(f"border: 1px solid {border_c};")
-            hover_qss.extend([
-                f"background-color: {hover_bg_color.name()};",
-                f"color: {hover_text_color};",
-            ])
-            pressed_qss.extend([
-                f"background-color: {click_bg_color.name()};",
-                f"color: {click_text_color};",
-            ])
+            hover_qss.extend(
+                [
+                    f"background-color: {hover_bg_color.name()};",
+                    f"color: {hover_text_color};",
+                ]
+            )
+            pressed_qss.extend(
+                [
+                    f"background-color: {click_bg_color.name()};",
+                    f"color: {click_text_color};",
+                ]
+            )
         elif shape_style == "3D":
-            main_qss.extend([f"border-width: {border_width}px;", f"border-color: {border_color.name()};", "border-style: outset;"])
+            main_qss.extend(
+                [
+                    f"border-width: {border_width}px;",
+                    f"border-color: {border_color.name()};",
+                    "border-style: outset;",
+                ]
+            )
             if bg_type == "Solid":
                 main_qss.append(f"background-color: {bg_color.name()};")
             else:
-                x1, y1, x2, y2 = self.x1_spin.value(), self.y1_spin.value(), self.x2_spin.value(), self.y2_spin.value()
+                x1, y1, x2, y2 = (
+                    self.x1_spin.value(),
+                    self.y1_spin.value(),
+                    self.x2_spin.value(),
+                    self.y2_spin.value(),
+                )
                 main_qss.append(
                     f"background-color: qlineargradient(x1:{x1}, y1:{y1}, x2:{x2}, y2:{y2}, stop:0 {bg_color.name()}, stop:1 {self._bg_color2.name()});"
                 )
-            hover_qss.extend([
-                f"background-color: {hover_bg_color.name()};",
-                f"color: {hover_text_color};",
-            ])
-            pressed_qss.extend([
-                "border-style: inset;",
-                f"background-color: {click_bg_color.name()};",
-                f"color: {click_text_color};",
-            ])
+            hover_qss.extend(
+                [
+                    f"background-color: {hover_bg_color.name()};",
+                    f"color: {hover_text_color};",
+                ]
+            )
+            pressed_qss.extend(
+                [
+                    "border-style: inset;",
+                    f"background-color: {click_bg_color.name()};",
+                    f"color: {click_text_color};",
+                ]
+            )
         elif shape_style == "Neumorphic":
             base_color = self.palette().color(QPalette.ColorRole.Window)
-            main_qss.extend([f"background-color: {base_color.name()};", f"border: 2px solid {base_color.name()};"])
-            pressed_qss.extend([f"border: 2px solid {base_color.darker(115).name()};",
-                                f"border-top-color: {base_color.lighter(115).name()};",
-                                f"border-left-color: {base_color.lighter(115).name()};"])
+            main_qss.extend(
+                [
+                    f"background-color: {base_color.name()};",
+                    f"border: 2px solid {base_color.name()};",
+                ]
+            )
+            pressed_qss.extend(
+                [
+                    f"border: 2px solid {base_color.darker(115).name()};",
+                    f"border-top-color: {base_color.lighter(115).name()};",
+                    f"border-left-color: {base_color.lighter(115).name()};",
+                ]
+            )
         elif shape_style == "Outline":
-            main_qss.extend([
-                "background-color: transparent;",
-                f"border: {border_width}px solid {bg_color.name()};",
-                f"color: {text_color};",
-            ])
-            hover_qss.extend([
-                f"background-color: {hover_bg_color.name()};",
-                f"color: {hover_text_color};",
-            ])
-            pressed_qss.extend([
-                f"background-color: {click_bg_color.name()};",
-                f"color: {click_text_color};",
-            ])
+            main_qss.extend(
+                [
+                    "background-color: transparent;",
+                    f"border: {border_width}px solid {bg_color.name()};",
+                    f"color: {text_color};",
+                ]
+            )
+            hover_qss.extend(
+                [
+                    f"background-color: {hover_bg_color.name()};",
+                    f"color: {hover_text_color};",
+                ]
+            )
+            pressed_qss.extend(
+                [
+                    f"background-color: {click_bg_color.name()};",
+                    f"color: {click_text_color};",
+                ]
+            )
         else:
-            main_qss.extend([f"border-width: {border_width}px;",
-                             f"border-style: {border_style};",
-                             f"border-color: {border_color.name()};"])
+            main_qss.extend(
+                [
+                    f"border-width: {border_width}px;",
+                    f"border-style: {border_style};",
+                    f"border-color: {border_color.name()};",
+                ]
+            )
             if bg_type == "Solid":
                 main_qss.append(f"background-color: {bg_color.name()};")
             else:
-                x1, y1, x2, y2 = self.x1_spin.value(), self.y1_spin.value(), self.x2_spin.value(), self.y2_spin.value()
+                x1, y1, x2, y2 = (
+                    self.x1_spin.value(),
+                    self.y1_spin.value(),
+                    self.x2_spin.value(),
+                    self.y2_spin.value(),
+                )
                 main_qss.append(
                     f"background-color: qlineargradient(x1:{x1}, y1:{y1}, x2:{x2}, y2:{y2}, stop:0 {bg_color.name()}, stop:1 {self._bg_color2.name()});"
                 )
-            hover_qss.extend([
-                f"background-color: {hover_bg_color.name()};",
-                f"color: {hover_text_color};",
-            ])
-            pressed_qss.extend([
-                f"background-color: {click_bg_color.name()};",
-                f"color: {click_text_color};",
-            ])
+            hover_qss.extend(
+                [
+                    f"background-color: {hover_bg_color.name()};",
+                    f"color: {hover_text_color};",
+                ]
+            )
+            pressed_qss.extend(
+                [
+                    f"background-color: {click_bg_color.name()};",
+                    f"color: {click_text_color};",
+                ]
+            )
 
         main_qss_str = "\n    ".join(main_qss)
         hover_qss_str = "\n    ".join(hover_qss) if hover_qss else ""
@@ -2326,10 +2670,12 @@ class ConditionalStyleEditorDialog(QDialog):
                         col_data = self.base_controls["comment_column"].get_data()
                         row_data = self.base_controls["comment_row"].get_data()
                         if (
-                            num_data and col_data and row_data and
-                            num_data.get("main_tag", {}).get("source") == "constant" and
-                            col_data.get("main_tag", {}).get("source") == "constant" and
-                            row_data.get("main_tag", {}).get("source") == "constant"
+                            num_data
+                            and col_data
+                            and row_data
+                            and num_data.get("main_tag", {}).get("source") == "constant"
+                            and col_data.get("main_tag", {}).get("source") == "constant"
+                            and row_data.get("main_tag", {}).get("source") == "constant"
                         ):
                             number = str(num_data["main_tag"].get("value", "")).strip()
                             col = int(float(col_data["main_tag"].get("value", 0)))
@@ -2342,7 +2688,9 @@ class ConditionalStyleEditorDialog(QDialog):
                                     break
                             if group and row > 0 and col > 0:
                                 comments = group.get("comments", [])
-                                columns = group.get("columns", ["Comment"]) or ["Comment"]
+                                columns = group.get("columns", ["Comment"]) or [
+                                    "Comment"
+                                ]
                                 if row - 1 < len(comments):
                                     row_vals = comments[row - 1]
                                     if col - 1 < len(row_vals):
@@ -2350,7 +2698,6 @@ class ConditionalStyleEditorDialog(QDialog):
                     except Exception:
                         pass
             self.preview_button.setText(text or "Preview")
-
 
     def get_style(self) -> ConditionalStyle:
         if self.copy_hover_chk.isChecked():
@@ -2375,10 +2722,20 @@ class ConditionalStyleEditorDialog(QDialog):
             "bold": self.base_controls["bold_btn"].isChecked(),
             "italic": self.base_controls["italic_btn"].isChecked(),
             "underline": self.base_controls["underline_btn"].isChecked(),
-            "vertical_align": self.base_controls["v_align_group"].checkedButton().property("align_value")
-                if self.base_controls["v_align_group"].checkedButton() else "middle",
-            "horizontal_align": self.base_controls["h_align_group"].checkedButton().property("align_value")
-                if self.base_controls["h_align_group"].checkedButton() else "center",
+            "vertical_align": (
+                self.base_controls["v_align_group"]
+                .checkedButton()
+                .property("align_value")
+                if self.base_controls["v_align_group"].checkedButton()
+                else "middle"
+            ),
+            "horizontal_align": (
+                self.base_controls["h_align_group"]
+                .checkedButton()
+                .property("align_value")
+                if self.base_controls["h_align_group"].checkedButton()
+                else "center"
+            ),
             "offset_to_frame": self.base_controls["offset_spin"].value(),
             "border_radius_tl": self.tl_radius_spin.value(),
             "border_radius_tr": self.tr_radius_spin.value(),
@@ -2390,8 +2747,12 @@ class ConditionalStyleEditorDialog(QDialog):
             "text_type": self.base_controls["text_type_combo"].currentText(),
         }
         if properties["text_type"] == "Comment":
-            properties["comment_number"] = self.base_controls["comment_number"].get_data()
-            properties["comment_column"] = self.base_controls["comment_column"].get_data()
+            properties["comment_number"] = self.base_controls[
+                "comment_number"
+            ].get_data()
+            properties["comment_column"] = self.base_controls[
+                "comment_column"
+            ].get_data()
             properties["comment_row"] = self.base_controls["comment_row"].get_data()
         else:
             properties["text"] = self.base_controls["text_edit"].toPlainText()
@@ -2417,10 +2778,20 @@ class ConditionalStyleEditorDialog(QDialog):
             "bold": self.hover_controls["bold_btn"].isChecked(),
             "italic": self.hover_controls["italic_btn"].isChecked(),
             "underline": self.hover_controls["underline_btn"].isChecked(),
-            "v_align": self.hover_controls["v_align_group"].checkedButton().property("align_value")
-                if self.hover_controls["v_align_group"].checkedButton() else "middle",
-            "h_align": self.hover_controls["h_align_group"].checkedButton().property("align_value")
-                if self.hover_controls["h_align_group"].checkedButton() else "center",
+            "v_align": (
+                self.hover_controls["v_align_group"]
+                .checkedButton()
+                .property("align_value")
+                if self.hover_controls["v_align_group"].checkedButton()
+                else "middle"
+            ),
+            "h_align": (
+                self.hover_controls["h_align_group"]
+                .checkedButton()
+                .property("align_value")
+                if self.hover_controls["h_align_group"].checkedButton()
+                else "center"
+            ),
             "offset": self.hover_controls["offset_spin"].value(),
             "text_type": self.hover_controls["text_type_combo"].currentText(),
         }
@@ -2431,8 +2802,9 @@ class ConditionalStyleEditorDialog(QDialog):
                 "row": self.hover_controls["comment_row"].get_data(),
             }
         else:
-            hover_properties["text_value"] = self.hover_controls["text_edit"].toPlainText()
-
+            hover_properties["text_value"] = self.hover_controls[
+                "text_edit"
+            ].toPlainText()
 
         click_properties = {
             "background_color": self._click_bg_color.name(),
@@ -2442,10 +2814,20 @@ class ConditionalStyleEditorDialog(QDialog):
             "bold": self.click_controls["bold_btn"].isChecked(),
             "italic": self.click_controls["italic_btn"].isChecked(),
             "underline": self.click_controls["underline_btn"].isChecked(),
-            "v_align": self.click_controls["v_align_group"].checkedButton().property("align_value")
-                if self.click_controls["v_align_group"].checkedButton() else "middle",
-            "h_align": self.click_controls["h_align_group"].checkedButton().property("align_value")
-                if self.click_controls["h_align_group"].checkedButton() else "center",
+            "v_align": (
+                self.click_controls["v_align_group"]
+                .checkedButton()
+                .property("align_value")
+                if self.click_controls["v_align_group"].checkedButton()
+                else "middle"
+            ),
+            "h_align": (
+                self.click_controls["h_align_group"]
+                .checkedButton()
+                .property("align_value")
+                if self.click_controls["h_align_group"].checkedButton()
+                else "center"
+            ),
             "offset": self.click_controls["offset_spin"].value(),
             "text_type": self.click_controls["text_type_combo"].currentText(),
         }
@@ -2456,27 +2838,47 @@ class ConditionalStyleEditorDialog(QDialog):
                 "row": self.click_controls["comment_row"].get_data(),
             }
         else:
-            click_properties["text_value"] = self.click_controls["text_edit"].toPlainText()
+            click_properties["text_value"] = self.click_controls[
+                "text_edit"
+            ].toPlainText()
 
         condition_cfg = {"mode": self.condition_mode_combo.currentText()}
         if condition_cfg["mode"] in (TriggerMode.ON.value, TriggerMode.OFF.value):
-            data = self.condition_tag_selector.get_data() if hasattr(self, 'condition_tag_selector') else None
+            data = (
+                self.condition_tag_selector.get_data()
+                if hasattr(self, "condition_tag_selector")
+                else None
+            )
             condition_cfg["operand1"] = data if data else None
         elif condition_cfg["mode"] == TriggerMode.RANGE.value:
-            data = self.range_tag_selector.get_data() if hasattr(self, 'range_tag_selector') else None
+            data = (
+                self.range_tag_selector.get_data()
+                if hasattr(self, "range_tag_selector")
+                else None
+            )
             condition_cfg["operand1"] = data if data else None
-            operator = self.range_operator_combo.currentText() if hasattr(self, 'range_operator_combo') else "=="
+            operator = (
+                self.range_operator_combo.currentText()
+                if hasattr(self, "range_operator_combo")
+                else "=="
+            )
             condition_cfg["operator"] = operator
             if operator in ["between", "outside"]:
                 condition_cfg["lower_bound"] = (
-                    self.range_lower_selector.get_data() if hasattr(self, 'range_lower_selector') else None
+                    self.range_lower_selector.get_data()
+                    if hasattr(self, "range_lower_selector")
+                    else None
                 )
                 condition_cfg["upper_bound"] = (
-                    self.range_upper_selector.get_data() if hasattr(self, 'range_upper_selector') else None
+                    self.range_upper_selector.get_data()
+                    if hasattr(self, "range_upper_selector")
+                    else None
                 )
             else:
                 condition_cfg["operand2"] = (
-                    self.range_operand_selector.get_data() if hasattr(self, 'range_operand_selector') else None
+                    self.range_operand_selector.get_data()
+                    if hasattr(self, "range_operand_selector")
+                    else None
                 )
 
         component_type = properties.get("component_type")
@@ -2490,11 +2892,15 @@ class ConditionalStyleEditorDialog(QDialog):
             text_value=properties.get("text_value", properties.get("text", "")),
             comment_ref=properties.get(
                 "comment_ref",
-                {
-                    "number": properties.get("comment_number", 0),
-                    "column": properties.get("comment_column", 0),
-                    "row": properties.get("comment_row", 0),
-                } if properties.get("text_type") == "Comment" else {},
+                (
+                    {
+                        "number": properties.get("comment_number", 0),
+                        "column": properties.get("comment_column", 0),
+                        "row": properties.get("comment_row", 0),
+                    }
+                    if properties.get("text_type") == "Comment"
+                    else {}
+                ),
             ),
             font_family=properties.get("font_family", ""),
             font_size=properties.get("font_size", 0),
@@ -2503,8 +2909,12 @@ class ConditionalStyleEditorDialog(QDialog):
             underline=properties.get("underline", False),
             background_color=properties.get("background_color", ""),
             text_color=properties.get("text_color", ""),
-            h_align=properties.get("h_align", properties.get("horizontal_align", "center")),
-            v_align=properties.get("v_align", properties.get("vertical_align", "middle")),
+            h_align=properties.get(
+                "h_align", properties.get("horizontal_align", "center")
+            ),
+            v_align=properties.get(
+                "v_align", properties.get("vertical_align", "middle")
+            ),
             offset=properties.get("offset", properties.get("offset_to_frame", 0)),
             properties=properties,
             hover_properties=hover_properties,
@@ -2528,4 +2938,3 @@ class ConditionalStyleEditorDialog(QDialog):
         except Exception:
             # In headless contexts or during tests, QMessageBox may fail.
             logger.warning("Condition Error: %s", message)
-
