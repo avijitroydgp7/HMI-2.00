@@ -58,6 +58,7 @@ from PyQt6.QtGui import (
 from PyQt6.QtSvg import QSvgRenderer
 from utils.icon_manager import IconManager
 from dialogs.icon_picker_dialog import IconPickerDialog
+from utils.dpi import dpi_scale
 import os
 from dialogs.widgets import TagSelector
 from services.comment_data_service import comment_data_service
@@ -273,7 +274,7 @@ class IconButton(QPushButton):
         self.pixmap_hover: Optional[QPixmap] = None
         self.pixmap_click: Optional[QPixmap] = None
 
-        self.icon_size = QSize(50, 50)
+        self.icon_size = QSize(dpi_scale(50), dpi_scale(50))
         self._is_pressed = False
 
     def set_icon(self, source: str):
@@ -904,7 +905,8 @@ class LedIndicator(QFrame):
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setFixedSize(40, 40)
+        size = dpi_scale(40)
+        self.setFixedSize(size, size)
 
 
 class ConditionalStyleEditorDialog(QDialog):
@@ -1322,7 +1324,7 @@ class ConditionalStyleEditorDialog(QDialog):
         preview_group_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.preview_stack = QStackedWidget()
         self.preview_button = PreviewButton("Preview")
-        self.preview_button.setMinimumSize(200, 100)
+        self.preview_button.setMinimumSize(dpi_scale(200), dpi_scale(100))
         self.preview_switch = SwitchButton()
         self.preview_led = LedIndicator()
         self.preview_stack.addWidget(self.preview_button)
@@ -2442,15 +2444,15 @@ class ConditionalStyleEditorDialog(QDialog):
 
         self.preview_stack.setFixedSize(size)
         width = self.preview_group.width() or self.preview_group.sizeHint().width()
-        self.preview_group.setFixedSize(width, size.height() + 20)
+        self.preview_group.setFixedSize(width, size.height() + dpi_scale(20))
 
     def update_dynamic_ranges(self):
-        width = 200
-        height = 100
+        width = dpi_scale(200)
+        height = dpi_scale(100)
         # Corner radii can be up to half of the smaller dimension.
         radius_limit = min(width, height) // 2
         # Border widths are limited to 10% of the smaller dimension, capped at 20px.
-        border_limit = min(20, max(1, min(width, height) // 10))
+        border_limit = min(dpi_scale(20), max(1, min(width, height) // 10))
         for s in [
             self.tl_radius_spin,
             self.tr_radius_spin,
@@ -2463,8 +2465,8 @@ class ConditionalStyleEditorDialog(QDialog):
     def generate_qss(self, component_type):
         shape_style = self.shape_style_combo.currentText()
         bg_type = self.bg_type_combo.currentText()
-        width = 200
-        height = 100
+        width = dpi_scale(200)
+        height = dpi_scale(100)
         padding = min(width, height) // 10
         tl_radius = self.tl_radius_spin.value()
         tr_radius = self.tr_radius_spin.value()
@@ -2503,7 +2505,7 @@ class ConditionalStyleEditorDialog(QDialog):
         elif component_type == "Toggle Switch":
             self.preview_switch.setFixedSize(width, height)
         elif component_type == "LED Indicator":
-            size = 40
+            size = dpi_scale(40)
             radius = size // 2
             self.preview_led.setFixedSize(size, size)
             main_qss = [

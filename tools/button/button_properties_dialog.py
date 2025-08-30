@@ -7,6 +7,7 @@ from PyQt6.QtWidgets import (
     QListWidget, QListWidgetItem, QToolButton, QStyle
 )
 from PyQt6.QtCore import Qt, QSize
+from utils.dpi import dpi_scale
 from typing import Dict, Any, Optional
 import logging
 import copy
@@ -538,7 +539,7 @@ class ButtonPropertiesDialog(QDialog):
 
         # Preview widgets
         self.preview_button = PreviewButton("Preview")
-        self.preview_button.setMinimumSize(200, 100)
+        self.preview_button.setMinimumSize(dpi_scale(200), dpi_scale(100))
         self.preview_switch = SwitchButton()
         self.preview_led = LedIndicator()
         self.preview_stack = QStackedWidget()
@@ -617,7 +618,7 @@ class ButtonPropertiesDialog(QDialog):
 
         # Small preview button
         preview = PreviewButton("Aa")
-        preview.setFixedSize(90, 36)
+        preview.setFixedSize(dpi_scale(90), dpi_scale(36))
         # Apply minimal styling based on base/hover/click props or stylesheet
         if style.style_sheet:
             preview.setStyleSheet(style.style_sheet)
@@ -646,7 +647,7 @@ class ButtonPropertiesDialog(QDialog):
             preview.set_icon(base_props.get('icon', ''))
             preview.set_hover_icon(hover_props.get('icon', ''))
             preview.set_click_icon(click_props.get('icon', ''))
-            icon_sz = base_props.get('icon_size', 20)
+            icon_sz = dpi_scale(base_props.get('icon_size', 20))
             preview.set_icon_size(icon_sz)
 
         # Label for style id
@@ -787,7 +788,7 @@ class ButtonPropertiesDialog(QDialog):
             self.preview_button.set_icon("")
             self.preview_button.set_hover_icon("")
             self.preview_button.set_click_icon("")
-            self.preview_button.setFixedSize(200, 100)
+            self.preview_button.setFixedSize(dpi_scale(200), dpi_scale(100))
             self.preview_switch.setStyleSheet("")
             self.preview_led.setStyleSheet("")
             self.preview_stack.setCurrentWidget(self.preview_button)
@@ -843,9 +844,9 @@ class ButtonPropertiesDialog(QDialog):
         else:
             self.preview_stack.setCurrentWidget(self.preview_button)
             if component_type in {"Circle Button", "Square Button"}:
-                self.preview_button.setFixedSize(200, 200)
+                self.preview_button.setFixedSize(dpi_scale(200), dpi_scale(200))
             else:
-                self.preview_button.setFixedSize(200, 100)
+                self.preview_button.setFixedSize(dpi_scale(200), dpi_scale(100))
 
             if style.style_sheet:
                 self.preview_button.setStyleSheet(style.style_sheet)
