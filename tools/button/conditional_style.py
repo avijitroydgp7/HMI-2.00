@@ -1315,7 +1315,7 @@ class ConditionalStyleEditorDialog(QDialog):
         main_layout.addWidget(self.button_box, 3, 0, 1, 2)
         self._validate_condition_section()
 
-        preview_group = QGroupBox("Preview")
+        self.preview_group = QGroupBox("Preview")
         preview_group_layout = QVBoxLayout()
         preview_group_layout.setContentsMargins(5, 5, 5, 5)
         preview_group_layout.setSpacing(8)
@@ -1329,12 +1329,11 @@ class ConditionalStyleEditorDialog(QDialog):
         self.preview_stack.addWidget(self.preview_switch)
         self.preview_stack.addWidget(self.preview_led)
         preview_group_layout.addWidget(self.preview_stack)
-        preview_group.setLayout(preview_group_layout)
-        preview_group.setFixedWidth(250)
-        main_layout.addWidget(preview_group, 1, 1)
+        self.preview_group.setLayout(preview_group_layout)
+        self.preview_group.setFixedWidth(250)
+        main_layout.addWidget(self.preview_group, 1, 1)
 
         # Ensure group boxes line up neatly
-        preview_group.setMinimumHeight(style_group.sizeHint().height())
         self.condition_group.setMinimumHeight(self.border_group.sizeHint().height())
 
         for w in [
@@ -1346,6 +1345,9 @@ class ConditionalStyleEditorDialog(QDialog):
         ]:
             w.valueChanged.connect(self.update_preview)
         self.component_type_combo.currentTextChanged.connect(self.update_preview)
+        self.component_type_combo.currentTextChanged.connect(
+            self.adjust_preview_size
+        )
 
         self.set_initial_colors()
 
@@ -1359,6 +1361,7 @@ class ConditionalStyleEditorDialog(QDialog):
 
         self.update_controls_state()
         self.update_preview()
+        self.adjust_preview_size(self.component_type_combo.currentText())
 
         # Use a wider default size to accommodate grouped controls and tabs
         self.resize(580, 850)
@@ -2424,6 +2427,22 @@ class ConditionalStyleEditorDialog(QDialog):
 
         self.update_dynamic_ranges()
         self.update_preview()
+
+    def adjust_preview_size(self, component_type: str):
+        if component_type == "Toggle Switch":
+            widget = self.preview_switch
+        elif component_type == "LED Indicator":
+            widget = self.preview_led
+        else:
+            widget = self.preview_button
+
+        size = widget.size()
+        if not size.isValid() or size == QSize(0, 0):
+            size = widget.sizeHint()
+
+        self.preview_stack.setFixedSize(size)
+        width = self.preview_group.width() or self.preview_group.sizeHint().width()
+        self.preview_group.setFixedSize(width, size.height() + 20)
 
     def update_dynamic_ranges(self):
         width = 200
