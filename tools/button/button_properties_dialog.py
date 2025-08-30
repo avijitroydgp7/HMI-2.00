@@ -3,9 +3,10 @@ from PyQt6.QtWidgets import (
     QTabWidget, QWidget, QDialogButtonBox, QLabel, QFormLayout,
     QLineEdit, QTableWidget, QTableWidgetItem, QHeaderView,
     QPushButton, QHBoxLayout, QAbstractItemView, QVBoxLayout,
-    QSplitter, QGroupBox, QStackedWidget, QDialog, QInputDialog
+    QSplitter, QGroupBox, QStackedWidget, QDialog, QInputDialog,
+    QListWidget, QListWidgetItem, QToolButton, QStyle
 )
-from PyQt6.QtCore import Qt
+from PyQt6.QtCore import Qt, QSize
 from typing import Dict, Any, Optional
 import logging
 import copy
@@ -489,18 +490,11 @@ class ButtonPropertiesDialog(QDialog):
         # Splitter for top area
         splitter = QSplitter(Qt.Orientation.Horizontal)
         
-        # Left panel: Style table
-        self.style_table = QTableWidget()
-        self.style_table.setColumnCount(2)
-        self.style_table.setHorizontalHeaderLabels(["#", "Style ID"])
-        self.style_table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
-        self.style_table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
-        self.style_table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
-        self.style_table.verticalHeader().setVisible(False)
-        header = self.style_table.horizontalHeader()
-        header.setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
-        header.setSectionResizeMode(1, QHeaderView.ResizeMode.ResizeToContents)
-        splitter.addWidget(self.style_table)
+        # Left panel: Style list with preview swatches
+        self.style_list = QListWidget()
+        self.style_list.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
+        self.style_list.setUniformItemSizes(True)
+        splitter.addWidget(self.style_list)
 
         # Right panel: Style properties and preview
         right_panel = QWidget()
@@ -562,14 +556,29 @@ class ButtonPropertiesDialog(QDialog):
         # Add splitter to the main layout
         layout.addWidget(splitter)
         
-        # Buttons at the bottom, outside the splitter
+        # Toolbar buttons at the bottom, outside the splitter
         button_layout = QHBoxLayout()
-        self.style_add_btn = QPushButton("Add")
-        self.style_edit_btn = QPushButton("Edit")
-        self.style_remove_btn = QPushButton("Remove")
-        self.style_duplicate_btn = QPushButton("Duplicate")
-        self.style_move_up_btn = QPushButton("Move Up")
-        self.style_move_down_btn = QPushButton("Move Down")
+        self.style_add_btn = QToolButton()
+        self.style_add_btn.setText("Add")
+        self.style_add_btn.setIcon(self.style_add_btn.style().standardIcon(QStyle.StandardPixmap.SP_FileDialogNewFolder))
+        self.style_edit_btn = QToolButton()
+        self.style_edit_btn.setText("Edit")
+        self.style_edit_btn.setIcon(self.style_edit_btn.style().standardIcon(QStyle.StandardPixmap.SP_DialogApplyButton))
+        self.style_remove_btn = QToolButton()
+        self.style_remove_btn.setText("Delete")
+        self.style_remove_btn.setIcon(self.style_remove_btn.style().standardIcon(QStyle.StandardPixmap.SP_TrashIcon))
+        self.style_duplicate_btn = QToolButton()
+        self.style_duplicate_btn.setText("Duplicate")
+        self.style_duplicate_btn.setIcon(self.style_duplicate_btn.style().standardIcon(QStyle.StandardPixmap.SP_FileDialogNewFolder))
+        self.style_move_up_btn = QToolButton()
+        self.style_move_up_btn.setText("Up")
+        self.style_move_up_btn.setIcon(self.style_move_up_btn.style().standardIcon(QStyle.StandardPixmap.SP_ArrowUp))
+        self.style_move_down_btn = QToolButton()
+        self.style_move_down_btn.setText("Down")
+        self.style_move_down_btn.setIcon(self.style_move_down_btn.style().standardIcon(QStyle.StandardPixmap.SP_ArrowDown))
+
+        for btn in (self.style_add_btn, self.style_edit_btn, self.style_remove_btn, self.style_duplicate_btn, self.style_move_up_btn, self.style_move_down_btn):
+            btn.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
 
         button_layout.addWidget(self.style_add_btn)
         button_layout.addWidget(self.style_edit_btn)
@@ -594,17 +603,70 @@ class ButtonPropertiesDialog(QDialog):
         self.style_move_up_btn.setEnabled(False)
         self.style_move_down_btn.setEnabled(False)
 
-        self.style_table.cellDoubleClicked.connect(self._on_style_double_click)
-        self.style_table.itemSelectionChanged.connect(self._on_style_selection_changed)
-        self._refresh_style_table()
+        self.style_list.itemDoubleClicked.connect(self._on_style_double_click)
+        self.style_list.itemSelectionChanged.connect(self._on_style_selection_changed)
+        self._refresh_style_list()
         self._on_style_selection_changed()
 
-    def _refresh_style_table(self):
-        self.style_table.setRowCount(0)
-        for i, style in enumerate(self.style_manager.conditional_styles):
-            self.style_table.insertRow(i)
-            self.style_table.setItem(i, 0, QTableWidgetItem(str(i + 1)))
-            self.style_table.setItem(i, 1, QTableWidgetItem(style.style_id))
+    def _build_swatch_widget(self, style: ConditionalStyle) -> QWidget:
+        """Create a small swatch widget to preview the style in the list."""
+        container = QWidget()
+        hl = QHBoxLayout(container)
+        hl.setContentsMargins(6, 4, 6, 4)
+        hl.setSpacing(8)
+
+        # Small preview button
+        preview = PreviewButton("Aa")
+        preview.setFixedSize(90, 36)
+        # Apply minimal styling based on base/hover/click props or stylesheet
+        if style.style_sheet:
+            preview.setStyleSheet(style.style_sheet)
+        else:
+            temp_manager = ConditionalStyleManager()
+            temp_manager.add_style(copy.deepcopy(style))
+            base_props = temp_manager.get_active_style()
+            hover_props = temp_manager.get_active_style(state='hover')
+            click_props = temp_manager.get_active_style(state='click')
+            qss = (
+                "QPushButton {\n"
+                f"    background-color: {base_props.get('background_color', 'transparent')};\n"
+                f"    color: {base_props.get('text_color', '#000')};\n"
+                f"    border-radius: {base_props.get('border_radius', 4)}px;\n"
+                "}\n"
+                "QPushButton:hover {\n"
+                f"    background-color: {hover_props.get('background_color', base_props.get('background_color', 'transparent'))};\n"
+                f"    color: {hover_props.get('text_color', base_props.get('text_color', '#000'))};\n"
+                "}\n"
+                "QPushButton:pressed {\n"
+                f"    background-color: {click_props.get('background_color', hover_props.get('background_color', base_props.get('background_color', 'transparent')))};\n"
+                f"    color: {click_props.get('text_color', hover_props.get('text_color', base_props.get('text_color', '#000')))};\n"
+                "}\n"
+            )
+            preview.setStyleSheet(qss)
+            preview.set_icon(base_props.get('icon', ''))
+            preview.set_hover_icon(hover_props.get('icon', ''))
+            preview.set_click_icon(click_props.get('icon', ''))
+            icon_sz = base_props.get('icon_size', 20)
+            preview.set_icon_size(icon_sz)
+
+        # Label for style id
+        label = QLabel(style.style_id)
+        label.setMinimumWidth(120)
+        label.setToolTip(style.tooltip)
+
+        hl.addWidget(preview)
+        hl.addWidget(label)
+        hl.addStretch()
+        return container
+
+    def _refresh_style_list(self):
+        self.style_list.clear()
+        for style in self.style_manager.conditional_styles:
+            item = QListWidgetItem()
+            item.setSizeHint(QSize(240, 48))
+            self.style_list.addItem(item)
+            widget = self._build_swatch_widget(style)
+            self.style_list.setItemWidget(item, widget)
 
     def _generate_unique_style_id(self, base_id: str) -> str:
         existing = {s.style_id for s in self.style_manager.conditional_styles}
@@ -641,16 +703,15 @@ class ButtonPropertiesDialog(QDialog):
             if new_style:
                 self._ensure_unique_style(new_style)
                 self.style_manager.add_style(new_style)
-                self._refresh_style_table()
+                self._refresh_style_list()
                 row = len(self.style_manager.conditional_styles) - 1
-                self.style_table.selectRow(row)
+                self.style_list.setCurrentRow(row)
                 self._on_style_selection_changed()
 
     def _edit_style(self):
-        selected_rows = self.style_table.selectionModel().selectedRows()
-        if not selected_rows:
+        row = self.style_list.currentRow()
+        if row < 0:
             return
-        row = selected_rows[0].row()
         if row >= len(self.style_manager.conditional_styles):
             return
         style = self.style_manager.conditional_styles[row]
@@ -660,64 +721,60 @@ class ButtonPropertiesDialog(QDialog):
             if updated_style:
                 # Use manager helper to ensure internal structures stay consistent
                 self.style_manager.update_style(row, updated_style)
-                self._refresh_style_table()
-                self.style_table.selectRow(row)
+                self._refresh_style_list()
+                self.style_list.setCurrentRow(row)
                 self._on_style_selection_changed()
 
     def _remove_style(self):
-        selected_rows = self.style_table.selectionModel().selectedRows()
-        if not selected_rows:
+        row = self.style_list.currentRow()
+        if row < 0:
             return
-        row = selected_rows[0].row()
         if 0 <= row < len(self.style_manager.conditional_styles):
             self.style_manager.remove_style(row)
-            self._refresh_style_table()
+            self._refresh_style_list()
             self._on_style_selection_changed()
 
     def _duplicate_style(self):
-        selected_rows = self.style_table.selectionModel().selectedRows()
-        if not selected_rows:
+        row = self.style_list.currentRow()
+        if row < 0:
             return
-        row = selected_rows[0].row()
         if 0 <= row < len(self.style_manager.conditional_styles):
             original = self.style_manager.conditional_styles[row]
             duplicated = copy.deepcopy(original)
             self._ensure_unique_style(duplicated)
             self.style_manager.conditional_styles.insert(row + 1, duplicated)
-            self._refresh_style_table()
-            self.style_table.selectRow(row + 1)
+            self._refresh_style_list()
+            self.style_list.setCurrentRow(row + 1)
             self._on_style_selection_changed()
 
     def _move_style_up(self):
-        selected_rows = self.style_table.selectionModel().selectedRows()
-        if not selected_rows:
+        row = self.style_list.currentRow()
+        if row < 0:
             return
-        row = selected_rows[0].row()
         styles = self.style_manager.conditional_styles
         if row > 0:
             styles.insert(row - 1, styles.pop(row))
-            self._refresh_style_table()
-            self.style_table.selectRow(row - 1)
+            self._refresh_style_list()
+            self.style_list.setCurrentRow(row - 1)
             self._on_style_selection_changed()
 
     def _move_style_down(self):
-        selected_rows = self.style_table.selectionModel().selectedRows()
-        if not selected_rows:
+        row = self.style_list.currentRow()
+        if row < 0:
             return
-        row = selected_rows[0].row()
         styles = self.style_manager.conditional_styles
         if row < len(styles) - 1:
             styles.insert(row + 1, styles.pop(row))
-            self._refresh_style_table()
-            self.style_table.selectRow(row + 1)
+            self._refresh_style_list()
+            self.style_list.setCurrentRow(row + 1)
             self._on_style_selection_changed()
 
-    def _on_style_double_click(self, row, column):
+    def _on_style_double_click(self, *_):
         self._edit_style()
 
     def _on_style_selection_changed(self):
-        selected_rows = self.style_table.selectionModel().selectedRows()
-        if not selected_rows:
+        row = self.style_list.currentRow()
+        if row < 0:
             self.style_edit_btn.setEnabled(False)
             self.style_remove_btn.setEnabled(False)
             self.style_duplicate_btn.setEnabled(False)
@@ -736,7 +793,6 @@ class ButtonPropertiesDialog(QDialog):
             self.preview_stack.setCurrentWidget(self.preview_button)
             return
 
-        row = selected_rows[0].row()
         self.style_edit_btn.setEnabled(True)
         self.style_remove_btn.setEnabled(True)
         self.style_duplicate_btn.setEnabled(True)
