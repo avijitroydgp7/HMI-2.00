@@ -1539,7 +1539,13 @@ class ConditionalStyleEditorDialog(QDialog):
             else:
                 w.setEnabled(enabled)
 
-    def copy_base_to_state(self, target):
+    def _enable_color_controls(self, controls):
+        for key in ("bg_base_combo", "bg_shade_combo", "text_base_combo", "text_shade_combo"):
+            w = controls.get(key)
+            if w:
+                w.setEnabled(True)
+
+    def copy_base_to_state(self, target, copy_colors=True):
         src = self.base_controls
         for key in self._TEXT_KEYS:
             if key not in src or key not in target:
@@ -1549,9 +1555,11 @@ class ConditionalStyleEditorDialog(QDialog):
                 t.setCurrentText(s.currentText())
                 target["stack"].setCurrentIndex(src["stack"].currentIndex())
             elif key in ["bg_base_combo", "text_base_combo"]:
-                t.setCurrentText(s.currentText())
+                if copy_colors:
+                    t.setCurrentText(s.currentText())
             elif key in ["bg_shade_combo", "text_shade_combo"]:
-                t.setCurrentIndex(s.currentIndex())
+                if copy_colors:
+                    t.setCurrentIndex(s.currentIndex())
             elif key.endswith("_combo"):
                 t.setCurrentText(s.currentText())
             elif key.endswith("_spin"):
@@ -1712,6 +1720,7 @@ class ConditionalStyleEditorDialog(QDialog):
             self.hover_controls["icon_edit"].setEnabled(not checked)
         if checked:
             self.copy_base_to_state(self.hover_controls)
+            self._enable_color_controls(self.hover_controls)
         self.update_preview()
 
     def on_copy_click_toggled(self, checked):
@@ -1720,11 +1729,14 @@ class ConditionalStyleEditorDialog(QDialog):
             self.click_controls["icon_edit"].setEnabled(not checked)
         if checked:
             self.copy_base_to_state(self.click_controls)
+            self._enable_color_controls(self.click_controls)
         self.update_preview()
 
     def on_base_text_changed(self, *args):
         if self.copy_hover_chk.isChecked():
-            self.copy_base_to_state(self.hover_controls)
+            self.copy_base_to_state(self.hover_controls, copy_colors=False)
+        if self.copy_click_chk.isChecked():
+            self.copy_base_to_state(self.click_controls, copy_colors=False)
     def on_state_bg_color_changed(self, state, color):
         if state == "base":
             self._bg_color = color
@@ -2338,9 +2350,9 @@ class ConditionalStyleEditorDialog(QDialog):
 
     def get_style(self) -> ConditionalStyle:
         if self.copy_hover_chk.isChecked():
-            self.copy_base_to_state(self.hover_controls)
+            self.copy_base_to_state(self.hover_controls, copy_colors=False)
         if self.copy_click_chk.isChecked():
-            self.copy_base_to_state(self.click_controls)
+            self.copy_base_to_state(self.click_controls, copy_colors=False)
 
         properties = {
             "component_type": self.component_type_combo.currentText(),
