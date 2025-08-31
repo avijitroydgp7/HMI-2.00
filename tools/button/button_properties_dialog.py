@@ -854,12 +854,8 @@ class ButtonPropertiesDialog(QDialog):
             self.preview_button.set_hover_icon(hover_props.get('icon', ''))
             icon_sz = base_props.get('icon_size', 48)
             self.preview_button.set_icon_size(icon_sz)
-
             text = style.text_value if style.text_type == "Text" else ""
-            if component_type in {"Icon-Only Button", "Image Button"}:
-                self.preview_button.setText("")
-            else:
-                self.preview_button.setText(text or "Preview")
+            self.preview_button.setText(text or "Preview")
             self.preview_button.setToolTip(style.tooltip)
 
     def _populate_extended_style_tab(self):

@@ -955,8 +955,6 @@ class ConditionalStyleEditorDialog(QDialog):
                 "Standard Button",
                 "Circle Button",
                 "Toggle Switch",
-                "Image Button",
-                "Icon-Only Button",
                 "LED Indicator",
             ]
         )
@@ -2317,11 +2315,7 @@ class ConditionalStyleEditorDialog(QDialog):
         for w in [self.gradient_dir_label, self.gradient_type_combo]:
             w.setEnabled(is_gradient)
 
-        is_textless = component_type in {
-            "Image Button",
-            "Icon-Only Button",
-            "LED Indicator",
-        }
+        is_textless = component_type == "LED Indicator"
         for controls in [self.base_controls, self.hover_controls]:
             self._set_state_controls_enabled(controls, not is_textless)
 
@@ -2536,12 +2530,9 @@ class ConditionalStyleEditorDialog(QDialog):
             icon_sz = self.style.properties.get("icon_size", 48)
             self.preview_button.set_icon_size(icon_sz)
             text = ""
-            if component_type in {"Icon-Only Button", "Image Button"}:
-                text = ""
-            else:
-                if self.base_controls["text_type_combo"].currentText() == "Text":
-                    text = self.base_controls["text_edit"].toPlainText()
-                elif self.base_controls["text_type_combo"].currentText() == "Comment":
+            if self.base_controls["text_type_combo"].currentText() == "Text":
+                text = self.base_controls["text_edit"].toPlainText()
+            elif self.base_controls["text_type_combo"].currentText() == "Comment":
                     # Try to resolve constant comment reference for preview
                     try:
                         num_data = self.base_controls["comment_number"].get_data()
