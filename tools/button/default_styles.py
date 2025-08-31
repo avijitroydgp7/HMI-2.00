@@ -132,7 +132,7 @@ def build_solid_variants() -> List[Dict]:
     for key, base in PALETTES:
         text = contrast_text(base)
         hover = darken(base, 0.1)
-        for shape, radius in (("Rounded", 10), ("Pill", 22), ("Square", 0)):
+        for shape, radius in (("Rounded", 10), ("Pill", 22)):
             props = {
                 "shape_style": "Flat",
                 "background_type": "Solid",
@@ -157,7 +157,7 @@ def build_outline_variants() -> List[Dict]:
     for key, base in PALETTES:
         text = base
         bg_hover = lighten(base, 0.85)  # very light tint
-        for shape, radius in (("Rounded", 10), ("Pill", 22), ("Square", 0)):
+        for shape, radius in (("Rounded", 10), ("Pill", 22)):
             props = {
                 "shape_style": "Outline",
                 "background_type": "Solid",
@@ -203,30 +203,6 @@ def build_gradient_variants() -> List[Dict]:
             _base_entry(
                 f"{key}_gradient_rounded",
                 f"{key.title()} Gradient Rounded",
-                props,
-                hover_props,
-            )
-        )
-    return styles
-
-
-def build_3d_variants() -> List[Dict]:
-    styles: List[Dict] = []
-    for key, base in PALETTES:
-        text = contrast_text(base)
-        hover = lighten(base, 0.06)
-        props = {
-            "shape_style": "3D",
-            "background_type": "Solid",
-            "background_color": base,
-            "text_color": text,
-            "border_radius": 6,
-        }
-        hover_props = {"background_color": hover, "text_color": text}
-        styles.append(
-            _base_entry(
-                f"{key}_3d_square",
-                f"{key.title()} 3D Square",
                 props,
                 hover_props,
             )
@@ -356,19 +332,6 @@ LEGACY_STYLES: List[Dict] = [
         },
     },
     {
-        "id": "success_square",
-        "name": "Success Square",
-        "properties": {
-            "background_color": "#4CAF50",
-            "text_color": "#ffffff",
-            "border_radius": 5,
-        },
-        "hover_properties": {
-            "background_color": "#45a049",
-            "text_color": "#ffffff",
-        },
-    },
-    {
         "id": "warning_pill",
         "name": "Warning Pill",
         "properties": {
@@ -477,9 +440,6 @@ STYLE_GROUPS["Outline"] = [s for s in LEGACY_STYLES if s["id"] == "outline_prima
 
 # Group: Gradient
 STYLE_GROUPS["Gradient"] = [s for s in LEGACY_STYLES if s["id"] == "gradient_blue"] + build_gradient_variants()
-
-# Group: 3D
-STYLE_GROUPS["3D"] = build_3d_variants()
 
 # Group: Glass
 STYLE_GROUPS["Glass"] = build_glass_variants()

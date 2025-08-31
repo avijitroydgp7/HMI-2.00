@@ -954,7 +954,6 @@ class ConditionalStyleEditorDialog(QDialog):
             [
                 "Standard Button",
                 "Circle Button",
-                "Square Button",
                 "Toggle Switch",
                 "Image Button",
                 "Icon-Only Button",
@@ -2395,9 +2394,6 @@ class ConditionalStyleEditorDialog(QDialog):
             size = max(width, height)
             radius = size // 2
             tl_radius = tr_radius = br_radius = bl_radius = radius
-            self.preview_button.setFixedSize(size, size)
-        elif component_type == "Square Button":
-            size = max(width, height)
             self.preview_button.setFixedSize(size, size)
         elif component_type == "Toggle Switch":
             self.preview_switch.setFixedSize(width, height)

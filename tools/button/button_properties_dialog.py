@@ -829,7 +829,7 @@ class ButtonPropertiesDialog(QDialog):
             self.preview_led.setToolTip(style.tooltip)
         else:
             self.preview_stack.setCurrentWidget(self.preview_button)
-            if component_type in {"Circle Button", "Square Button"}:
+            if component_type == "Circle Button":
                 self.preview_button.setFixedSize(dpi_scale(200), dpi_scale(200))
             else:
                 self.preview_button.setFixedSize(dpi_scale(200), dpi_scale(100))
