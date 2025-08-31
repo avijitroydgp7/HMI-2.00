@@ -619,8 +619,6 @@ class ConditionalStyle:
 @dataclass
 class ConditionalStyleManager(QObject):
     """Manages conditional styles for buttons"""
-
-    styles_changed: ClassVar[pyqtSignal] = pyqtSignal()
     # Emitted when a condition fails to evaluate; payload is an error message.
     condition_error: ClassVar[pyqtSignal] = pyqtSignal(str)
     parent: Optional[QObject] = None
@@ -645,19 +643,16 @@ class ConditionalStyleManager(QObject):
         """Add a new conditional style"""
         style.style_id = self._generate_unique_style_id(style.style_id)
         self.conditional_styles.append(style)
-        self.styles_changed.emit()
 
     def remove_style(self, index: int):
         """Remove a conditional style by index"""
         if 0 <= index < len(self.conditional_styles):
             del self.conditional_styles[index]
-            self.styles_changed.emit()
 
     def update_style(self, index: int, style: ConditionalStyle):
         """Update an existing conditional style"""
         if 0 <= index < len(self.conditional_styles):
             self.conditional_styles[index] = style
-            self.styles_changed.emit()
 
     def get_active_style(
         self, tag_values: Optional[Dict[str, Any]] = None, state: Optional[str] = None
@@ -830,7 +825,7 @@ class ConditionalStyleManager(QObject):
         return None
 
     def to_dict(self) -> Dict[str, Any]:
-        """Serialize to dictionary"""
+        """Serialize style data without component identifiers."""
         return {
             "conditional_styles": [
                 style.to_dict() for style in self.conditional_styles
@@ -840,7 +835,7 @@ class ConditionalStyleManager(QObject):
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "ConditionalStyleManager":
-        """Deserialize from dictionary"""
+        """Deserialize from dictionary data without component identifiers."""
         manager = cls()
         manager.conditional_styles = [
             ConditionalStyle.from_dict(style_data)
@@ -2480,10 +2475,14 @@ class ConditionalStyleEditorDialog(QDialog):
     def update_preview(self):
         component_type = self.component_type_combo.currentText()
         qss = self.generate_qss(component_type)
-        if component_type == "Toggle Switch":
-            self.preview_switch.setStyleSheet(qss)
-        else:
-            self.preview_button.setStyleSheet(qss)
+        preview_map = {
+            "Toggle Switch": self.preview_switch,
+            "Circle Button": self.preview_button,
+            "Standard Button": self.preview_button,
+        }
+        widget = preview_map.get(component_type, self.preview_button)
+        widget.setStyleSheet(qss)
+        if component_type != "Toggle Switch":
             self.preview_button.set_icon(self.base_controls["icon_edit"].text())
             self.preview_button.set_hover_icon(self.hover_controls["icon_edit"].text())
             icon_sz = self.style.properties.get("icon_size", 48)
@@ -2492,39 +2491,37 @@ class ConditionalStyleEditorDialog(QDialog):
             if self.base_controls["text_type_combo"].currentText() == "Text":
                 text = self.base_controls["text_edit"].toPlainText()
             elif self.base_controls["text_type_combo"].currentText() == "Comment":
-                    # Try to resolve constant comment reference for preview
-                    try:
-                        num_data = self.base_controls["comment_number"].get_data()
-                        col_data = self.base_controls["comment_column"].get_data()
-                        row_data = self.base_controls["comment_row"].get_data()
-                        if (
-                            num_data
-                            and col_data
-                            and row_data
-                            and num_data.get("main_tag", {}).get("source") == "constant"
-                            and col_data.get("main_tag", {}).get("source") == "constant"
-                            and row_data.get("main_tag", {}).get("source") == "constant"
-                        ):
-                            number = str(num_data["main_tag"].get("value", "")).strip()
-                            col = int(float(col_data["main_tag"].get("value", 0)))
-                            row = int(float(row_data["main_tag"].get("value", 0)))
-                            groups = comment_data_service.get_all_groups()
-                            group = None
-                            for g in groups.values():
-                                if g.get("number") == number:
-                                    group = g
-                                    break
-                            if group and row > 0 and col > 0:
-                                comments = group.get("comments", [])
-                                columns = group.get("columns", ["Comment"]) or [
-                                    "Comment"
-                                ]
-                                if row - 1 < len(comments):
-                                    row_vals = comments[row - 1]
-                                    if col - 1 < len(row_vals):
-                                        text = str(row_vals[col - 1])
-                    except Exception:
-                        pass
+                # Try to resolve constant comment reference for preview
+                try:
+                    num_data = self.base_controls["comment_number"].get_data()
+                    col_data = self.base_controls["comment_column"].get_data()
+                    row_data = self.base_controls["comment_row"].get_data()
+                    if (
+                        num_data
+                        and col_data
+                        and row_data
+                        and num_data.get("main_tag", {}).get("source") == "constant"
+                        and col_data.get("main_tag", {}).get("source") == "constant"
+                        and row_data.get("main_tag", {}).get("source") == "constant"
+                    ):
+                        number = str(num_data["main_tag"].get("value", "")).strip()
+                        col = int(float(col_data["main_tag"].get("value", 0)))
+                        row = int(float(row_data["main_tag"].get("value", 0)))
+                        groups = comment_data_service.get_all_groups()
+                        group = None
+                        for g in groups.values():
+                            if g.get("number") == number:
+                                group = g
+                                break
+                        if group and row > 0 and col > 0:
+                            comments = group.get("comments", [])
+                            columns = group.get("columns", ["Comment"]) or ["Comment"]
+                            if row - 1 < len(comments):
+                                row_vals = comments[row - 1]
+                                if col - 1 < len(row_vals):
+                                    text = str(row_vals[col - 1])
+                except Exception:
+                    pass
             self.preview_button.setText(text or "Preview")
 
     def get_style(self) -> ConditionalStyle:
