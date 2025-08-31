@@ -961,7 +961,7 @@ class ConditionalStyleEditorDialog(QDialog):
         style_layout.addWidget(self.shape_style_label, 1, 0)
         self.shape_style_combo = QComboBox()
         self.shape_style_combo.addItems(
-            ["Flat", "3D", "Glass", "Neumorphic", "Outline"]
+            ["Flat", "3D", "Glass", "Outline"]
         )
         self.shape_style_combo.setCurrentText(
             self.style.properties.get("shape_style", "Flat")
@@ -2427,14 +2427,6 @@ class ConditionalStyleEditorDialog(QDialog):
                 [
                     f"background-color: {hover_bg_color.name()};",
                     f"color: {hover_text_color};",
-                ]
-            )
-        elif shape_style == "Neumorphic":
-            base_color = self.palette().color(QPalette.ColorRole.Window)
-            main_qss.extend(
-                [
-                    f"background-color: {base_color.name()};",
-                    f"border: 2px solid {base_color.name()};",
                 ]
             )
         elif shape_style == "Outline":

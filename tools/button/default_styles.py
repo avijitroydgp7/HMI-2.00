@@ -17,7 +17,7 @@ Each style entry is a dictionary compatible with the structure that
     "icon": str | None,
     "hover_icon": str | None,
     "properties": {
-        "shape_style": str,                 # Flat | 3D | Glass | Neumorphic | Outline
+        "shape_style": str,                 # Flat | 3D | Glass | Outline
         "background_type": str,             # Solid | Linear Gradient | Radial Gradient
         "background_color": str,            # #RRGGBB
         "background_color2": str | None,    # for gradients
@@ -242,33 +242,6 @@ def build_glass_variants() -> List[Dict]:
     return styles
 
 
-def build_neumorphic_variants() -> List[Dict]:
-    styles: List[Dict] = []
-    # Neumorphic looks best on light greys
-    bases = [
-        ("softgray", "#e0e0e0"),
-        ("paper", "#f3f3f3"),
-        ("ash", "#d9d9d9"),
-    ]
-    for key, base in bases:
-        text = "#333333"
-        hover = lighten(base, 0.04)
-        props = {
-            "shape_style": "Neumorphic",
-            "background_type": "Solid",
-            "background_color": base,
-            "text_color": text,
-            "border_radius": 16,
-        }
-        styles.append(
-            _base_entry(
-                f"{key}_neumorphic_soft",
-                f"{key.title()} Neumorphic Soft",
-                props,
-                {"background_color": hover, "text_color": text},
-            )
-        )
-    return styles
 
 
 def build_icon_variants() -> List[Dict]:
@@ -393,20 +366,6 @@ LEGACY_STYLES: List[Dict] = [
         },
     },
     {
-        "id": "neumorphic_soft",
-        "name": "Neumorphic Soft",
-        "properties": {
-            "background_color": "#e0e0e0",
-            "text_color": "#333333",
-            "border_radius": 15,
-            "shape_style": "Neumorphic",
-        },
-        "hover_properties": {
-            "background_color": "#e8e8e8",
-            "text_color": "#333333",
-        },
-    },
-    {
         "id": "icon_play",
         "name": "Icon Play",
         "icon": "lib/icon/bolt-circle-svgrepo-com.svg",
@@ -443,9 +402,6 @@ STYLE_GROUPS["Gradient"] = [s for s in LEGACY_STYLES if s["id"] == "gradient_blu
 
 # Group: Glass
 STYLE_GROUPS["Glass"] = build_glass_variants()
-
-# Group: Neumorphic
-STYLE_GROUPS["Neumorphic"] = [s for s in LEGACY_STYLES if s["id"] == "neumorphic_soft"] + build_neumorphic_variants()
 
 # Group: Icons
 STYLE_GROUPS["Icon"] = [s for s in LEGACY_STYLES if s["id"] == "icon_play"] + build_icon_variants()
