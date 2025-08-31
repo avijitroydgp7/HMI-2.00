@@ -264,18 +264,14 @@ class IconButton(QPushButton):
         # SVG renderers
         self.svg_renderer: Optional[QSvgRenderer] = None
         self.svg_renderer_hover: Optional[QSvgRenderer] = None
-        self.svg_renderer_click: Optional[QSvgRenderer] = None
         # QtAwesome icon names (without the 'qta:' prefix)
         self.qt_icon_name: Optional[str] = None
         self.qt_icon_hover_name: Optional[str] = None
-        self.qt_icon_click_name: Optional[str] = None
         # Raster image fallbacks
         self.pixmap: Optional[QPixmap] = None
         self.pixmap_hover: Optional[QPixmap] = None
-        self.pixmap_click: Optional[QPixmap] = None
 
         self.icon_size = QSize(dpi_scale(50), dpi_scale(50))
-        self._is_pressed = False
 
     def set_icon(self, source: str):
         self._assign_icon_source(source, variant="base")
@@ -284,13 +280,6 @@ class IconButton(QPushButton):
     def set_hover_icon(self, source: str):
         self._assign_icon_source(source, variant="hover")
         self.update()
-
-    def set_click_icon(self, source: str):
-        self._assign_icon_source(source, variant="click")
-        self.update()
-
-    def set_icon_clicked(self, source: str):
-        self.set_click_icon(source)
 
     def set_icon_size(self, size: int):
         self.icon_size = QSize(size, size)
@@ -306,10 +295,6 @@ class IconButton(QPushButton):
             self.svg_renderer_hover = None
             self.qt_icon_hover_name = None
             self.pixmap_hover = None
-        elif variant == "click":
-            self.svg_renderer_click = None
-            self.qt_icon_click_name = None
-            self.pixmap_click = None
 
         if not source:
             return
@@ -321,8 +306,6 @@ class IconButton(QPushButton):
                 self.qt_icon_name = name
             elif variant == "hover":
                 self.qt_icon_hover_name = name
-            else:
-                self.qt_icon_click_name = name
             return
 
         # File path
@@ -335,8 +318,6 @@ class IconButton(QPushButton):
                 self.svg_renderer = renderer
             elif variant == "hover":
                 self.svg_renderer_hover = renderer
-            else:
-                self.svg_renderer_click = renderer
             return
         # Raster image
         pix = QPixmap(src)
@@ -345,18 +326,6 @@ class IconButton(QPushButton):
                 self.pixmap = pix
             elif variant == "hover":
                 self.pixmap_hover = pix
-            else:
-                self.pixmap_click = pix
-
-    def mousePressEvent(self, e):
-        self._is_pressed = True
-        self.update()
-        super().mousePressEvent(e)
-
-    def mouseReleaseEvent(self, e):
-        self._is_pressed = False
-        self.update()
-        super().mouseReleaseEvent(e)
 
     def enterEvent(self, e):
         self.update()
@@ -367,8 +336,6 @@ class IconButton(QPushButton):
         super().leaveEvent(e)
 
     def _current_sources(self):
-        if self._is_pressed:
-            return (self.svg_renderer_click, self.qt_icon_click_name, self.pixmap_click)
         if self.underMouse():
             return (self.svg_renderer_hover, self.qt_icon_hover_name, self.pixmap_hover)
         return (self.svg_renderer, self.qt_icon_name, self.pixmap)
@@ -489,12 +456,10 @@ class ConditionalStyle:
     offset: int = 0
     icon: str = ""
     hover_icon: str = ""
-    click_icon: str = ""
     # miscellaneous properties remain grouped
     properties: Dict[str, Any] = field(default_factory=dict)
     tooltip: str = ""
     hover_properties: Dict[str, Any] = field(default_factory=dict)
-    click_properties: Dict[str, Any] = field(default_factory=dict)
     animation: AnimationProperties = field(default_factory=AnimationProperties)
     style_sheet: str = ""
 
@@ -569,10 +534,8 @@ class ConditionalStyle:
             "offset": self.offset,
             "icon": self.icon,
             "hover_icon": self.hover_icon,
-            "click_icon": self.click_icon,
             "properties": self.properties,
             "hover_properties": self._normalize_state(self.hover_properties),
-            "click_properties": self._normalize_state(self.click_properties),
             "animation": self.animation.to_dict(),
             "style_sheet": self.style_sheet,
         }
@@ -581,14 +544,12 @@ class ConditionalStyle:
     def from_dict(cls, data: Dict[str, Any]) -> "ConditionalStyle":
         props = data.get("properties", {})
         hover = cls._normalize_state(data.get("hover_properties", {}))
-        click = cls._normalize_state(data.get("click_properties", {}))
         style = cls(
             style_id=data.get("style_id", ""),
             condition=data.get("condition"),
             tooltip=data.get("tooltip", ""),
             icon=data.get("icon", data.get("svg_icon", "")),
             hover_icon=data.get("hover_icon", ""),
-            click_icon=data.get("click_icon", data.get("svg_icon_clicked", "")),
             text_type=data.get("text_type", props.get("text_type", "Text")),
             text_value=data.get("text_value", props.get("text", "")),
             comment_ref=data.get(
@@ -617,7 +578,6 @@ class ConditionalStyle:
             offset=data.get("offset", props.get("offset_to_frame", 0)),
             properties=props,
             hover_properties=hover,
-            click_properties=click,
             style_sheet=data.get("style_sheet", ""),
         )
         cond = data.get("condition_data", {"mode": TriggerMode.ORDINARY.value})
@@ -717,7 +677,7 @@ class ConditionalStyleManager(QObject):
             Current tag values used when evaluating style conditions.
         state: Optional[str]
             Optional state for which to retrieve additional properties.
-            Supported states: ``"hover"`` and ``"click"``.
+            Supported state: ``"hover"``.
         """
         tag_values = tag_values or {}
 
@@ -746,13 +706,10 @@ class ConditionalStyleManager(QObject):
                 props = dict(style.properties)
                 props["icon"] = style.icon
                 props["hover_icon"] = style.hover_icon
-                props["click_icon"] = style.click_icon
                 if state:
                     props.update(getattr(style, f"{state}_properties", {}))
                     if state == "hover" and style.hover_icon:
                         props["icon"] = style.hover_icon
-                    if state == "click" and style.click_icon:
-                        props["icon"] = style.click_icon
                 if style.tooltip:
 
                     props["tooltip"] = style.tooltip
@@ -936,14 +893,12 @@ class ConditionalStyleEditorDialog(QDialog):
         self.style = copy.deepcopy(style) if style else ConditionalStyle()
         self._text_color = self.style.properties.get("text_color", "")
         self._hover_text_color = self.style.hover_properties.get("text_color", "")
-        self._click_text_color = self.style.click_properties.get("text_color", "")
 
         # Initialize background-related colors so early update/preview calls
         # have default values to work with.  These will be overwritten once
         # the proper colour scheme is applied via ``set_initial_colors``.
         self._bg_color = QColor()
         self._hover_bg_color = QColor()
-        self._click_bg_color = QColor()
         self._bg_color2 = QColor()
         self._border_color = QColor()
 
@@ -1217,24 +1172,15 @@ class ConditionalStyleEditorDialog(QDialog):
             self.style.hover_properties, "hover"
         )
         style_tabs.addTab(self.hover_tab, "Hover")
-
-        self.click_tab, self.click_controls = self._build_state_tab(
-            self.style.click_properties, "click"
-        )
-        style_tabs.addTab(self.click_tab, "Click")
-
         self.base_controls["icon_edit"].setText(self.style.icon)
         self.hover_controls["icon_edit"].setText(self.style.hover_icon)
-        self.click_controls["icon_edit"].setText(self.style.click_icon)
 
         # Convenience shortcuts for commonly used controls
         self.font_size_spin = self.base_controls["font_size_spin"]
 
         # checkboxes for syncing text properties
         self.copy_hover_chk = QCheckBox("Text base = Hover")
-        self.copy_click_chk = QCheckBox("Text base = Click")
         self.copy_hover_chk.toggled.connect(self.on_copy_hover_toggled)
-        self.copy_click_chk.toggled.connect(self.on_copy_click_toggled)
 
         # connect base text controls to keep synced when needed
         self._connect_base_text_signals()
@@ -1303,7 +1249,6 @@ class ConditionalStyleEditorDialog(QDialog):
         cb_layout.setSpacing(6)
         cb_layout.addStretch()
         cb_layout.addWidget(self.copy_hover_chk)
-        cb_layout.addWidget(self.copy_click_chk)
         cb_layout.addStretch()
         options_layout.addLayout(cb_layout, 2, 0, 1, 2)
 
@@ -1355,7 +1300,6 @@ class ConditionalStyleEditorDialog(QDialog):
 
         # Initialize copy states after colors and preview widgets are ready
         self.on_copy_hover_toggled(False)
-        self.on_copy_click_toggled(False)
 
         # Ensure border width enablement reflects current style selection
 
@@ -1924,20 +1868,9 @@ class ConditionalStyleEditorDialog(QDialog):
             self._enable_color_controls(self.hover_controls)
         self.update_preview()
 
-    def on_copy_click_toggled(self, checked):
-        self._set_state_controls_enabled(self.click_controls, not checked)
-        if "icon_edit" in self.click_controls:
-            self.click_controls["icon_edit"].setEnabled(not checked)
-        if checked:
-            self.copy_base_to_state(self.click_controls)
-            self._enable_color_controls(self.click_controls)
-        self.update_preview()
-
     def on_base_text_changed(self, *args):
         if self.copy_hover_chk.isChecked():
             self.copy_base_to_state(self.hover_controls, copy_colors=False)
-        if self.copy_click_chk.isChecked():
-            self.copy_base_to_state(self.click_controls, copy_colors=False)
 
     def on_state_bg_color_changed(self, state, color):
         if state == "base":
@@ -1960,15 +1893,6 @@ class ConditionalStyleEditorDialog(QDialog):
                 self.hover_controls["text_shade_combo"],
                 txt,
             )
-        elif state == "click":
-            self._click_bg_color = color
-            txt = self.get_contrast_color(self._click_bg_color)
-            self._click_text_color = txt.name()
-            self.set_combo_selection(
-                self.click_controls["text_base_combo"],
-                self.click_controls["text_shade_combo"],
-                txt,
-            )
         self.update_preview()
 
     def on_state_text_color_changed(self, state, color):
@@ -1977,8 +1901,6 @@ class ConditionalStyleEditorDialog(QDialog):
             self._text_color = name
         elif state == "hover":
             self._hover_text_color = name
-        elif state == "click":
-            self._click_text_color = name
         self.update_preview()
 
     def init_colors(self):
@@ -2169,30 +2091,23 @@ class ConditionalStyleEditorDialog(QDialog):
             self.on_state_bg_color_changed("base", final_color)
         elif base_combo is self.hover_controls.get("bg_base_combo"):
             self.on_state_bg_color_changed("hover", final_color)
-        elif base_combo is self.click_controls.get("bg_base_combo"):
-            self.on_state_bg_color_changed("click", final_color)
         elif base_combo is self.base_controls.get("text_base_combo"):
             self.on_state_text_color_changed("base", final_color)
         elif base_combo is self.hover_controls.get("text_base_combo"):
             self.on_state_text_color_changed("hover", final_color)
-        elif base_combo is self.click_controls.get("text_base_combo"):
-            self.on_state_text_color_changed("click", final_color)
 
     def on_bg_color_changed(self, color_name, color):
         if not color:
             return
         self._bg_color = color
         self._hover_bg_color = color.lighter(120)
-        self._click_bg_color = color.darker(120)
         self._border_color = color.darker(150)
         self._bg_color2 = color.lighter(130)
 
         base_text = self.get_contrast_color(self._bg_color)
         hover_text = self.get_contrast_color(self._hover_bg_color)
-        click_text = self.get_contrast_color(self._click_bg_color)
         self._text_color = base_text.name()
         self._hover_text_color = hover_text.name()
-        self._click_text_color = click_text.name()
 
         self.set_combo_selection(
             self.base_controls["bg_base_combo"],
@@ -2205,11 +2120,6 @@ class ConditionalStyleEditorDialog(QDialog):
             self._hover_bg_color,
         )
         self.set_combo_selection(
-            self.click_controls["bg_base_combo"],
-            self.click_controls["bg_shade_combo"],
-            self._click_bg_color,
-        )
-        self.set_combo_selection(
             self.base_controls["text_base_combo"],
             self.base_controls["text_shade_combo"],
             base_text,
@@ -2218,11 +2128,6 @@ class ConditionalStyleEditorDialog(QDialog):
             self.hover_controls["text_base_combo"],
             self.hover_controls["text_shade_combo"],
             hover_text,
-        )
-        self.set_combo_selection(
-            self.click_controls["text_base_combo"],
-            self.click_controls["text_shade_combo"],
-            click_text,
         )
         self.update_preview()
 
@@ -2235,7 +2140,6 @@ class ConditionalStyleEditorDialog(QDialog):
 
         orig_base_text = self._text_color
         orig_hover_text = self._hover_text_color
-        orig_click_text = self._click_text_color
 
         self.on_bg_color_changed("Green", self._bg_color)
 
@@ -2250,12 +2154,6 @@ class ConditionalStyleEditorDialog(QDialog):
                 self.hover_controls["text_base_combo"],
                 self.hover_controls["text_shade_combo"],
                 QColor(orig_hover_text),
-            )
-        if orig_click_text:
-            self.set_combo_selection(
-                self.click_controls["text_base_combo"],
-                self.click_controls["text_shade_combo"],
-                QColor(orig_click_text),
             )
 
     def create_coord_spinbox(self, value=0):
@@ -2424,7 +2322,7 @@ class ConditionalStyleEditorDialog(QDialog):
             "Icon-Only Button",
             "LED Indicator",
         }
-        for controls in [self.base_controls, self.hover_controls, self.click_controls]:
+        for controls in [self.base_controls, self.hover_controls]:
             self._set_state_controls_enabled(controls, not is_textless)
 
         self.update_dynamic_ranges()
@@ -2476,14 +2374,12 @@ class ConditionalStyleEditorDialog(QDialog):
         border_style = self.border_style_combo.currentData()
         bg_color = self._bg_color
         hover_bg_color = self._hover_bg_color
-        click_bg_color = self._click_bg_color
         border_color = self._border_color
         text_color = (
             self._text_color
             or self.palette().color(QPalette.ColorRole.ButtonText).name()
         )
         hover_text_color = self._hover_text_color or text_color
-        click_text_color = self._click_text_color or text_color
         font_size = self.font_size_spin.value()
         font_family = self.base_controls["font_family_combo"].currentText()
         font_weight = "bold" if self.base_controls["bold_btn"].isChecked() else "normal"
@@ -2517,7 +2413,7 @@ class ConditionalStyleEditorDialog(QDialog):
         else:
             self.preview_button.setFixedSize(width, height)
 
-        main_qss, hover_qss, pressed_qss = [], [], []
+        main_qss, hover_qss = [], []
         main_qss.extend(
             [
                 f"padding: {padding}px;",
@@ -2547,12 +2443,6 @@ class ConditionalStyleEditorDialog(QDialog):
                     f"color: {hover_text_color};",
                 ]
             )
-            pressed_qss.extend(
-                [
-                    f"background-color: {click_bg_color.name()};",
-                    f"color: {click_text_color};",
-                ]
-            )
         elif shape_style == "3D":
             main_qss.extend(
                 [
@@ -2579,26 +2469,12 @@ class ConditionalStyleEditorDialog(QDialog):
                     f"color: {hover_text_color};",
                 ]
             )
-            pressed_qss.extend(
-                [
-                    "border-style: inset;",
-                    f"background-color: {click_bg_color.name()};",
-                    f"color: {click_text_color};",
-                ]
-            )
         elif shape_style == "Neumorphic":
             base_color = self.palette().color(QPalette.ColorRole.Window)
             main_qss.extend(
                 [
                     f"background-color: {base_color.name()};",
                     f"border: 2px solid {base_color.name()};",
-                ]
-            )
-            pressed_qss.extend(
-                [
-                    f"border: 2px solid {base_color.darker(115).name()};",
-                    f"border-top-color: {base_color.lighter(115).name()};",
-                    f"border-left-color: {base_color.lighter(115).name()};",
                 ]
             )
         elif shape_style == "Outline":
@@ -2613,12 +2489,6 @@ class ConditionalStyleEditorDialog(QDialog):
                 [
                     f"background-color: {hover_bg_color.name()};",
                     f"color: {hover_text_color};",
-                ]
-            )
-            pressed_qss.extend(
-                [
-                    f"background-color: {click_bg_color.name()};",
-                    f"color: {click_text_color};",
                 ]
             )
         else:
@@ -2647,21 +2517,12 @@ class ConditionalStyleEditorDialog(QDialog):
                     f"color: {hover_text_color};",
                 ]
             )
-            pressed_qss.extend(
-                [
-                    f"background-color: {click_bg_color.name()};",
-                    f"color: {click_text_color};",
-                ]
-            )
 
         main_qss_str = "\n    ".join(main_qss)
         hover_qss_str = "\n    ".join(hover_qss) if hover_qss else ""
-        pressed_qss_str = "\n    ".join(pressed_qss) if pressed_qss else ""
         final_qss = f"QPushButton {{\n    {main_qss_str}\n}}\n"
         if hover_qss_str:
             final_qss += f"QPushButton:hover {{\n    {hover_qss_str}\n}}\n"
-        if pressed_qss_str:
-            final_qss += f"QPushButton:pressed {{\n    {pressed_qss_str}\n}}\n"
         return final_qss
 
     def update_preview(self):
@@ -2675,7 +2536,6 @@ class ConditionalStyleEditorDialog(QDialog):
             self.preview_button.setStyleSheet(qss)
             self.preview_button.set_icon(self.base_controls["icon_edit"].text())
             self.preview_button.set_hover_icon(self.hover_controls["icon_edit"].text())
-            self.preview_button.set_click_icon(self.click_controls["icon_edit"].text())
             icon_sz = self.style.properties.get("icon_size", 48)
             self.preview_button.set_icon_size(icon_sz)
             text = ""
@@ -2723,8 +2583,6 @@ class ConditionalStyleEditorDialog(QDialog):
     def get_style(self) -> ConditionalStyle:
         if self.copy_hover_chk.isChecked():
             self.copy_base_to_state(self.hover_controls, copy_colors=False)
-        if self.copy_click_chk.isChecked():
-            self.copy_base_to_state(self.click_controls, copy_colors=False)
 
         properties = {
             "component_type": self.component_type_combo.currentText(),
@@ -2827,42 +2685,6 @@ class ConditionalStyleEditorDialog(QDialog):
                 "text_edit"
             ].toPlainText()
 
-        click_properties = {
-            "background_color": self._click_bg_color.name(),
-            "text_color": self._click_text_color,
-            "font_size": self.click_controls["font_size_spin"].value(),
-            "font_family": self.click_controls["font_family_combo"].currentText(),
-            "bold": self.click_controls["bold_btn"].isChecked(),
-            "italic": self.click_controls["italic_btn"].isChecked(),
-            "underline": self.click_controls["underline_btn"].isChecked(),
-            "v_align": (
-                self.click_controls["v_align_group"]
-                .checkedButton()
-                .property("align_value")
-                if self.click_controls["v_align_group"].checkedButton()
-                else "middle"
-            ),
-            "h_align": (
-                self.click_controls["h_align_group"]
-                .checkedButton()
-                .property("align_value")
-                if self.click_controls["h_align_group"].checkedButton()
-                else "center"
-            ),
-            "offset": self.click_controls["offset_spin"].value(),
-            "text_type": self.click_controls["text_type_combo"].currentText(),
-        }
-        if click_properties["text_type"] == "Comment":
-            click_properties["comment_ref"] = {
-                "number": self.click_controls["comment_number"].get_data(),
-                "column": self.click_controls["comment_column"].get_data(),
-                "row": self.click_controls["comment_row"].get_data(),
-            }
-        else:
-            click_properties["text_value"] = self.click_controls[
-                "text_edit"
-            ].toPlainText()
-
         condition_cfg = {"mode": self.condition_mode_combo.currentText()}
         if condition_cfg["mode"] in (TriggerMode.ON.value, TriggerMode.OFF.value):
             data = (
@@ -2908,7 +2730,6 @@ class ConditionalStyleEditorDialog(QDialog):
             tooltip=self.tooltip_edit.text(),
             icon=self.base_controls["icon_edit"].text(),
             hover_icon=self.hover_controls["icon_edit"].text(),
-            click_icon=self.click_controls["icon_edit"].text(),
             text_type=properties.get("text_type", "Text"),
             text_value=properties.get("text_value", properties.get("text", "")),
             comment_ref=properties.get(
@@ -2939,7 +2760,6 @@ class ConditionalStyleEditorDialog(QDialog):
             offset=properties.get("offset", properties.get("offset_to_frame", 0)),
             properties=properties,
             hover_properties=hover_properties,
-            click_properties=click_properties,
             condition_data=condition_cfg,
         )
         style.style_sheet = self.generate_qss(component_type)

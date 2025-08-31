@@ -787,7 +787,6 @@ class ButtonPropertiesDialog(QDialog):
             self.preview_button.setText("Preview")
             self.preview_button.set_icon("")
             self.preview_button.set_hover_icon("")
-            self.preview_button.set_click_icon("")
             self.preview_button.setFixedSize(dpi_scale(200), dpi_scale(100))
             self.preview_switch.setStyleSheet("")
             self.preview_led.setStyleSheet("")

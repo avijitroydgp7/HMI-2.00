@@ -367,6 +367,11 @@ class PropertyEditor(QStackedWidget):
         self.setCurrentWidget(self.blank_page)
         return None
 
+    # Backward compatibility: some code/tests expect this legacy helper name
+    def _build_editor_for_instance(self, tool_type, incoming_props: dict):
+        """Compatibility wrapper for building an editor for a given tool type."""
+        return self._build_editor(tool_type, incoming_props)
+
     def _update_editor_fields(self, tool_type, props: dict):
         """Update existing editor widgets in place based on new props.
         Signals are blocked during programmatic updates to avoid feedback loops.
