@@ -23,7 +23,6 @@ from .conditional_style import (
     ConditionalStyleEditorDialog,
     PreviewButton,
     SwitchButton,
-    LedIndicator,
 )
 
 
@@ -537,11 +536,9 @@ class ButtonPropertiesDialog(QDialog):
         self.preview_button = PreviewButton("Preview")
         self.preview_button.setMinimumSize(dpi_scale(200), dpi_scale(100))
         self.preview_switch = SwitchButton()
-        self.preview_led = LedIndicator()
         self.preview_stack = QStackedWidget()
         self.preview_stack.addWidget(self.preview_button)
         self.preview_stack.addWidget(self.preview_switch)
-        self.preview_stack.addWidget(self.preview_led)
         right_layout.addWidget(self.preview_stack, alignment=Qt.AlignmentFlag.AlignCenter)
         right_layout.addStretch()
 
@@ -779,7 +776,6 @@ class ButtonPropertiesDialog(QDialog):
             self.preview_button.set_hover_icon("")
             self.preview_button.setFixedSize(dpi_scale(200), dpi_scale(100))
             self.preview_switch.setStyleSheet("")
-            self.preview_led.setStyleSheet("")
             self.preview_stack.setCurrentWidget(self.preview_button)
             return
 
@@ -820,13 +816,6 @@ class ButtonPropertiesDialog(QDialog):
             else:
                 self.preview_switch.setStyleSheet("")
             self.preview_switch.setToolTip(style.tooltip)
-        elif component_type == "LED Indicator":
-            self.preview_stack.setCurrentWidget(self.preview_led)
-            if style.style_sheet:
-                self.preview_led.setStyleSheet(style.style_sheet)
-            else:
-                self.preview_led.setStyleSheet("")
-            self.preview_led.setToolTip(style.tooltip)
         else:
             self.preview_stack.setCurrentWidget(self.preview_button)
             if component_type == "Circle Button":
