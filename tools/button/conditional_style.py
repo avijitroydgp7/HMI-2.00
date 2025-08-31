@@ -676,8 +676,9 @@ class ConditionalStyleManager(QObject):
         tag_values: Dict[str, Any], optional
             Current tag values used when evaluating style conditions.
         state: Optional[str]
-            Optional state for which to retrieve additional properties.
-            Supported state: ``"hover"``.
+            Optional visual state for which to retrieve additional properties.
+            Supported states: ``"hover"``.  Click styles are no longer
+            handled.
         """
         tag_values = tag_values or {}
 
@@ -704,14 +705,14 @@ class ConditionalStyleManager(QObject):
 
             if match:
                 props = dict(style.properties)
-                props["icon"] = style.icon
-                props["hover_icon"] = style.hover_icon
+                # Only return the icon relevant for the current state.
+                if state == "hover" and style.hover_icon:
+                    props["icon"] = style.hover_icon
+                else:
+                    props["icon"] = style.icon
                 if state:
                     props.update(getattr(style, f"{state}_properties", {}))
-                    if state == "hover" and style.hover_icon:
-                        props["icon"] = style.hover_icon
                 if style.tooltip:
-
                     props["tooltip"] = style.tooltip
                 return props
 
