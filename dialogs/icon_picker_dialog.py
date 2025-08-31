@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import Dict, List, Optional, Tuple
 import os
+import json
 
 from PyQt6.QtCore import Qt, QSize
 from PyQt6.QtGui import QIcon, QPixmap
@@ -22,8 +23,6 @@ from PyQt6.QtWidgets import (
     QRadioButton,
     QButtonGroup,
 )
-
-import qtawesome as qta
 
 from utils.icon_manager import IconManager
 
@@ -103,7 +102,7 @@ class IconPickerDialog(QDialog):
         content = QHBoxLayout()
         layout.addLayout(content)
 
-        # Groups (families like mdi, fa5s, fa5r ...)
+        # Groups (categories like arrow, media ...)
         self.qt_groups = QListWidget(); self.qt_groups.setMaximumWidth(160)
         content.addWidget(self.qt_groups)
 
@@ -116,15 +115,15 @@ class IconPickerDialog(QDialog):
         scroll = QScrollArea(); scroll.setWidgetResizable(True); scroll.setWidget(self.qt_grid_container)
         content.addWidget(scroll, 1)
 
-        # Load icons
+        # Load icons from curated JSON list
         self._qt_items: List[_ThumbButton] = []
         self._qt_meta: Dict[_ThumbButton, Tuple[str, str]] = {}
-        families, names = self._get_qtawesome_icons()
+        groups, names = self._get_qtawesome_icons()
 
         # populate groups
         self.qt_groups.addItem("All")
-        for fam in families:
-            self.qt_groups.addItem(fam)
+        for grp in groups:
+            self.qt_groups.addItem(grp)
 
         # populate grid
         self._populate_grid(self.qt_grid, names, kind="qta")
@@ -136,41 +135,66 @@ class IconPickerDialog(QDialog):
         return page
 
     def _get_qtawesome_icons(self) -> Tuple[List[str], List[Tuple[str, str]]]:
-        families: List[str] = []
-        names: List[Tuple[str, str]] = []  # (family, full-name)
-        try:
-            # Try public or private charmap APIs
-            charmap = None
-            if hasattr(qta, "charmap") and callable(getattr(qta, "charmap")):
-                charmap = qta.charmap()  # type: ignore[attr-defined]
-            if charmap is None:
-                try:
-                    from qtawesome.iconic import charmap as ic_charmap  # type: ignore
-                    charmap = ic_charmap
-                except Exception:
-                    pass
-            if not charmap:
-                return families, names
+        """Return curated QtAwesome icons grouped by category.
 
-            for key in sorted(charmap.keys()):  # keys like 'mdi.home', 'fa5s.link'
-                if "." not in key:
-                    continue
-                fam, _ = key.split(".", 1)
-                if fam not in families:
-                    families.append(fam)
-                names.append((fam, key))
+        The icons are listed in ``qtawesome_icons.json`` to avoid importing
+        Qt modules or scanning the full QtAwesome charmap at runtime. If that
+        file is unavailable we fall back to enumerating the bundled font
+        charmaps without importing ``qtawesome`` or any Qt modules."""
+
+        groups: List[str] = []
+        names: List[Tuple[str, str]] = []  # (group, full-name)
+        json_path = os.path.join(os.path.dirname(__file__), "qtawesome_icons.json")
+        try:
+            with open(json_path, "r", encoding="utf-8") as fh:
+                data: Dict[str, List[str]] = json.load(fh)
+            for group, icons in data.items():
+                groups.append(group)
+                for full in icons:
+                    names.append((group, full))
+            return groups, names
         except Exception:
-            # Fallback to a small set if enumeration fails
-            fallback = [
-                "mdi.home",
-                "mdi.account",
-                "mdi.alert",
-                "fa5s.link",
-                "fa5s.check",
-            ]
-            families = sorted({n.split(".", 1)[0] for n in fallback})
-            names = [(n.split(".", 1)[0], n) for n in fallback]
-        return families, names
+            # fall back to dynamic discovery of QtAwesome fonts. This avoids
+            # importing Qt modules at startup which can slow down the dialog.
+            pass
+
+        try:
+            import ast
+            import importlib.util
+
+            spec = importlib.util.find_spec("qtawesome")
+            if not spec or not spec.submodule_search_locations:
+                return groups, names
+
+            base = spec.submodule_search_locations[0]
+            init_path = os.path.join(base, "__init__.py")
+            fonts_dir = os.path.join(base, "fonts")
+
+            bundled: List[Tuple[str, str, str]] = []
+            with open(init_path, "r", encoding="utf-8") as fh:
+                tree = ast.parse(fh.read())
+            for node in tree.body:
+                if isinstance(node, ast.Assign):
+                    for target in node.targets:
+                        if isinstance(target, ast.Name) and target.id == "_BUNDLED_FONTS":
+                            bundled = list(ast.literal_eval(node.value))
+                            break
+
+            families: List[str] = []
+            for prefix, _ttf, charmap_file in bundled:
+                families.append(prefix)
+                charmap_path = os.path.join(fonts_dir, charmap_file)
+                try:
+                    with open(charmap_path, "r", encoding="utf-8") as fh:
+                        data = json.load(fh)
+                    for name in data:
+                        names.append((prefix, f"{prefix}.{name}"))
+                except Exception:
+                    continue
+            return families, names
+        except Exception:
+            # Leave groups and names empty if font resources cannot be read.
+            return groups, names
 
     def _populate_grid(self, grid: QGridLayout, items: List[Tuple[str, str]], kind: str):
         # Clear
@@ -185,7 +209,7 @@ class IconPickerDialog(QDialog):
         self._qt_meta.clear()
         cols = 6
         r = c = 0
-        for fam, full in items:
+        for grp, full in items:
             try:
                 icon = IconManager.create_icon(full)
             except Exception:
@@ -193,7 +217,7 @@ class IconPickerDialog(QDialog):
             btn = _ThumbButton(full.split(".", 1)[1], icon)
             btn.clicked.connect(lambda _=False, b=btn, v=full: self._on_select("qta", v, b))
             self._qt_items.append(btn)
-            self._qt_meta[btn] = (fam, full)
+            self._qt_meta[btn] = (grp, full)
             grid.addWidget(btn, r, c)
             c += 1
             if c >= cols:
@@ -204,8 +228,8 @@ class IconPickerDialog(QDialog):
         group = self.qt_groups.currentItem().text() if self.qt_groups.currentItem() else "All"
         text = (text or "").strip().lower()
         for btn in self._qt_items:
-            fam, full = self._qt_meta.get(btn, ("", ""))
-            visible = (group == "All" or fam == group)
+            grp, full = self._qt_meta.get(btn, ("", ""))
+            visible = (group == "All" or grp == group)
             if text:
                 visible = visible and (text in full.lower())
             btn.setVisible(visible)

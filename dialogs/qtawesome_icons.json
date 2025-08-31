@@ -1,0 +1,54 @@
+{
+  "Simple Arrow": [
+    "mdi.arrow-up-thick",
+    "mdi.arrow-down-thick",
+    "mdi.arrow-left-thick",
+    "mdi.arrow-right-thick",
+    "mdi.arrow-top-left-thick",
+    "mdi.arrow-top-right-thick",
+    "mdi.arrow-bottom-left-thick",
+    "mdi.arrow-bottom-right-thick",
+    "ei.arrow-up",
+    "ei.arrow-down",
+    "ei.arrow-left",
+    "ei.arrow-right"
+    ],
+  "Box Arrow": [
+    "mdi6.arrow-up-bold-box",
+    "mdi6.arrow-down-bold-box",
+    "mdi6.arrow-left-bold-box",
+    "mdi6.arrow-right-bold-box",
+    "mdi6.arrow-top-left-bold-box",
+    "mdi6.arrow-top-right-bold-box",
+    "mdi6.arrow-bottom-left-bold-box",
+    "mdi6.arrow-bottom-right-bold-box",
+    "mdi6.arrow-up-bold-box-outline",
+    "mdi6.arrow-down-bold-box-outline",
+    "mdi6.arrow-left-bold-box-outline",
+    "mdi6.arrow-right-bold-box-outline",
+    "mdi6.arrow-top-left-bold-box-outline",
+    "mdi6.arrow-top-right-bold-box-outline",
+    "mdi6.arrow-bottom-left-bold-box-outline",
+    "mdi6.arrow-bottom-right-bold-box-outline"
+
+    ],
+"Circle Arrow": [
+    "mdi6.arrow-up-bold-circle",
+    "mdi6.arrow-down-bold-circle",
+    "mdi6.arrow-left-bold-circle",
+    "mdi6.arrow-right-bold-circle"
+],
+  "Media": [
+    "mdi.play",
+    "mdi.pause",
+    "mdi.stop",
+    "mdi.record",
+    "mdi.fast-forward",
+    "mdi.rewind"
+  ],
+  "Navigation": [
+    "mdi.home",
+    "mdi.account",
+    "mdi.help-circle"
+  ]
+}
