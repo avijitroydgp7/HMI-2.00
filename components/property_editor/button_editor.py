@@ -71,14 +71,10 @@ def build(host) -> QWidget:
                 new_props.update(style_def["properties"])
                 if "hover_properties" in style_def:
                     new_props["hover_properties"] = copy.deepcopy(style_def["hover_properties"])
-                if "click_properties" in style_def:
-                    new_props["click_properties"] = copy.deepcopy(style_def["click_properties"])
                 if style_def.get("icon"):
                     new_props["icon"] = style_def["icon"]
                 if style_def.get("hover_icon"):
                     new_props["hover_icon"] = style_def["hover_icon"]
-                if style_def.get("click_icon"):
-                    new_props["click_icon"] = style_def["click_icon"]
 
             if new_props != host.current_properties:
                 if host.current_object_id:

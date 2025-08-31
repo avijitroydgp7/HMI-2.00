@@ -16,7 +16,6 @@ Each style entry is a dictionary compatible with the structure that
     "name": str,
     "icon": str | None,
     "hover_icon": str | None,
-    "click_icon": str | None,
     "properties": {
         "shape_style": str,                 # Flat | 3D | Glass | Neumorphic | Outline
         "background_type": str,             # Solid | Linear Gradient | Radial Gradient
@@ -31,7 +30,6 @@ Each style entry is a dictionary compatible with the structure that
         "icon_size": int | None,
     },
     "hover_properties": {...},
-    "click_properties": {...},
 }
 """
 
@@ -115,20 +113,17 @@ PALETTES: List[Tuple[str, str]] = [
 # Builders
 # ---------------------------------------------------------------------------
 
-def _base_entry(_id: str, name: str, props: Dict, hover: Dict, click: Dict, *, icon: str = "", hover_icon: str = "", click_icon: str = "") -> Dict:
+def _base_entry(_id: str, name: str, props: Dict, hover: Dict, *, icon: str = "", hover_icon: str = "") -> Dict:
     entry = {
         "id": _id,
         "name": name,
         "properties": props,
         "hover_properties": hover,
-        "click_properties": click,
     }
     if icon:
         entry["icon"] = icon
     if hover_icon:
         entry["hover_icon"] = hover_icon
-    if click_icon:
-        entry["click_icon"] = click_icon
     return entry
 
 
@@ -137,7 +132,6 @@ def build_solid_variants() -> List[Dict]:
     for key, base in PALETTES:
         text = contrast_text(base)
         hover = darken(base, 0.1)
-        active = darken(base, 0.2)
         for shape, radius in (("Rounded", 10), ("Pill", 22), ("Square", 0)):
             props = {
                 "shape_style": "Flat",
@@ -147,14 +141,12 @@ def build_solid_variants() -> List[Dict]:
                 "border_radius": radius,
             }
             hover_props = {"background_color": hover, "text_color": text}
-            click_props = {"background_color": active, "text_color": text}
             styles.append(
                 _base_entry(
                     f"{key}_solid_{shape.lower()}",
                     f"{key.title()} Solid {shape}",
                     props,
                     hover_props,
-                    click_props,
                 )
             )
     return styles
@@ -165,7 +157,6 @@ def build_outline_variants() -> List[Dict]:
     for key, base in PALETTES:
         text = base
         bg_hover = lighten(base, 0.85)  # very light tint
-        bg_active = lighten(base, 0.7)
         for shape, radius in (("Rounded", 10), ("Pill", 22), ("Square", 0)):
             props = {
                 "shape_style": "Outline",
@@ -178,14 +169,12 @@ def build_outline_variants() -> List[Dict]:
                 "border_color": base,
             }
             hover_props = {"background_color": bg_hover, "text_color": contrast_text(bg_hover)}
-            click_props = {"background_color": bg_active, "text_color": contrast_text(bg_active)}
             styles.append(
                 _base_entry(
                     f"{key}_outline_{shape.lower()}",
                     f"{key.title()} Outline {shape}",
                     props,
                     hover_props,
-                    click_props,
                 )
             )
     return styles
@@ -197,7 +186,6 @@ def build_gradient_variants() -> List[Dict]:
         c2 = lighten(base, 0.25)
         text = contrast_text(base)
         hover = lighten(base, 0.08)
-        active = darken(base, 0.08)
         props = {
             "shape_style": "Flat",
             "background_type": "Linear Gradient",
@@ -211,14 +199,12 @@ def build_gradient_variants() -> List[Dict]:
             "border_color": base,
         }
         hover_props = {"background_color": hover, "text_color": text}
-        click_props = {"background_color": active, "text_color": text}
         styles.append(
             _base_entry(
                 f"{key}_gradient_rounded",
                 f"{key.title()} Gradient Rounded",
                 props,
                 hover_props,
-                click_props,
             )
         )
     return styles
@@ -229,7 +215,6 @@ def build_3d_variants() -> List[Dict]:
     for key, base in PALETTES:
         text = contrast_text(base)
         hover = lighten(base, 0.06)
-        active = darken(base, 0.12)
         props = {
             "shape_style": "3D",
             "background_type": "Solid",
@@ -238,14 +223,12 @@ def build_3d_variants() -> List[Dict]:
             "border_radius": 6,
         }
         hover_props = {"background_color": hover, "text_color": text}
-        click_props = {"background_color": active, "text_color": text}
         styles.append(
             _base_entry(
                 f"{key}_3d_square",
                 f"{key.title()} 3D Square",
                 props,
                 hover_props,
-                click_props,
             )
         )
     return styles
@@ -272,14 +255,12 @@ def build_glass_variants() -> List[Dict]:
             "border_color": lighten(base, 0.4),
         }
         hover_props = {"background_color": lighten(base, 0.45)}
-        click_props = {"background_color": darken(base, 0.25)}
         styles.append(
             _base_entry(
                 f"{key}_glass_rounded",
                 f"{key.title()} Glass Rounded",
                 props,
                 hover_props,
-                click_props,
             )
         )
     return styles
@@ -296,7 +277,6 @@ def build_neumorphic_variants() -> List[Dict]:
     for key, base in bases:
         text = "#333333"
         hover = lighten(base, 0.04)
-        active = darken(base, 0.08)
         props = {
             "shape_style": "Neumorphic",
             "background_type": "Solid",
@@ -310,7 +290,6 @@ def build_neumorphic_variants() -> List[Dict]:
                 f"{key.title()} Neumorphic Soft",
                 props,
                 {"background_color": hover, "text_color": text},
-                {"background_color": active, "text_color": text},
             )
         )
     return styles
@@ -331,7 +310,6 @@ def build_icon_variants() -> List[Dict]:
     base = "#ffffff"
     text = "#333333"
     hover = "#f0f0f0"
-    active = "#e0e0e0"
     styles: List[Dict] = []
     for key, filename in icons:
         path = f"lib/icon/{filename}"
@@ -352,10 +330,8 @@ def build_icon_variants() -> List[Dict]:
                 f"Icon {key.title()}",
                 props,
                 {"background_color": hover},
-                {"background_color": active},
                 icon=path,
                 hover_icon=path,
-                click_icon=path,
             )
         )
     return styles
@@ -378,10 +354,6 @@ LEGACY_STYLES: List[Dict] = [
             "background_color": "#6b7383",
             "text_color": "#ffffff",
         },
-        "click_properties": {
-            "background_color": "#4a515c",
-            "text_color": "#ffffff",
-        },
     },
     {
         "id": "success_square",
@@ -393,10 +365,6 @@ LEGACY_STYLES: List[Dict] = [
         },
         "hover_properties": {
             "background_color": "#45a049",
-            "text_color": "#ffffff",
-        },
-        "click_properties": {
-            "background_color": "#388e3c",
             "text_color": "#ffffff",
         },
     },
@@ -412,10 +380,6 @@ LEGACY_STYLES: List[Dict] = [
             "background_color": "#ffb74d",
             "text_color": "#000000",
         },
-        "click_properties": {
-            "background_color": "#e68900",
-            "text_color": "#000000",
-        },
     },
     {
         "id": "danger_flat",
@@ -427,10 +391,6 @@ LEGACY_STYLES: List[Dict] = [
         },
         "hover_properties": {
             "background_color": "#e53935",
-            "text_color": "#ffffff",
-        },
-        "click_properties": {
-            "background_color": "#d32f2f",
             "text_color": "#ffffff",
         },
     },
@@ -452,10 +412,6 @@ LEGACY_STYLES: List[Dict] = [
             "background_color": "#00f2fe",
             "text_color": "#ffffff",
         },
-        "click_properties": {
-            "background_color": "#0099cc",
-            "text_color": "#ffffff",
-        },
     },
     {
         "id": "outline_primary",
@@ -472,10 +428,6 @@ LEGACY_STYLES: List[Dict] = [
             "background_color": "#1976d2",
             "text_color": "#ffffff",
         },
-        "click_properties": {
-            "background_color": "#0d47a1",
-            "text_color": "#ffffff",
-        },
     },
     {
         "id": "neumorphic_soft",
@@ -490,16 +442,11 @@ LEGACY_STYLES: List[Dict] = [
             "background_color": "#e8e8e8",
             "text_color": "#333333",
         },
-        "click_properties": {
-            "background_color": "#d0d0d0",
-            "text_color": "#333333",
-        },
     },
     {
         "id": "icon_play",
         "name": "Icon Play",
         "icon": "lib/icon/bolt-circle-svgrepo-com.svg",
-        "click_icon": "lib/icon/bolt-circle-svgrepo-com.svg",
         "properties": {
             "background_color": "#ffffff",
             "text_color": "#333333",
@@ -511,9 +458,6 @@ LEGACY_STYLES: List[Dict] = [
         },
         "hover_properties": {
             "background_color": "#f0f0f0",
-        },
-        "click_properties": {
-            "background_color": "#e0e0e0",
         },
     },
 ]

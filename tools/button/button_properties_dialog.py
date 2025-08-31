@@ -38,14 +38,14 @@ class ButtonPropertiesDialog(QDialog):
         self.style_manager = ConditionalStyleManager()
         for style_data in self.properties.get('conditional_styles', []):
             # Typical failure reasons when importing styles from dict:
-            # - Missing or misspelled keys like 'properties', 'hover_properties', 'click_properties'
+            # - Missing or misspelled keys like 'properties' or 'hover_properties'
             # - Wrong data types (e.g., strings where dicts are expected)
             # - Invalid color formats or icon paths in the properties
             # - Malformed 'condition' or 'condition_data' structures
             # - Legacy schema fields not compatible with current loader
             try:
                 # ConditionalStyle.from_dict already understands the separated
-                # base/hover/click property dictionaries and tooltip field.
+                # base/hover property dictionaries and tooltip field.
                 style = ConditionalStyle.from_dict(style_data)
                 self.style_manager.add_style(style)
             except Exception as e:
@@ -523,16 +523,12 @@ class ButtonPropertiesDialog(QDialog):
         self.text_color_label = QLabel()
         self.hover_bg_color_label = QLabel()
         self.hover_text_color_label = QLabel()
-        self.click_bg_color_label = QLabel()
-        self.click_text_color_label = QLabel()
         info_layout.addRow("Style ID:", self.style_id_label)
         info_layout.addRow("Tooltip:", self.tooltip_label)
         info_layout.addRow("Base BG:", self.bg_color_label)
         info_layout.addRow("Base Text:", self.text_color_label)
         info_layout.addRow("Hover BG:", self.hover_bg_color_label)
         info_layout.addRow("Hover Text:", self.hover_text_color_label)
-        info_layout.addRow("Click BG:", self.click_bg_color_label)
-        info_layout.addRow("Click Text:", self.click_text_color_label)
         self.style_properties_stack.addWidget(info_widget)
 
         right_layout.addWidget(self.style_properties_group)
@@ -619,7 +615,7 @@ class ButtonPropertiesDialog(QDialog):
         # Small preview button
         preview = PreviewButton("Aa")
         preview.setFixedSize(dpi_scale(90), dpi_scale(36))
-        # Apply minimal styling based on base/hover/click props or stylesheet
+        # Apply minimal styling based on base/hover props or stylesheet
         if style.style_sheet:
             preview.setStyleSheet(style.style_sheet)
         else:
@@ -627,7 +623,6 @@ class ButtonPropertiesDialog(QDialog):
             temp_manager.add_style(copy.deepcopy(style))
             base_props = temp_manager.get_active_style()
             hover_props = temp_manager.get_active_style(state='hover')
-            click_props = temp_manager.get_active_style(state='click')
             qss = (
                 "QPushButton {\n"
                 f"    background-color: {base_props.get('background_color', 'transparent')};\n"
@@ -638,15 +633,10 @@ class ButtonPropertiesDialog(QDialog):
                 f"    background-color: {hover_props.get('background_color', base_props.get('background_color', 'transparent'))};\n"
                 f"    color: {hover_props.get('text_color', base_props.get('text_color', '#000'))};\n"
                 "}\n"
-                "QPushButton:pressed {\n"
-                f"    background-color: {click_props.get('background_color', hover_props.get('background_color', base_props.get('background_color', 'transparent')))};\n"
-                f"    color: {click_props.get('text_color', hover_props.get('text_color', base_props.get('text_color', '#000')))};\n"
-                "}\n"
             )
             preview.setStyleSheet(qss)
             preview.set_icon(base_props.get('icon', ''))
             preview.set_hover_icon(hover_props.get('icon', ''))
-            preview.set_click_icon(click_props.get('icon', ''))
             icon_sz = dpi_scale(base_props.get('icon_size', 20))
             preview.set_icon_size(icon_sz)
 
@@ -811,8 +801,6 @@ class ButtonPropertiesDialog(QDialog):
         self.text_color_label.setText(style.properties.get("text_color", ""))
         self.hover_bg_color_label.setText(style.hover_properties.get("background_color", ""))
         self.hover_text_color_label.setText(style.hover_properties.get("text_color", ""))
-        self.click_bg_color_label.setText(style.click_properties.get("background_color", ""))
-        self.click_text_color_label.setText(style.click_properties.get("text_color", ""))
 
         self.style_properties_stack.setCurrentIndex(1)
         self.style_properties_group.setTitle(f"Style Properties - {style.style_id}")
@@ -822,7 +810,6 @@ class ButtonPropertiesDialog(QDialog):
         temp_manager.add_style(copy.deepcopy(style))
         base_props = temp_manager.get_active_style()
         hover_props = temp_manager.get_active_style(state='hover')
-        click_props = temp_manager.get_active_style(state='click')
 
         component_type = style.properties.get("component_type", "Standard Button")
 
@@ -860,16 +847,11 @@ class ButtonPropertiesDialog(QDialog):
                     f"    background-color: {hover_props.get('background_color', base_props.get('background_color', 'transparent'))};\n"
                     f"    color: {hover_props.get('text_color', base_props.get('text_color', '#000000'))};\n"
                     "}\n"
-                    "QPushButton:pressed {\n"
-                    f"    background-color: {click_props.get('background_color', hover_props.get('background_color', base_props.get('background_color', 'transparent')))};\n"
-                    f"    color: {click_props.get('text_color', hover_props.get('text_color', base_props.get('text_color', '#000000')))};\n"
-                    "}\n"
                 )
                 self.preview_button.setStyleSheet(qss)
 
             self.preview_button.set_icon(base_props.get('icon', ''))
             self.preview_button.set_hover_icon(hover_props.get('icon', ''))
-            self.preview_button.set_click_icon(click_props.get('icon', ''))
             icon_sz = base_props.get('icon_size', 48)
             self.preview_button.set_icon_size(icon_sz)
 

@@ -204,21 +204,18 @@ class ButtonItem(BaseGraphicsItem):
         Parameters
         ----------
         state: str
-            One of ``'normal'``, ``'hover'``, or ``'click'``.
+            One of ``'normal'`` or ``'hover'``.
         """
         manager = self._get_conditional_style_manager()
         tag_values = self._get_current_tag_values()
 
         default_props = dict(self.instance_data.get('properties', {}))
         hover_default = default_props.pop('hover_properties', {})
-        click_default = default_props.pop('click_properties', {})
 
         if state == 'hover':
             default_props.update(hover_default)
-        elif state == 'click':
-            default_props.update(click_default)
 
-        active_props = manager.get_active_style(tag_values, state if state in ('hover', 'click') else None)
+        active_props = manager.get_active_style(tag_values, state if state == 'hover' else None)
 
         final_props = {**default_props, **active_props}
 
