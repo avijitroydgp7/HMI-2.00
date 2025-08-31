@@ -42,6 +42,7 @@ from PyQt6.QtWidgets import (
     QFileDialog,
     QToolTip,
     QMessageBox,
+    QStyle,
 )
 from PyQt6.QtGui import (
     QColor,
@@ -198,7 +199,10 @@ def _safe_eval(expr: str, variables: Dict[str, Any]) -> Tuple[Any, Optional[str]
 
 
 class SwitchButton(QPushButton):
-    """A custom toggle switch used for previewing switch styles."""
+    """A custom toggle switch used for previewing switch styles.
+
+    Toggle switches always use a fixed 50px corner radius.
+    """
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -2281,6 +2285,14 @@ class ConditionalStyleEditorDialog(QDialog):
         is_switch = component_type == "Toggle Switch"
         if is_switch:
             self.preview_stack.setCurrentWidget(self.preview_switch)
+            for spin in (
+                self.tl_radius_spin,
+                self.tr_radius_spin,
+                self.br_radius_spin,
+                self.bl_radius_spin,
+            ):
+                # Toggle switches always use a fixed 50px corner radius
+                spin.setValue(50)
         else:
             self.preview_stack.setCurrentWidget(self.preview_button)
 
@@ -2310,7 +2322,15 @@ class ConditionalStyleEditorDialog(QDialog):
 
         self.preview_stack.setFixedSize(size)
         width = self.preview_group.width() or self.preview_group.sizeHint().width()
-        self.preview_group.setFixedSize(width, size.height() + dpi_scale(20))
+
+        margins = self.preview_group.layout().contentsMargins()
+        top = margins.top()
+        bottom = margins.bottom()
+        title_height = self.preview_group.style().pixelMetric(
+            QStyle.PixelMetric.PM_TitleBarHeight
+        )
+        height = size.height() + top + bottom + title_height
+        self.preview_group.setFixedSize(width, height)
 
     def update_dynamic_ranges(self):
         width = dpi_scale(200)
@@ -2364,6 +2384,8 @@ class ConditionalStyleEditorDialog(QDialog):
             tl_radius = tr_radius = br_radius = bl_radius = radius
             self.preview_button.setFixedSize(size, size)
         elif component_type == "Toggle Switch":
+            # Toggle switches always use a fixed 50px corner radius
+            tl_radius = tr_radius = br_radius = bl_radius = 50
             self.preview_switch.setFixedSize(width, height)
         else:
             self.preview_button.setFixedSize(width, height)
