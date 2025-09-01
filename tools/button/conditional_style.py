@@ -576,19 +576,24 @@ class ConditionalStyleManager(QObject):
         QObject.__init__(self, self.parent)
 
     def _generate_unique_style_id(self, base_id: str) -> str:
+        """Return a unique style id based on ``base_id``.
+
+        Empty ids will be converted into ``style_1``, ``style_2`` and so on."""
         existing = {s.style_id for s in self.conditional_styles}
-        if base_id not in existing:
-            return base_id
+        base = base_id or "style"
+        if base != "style" and base not in existing:
+            return base
         suffix = 1
-        new_id = f"{base_id}_{suffix}"
-        while new_id in existing:
+        candidate = f"{base}_{suffix}"
+        while candidate in existing:
             suffix += 1
-            new_id = f"{base_id}_{suffix}"
-        return new_id
+            candidate = f"{base}_{suffix}"
+        return candidate
 
     def add_style(self, style: ConditionalStyle):
         """Add a new conditional style"""
-        style.style_id = self._generate_unique_style_id(style.style_id)
+        base_id = style.style_id or "style"
+        style.style_id = self._generate_unique_style_id(base_id)
         self.conditional_styles.append(style)
 
     def remove_style(self, index: int):

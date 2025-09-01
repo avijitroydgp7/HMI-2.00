@@ -1792,12 +1792,21 @@ class DesignCanvas(QGraphicsView):
             old_properties = button_instance_data['properties']
             if new_properties != old_properties:
                 command = UpdateChildPropertiesCommand(
-                    self.screen_id, 
-                    button_instance_data['instance_id'], 
-                    new_properties, 
+                    self.screen_id,
+                    button_instance_data['instance_id'],
+                    new_properties,
                     old_properties
                 )
                 command_history_service.add_command(command)
+                button_instance_data['properties'] = new_properties
+                if item:
+                    item.update_data({
+                        'instance_id': button_instance_data['instance_id'],
+                        'properties': new_properties,
+                    })
+                    item.update()
+                self.scene.update()
+                self.viewport().update()
         
         # Ensure item position is restored and scene is updated
         if item and original_pos:

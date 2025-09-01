@@ -636,31 +636,41 @@ class ButtonPropertiesDialog(QDialog):
             self.style_list.setItemWidget(item, widget)
 
     def _generate_unique_style_id(self, base_id: str) -> str:
+        """Return a unique style id based on ``base_id``.
+
+        The first generated id for an empty or generic ``base_id`` will be
+        ``style_1`` and subsequent ids will increment the suffix.
+        """
         existing = {s.style_id for s in self.style_manager.conditional_styles}
-        if base_id not in existing:
-            return base_id
+        base = base_id or "style"
+        if base != "style" and base not in existing:
+            return base
         suffix = 1
-        new_id = f"{base_id}_{suffix}"
-        while new_id in existing:
+        candidate = f"{base}_{suffix}"
+        while candidate in existing:
             suffix += 1
-            new_id = f"{base_id}_{suffix}"
-        return new_id
+            candidate = f"{base}_{suffix}"
+        return candidate
 
     def _ensure_unique_style(self, style: ConditionalStyle):
+        """Ensure ``style`` has a non-empty and unique ``style_id``."""
         existing = {s.style_id for s in self.style_manager.conditional_styles}
-        if style.style_id in existing:
+        if not style.style_id or style.style_id in existing:
             suggestion = self._generate_unique_style_id(style.style_id)
+            title = "Missing Style ID" if not style.style_id else "Duplicate Style ID"
+            prompt = (
+                "Style ID is required. "
+                if not style.style_id
+                else f"Style ID '{style.style_id}' already exists. "
+            )
             new_id, ok = QInputDialog.getText(
                 self,
-                "Duplicate Style ID",
-                (
-                    f"Style ID '{style.style_id}' already exists. "
-                    f"Enter a new ID or leave blank to use '{suggestion}':"
-                ),
+                title,
+                f"{prompt}Enter a new ID or leave blank to use '{suggestion}':",
             )
             candidate = (new_id.strip() if ok else "") or suggestion
             if candidate in existing:
-                candidate = self._generate_unique_style_id(candidate)
+                candidate = self._generate_unique_style_id(style.style_id or "style")
             style.style_id = candidate
 
     def _add_style(self):
