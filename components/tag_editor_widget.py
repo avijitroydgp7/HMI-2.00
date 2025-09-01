@@ -95,7 +95,7 @@ class TagTreeWidget(QTreeView):
 
 
 class TagFilterProxyModel(QSortFilterProxyModel):
-    """Proxy model to filter tag tree columns without Python iteration."""
+    """Proxy model to filter tag table columns without Python iteration."""
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -168,42 +168,49 @@ class TagEditorWidget(QWidget):
         filter_layout.addWidget(self.name_filter_input); filter_layout.addWidget(self.type_filter_input); filter_layout.addWidget(self.comment_filter_input)
         layout.addWidget(filter_widget)
 
-        self.tag_tree = TagTreeWidget()
-        self.tag_tree.setObjectName("TagTree")
-        self.tag_tree.setSelectionMode(QAbstractItemView.SelectionMode.ExtendedSelection)
-        self.tag_tree.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
-        self.tag_tree.setAlternatingRowColors(True)
-        self.tag_tree.setEditTriggers(
+        self.tag_table = TagTreeWidget()
+        self.tag_table.setObjectName("TagTable")
+        self.tag_table.setSelectionMode(QAbstractItemView.SelectionMode.ExtendedSelection)
+        self.tag_table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
+        self.tag_table.setAlternatingRowColors(False)
+        self.tag_table.setRootIsDecorated(True)
+        self.tag_table.setUniformRowHeights(True)
+        self.tag_table.setStyleSheet(
+            "QTreeView::item { border-right: 1px solid palette(mid);"
+            " border-bottom: 1px solid palette(mid); }"
+            "QTreeView { border: 1px solid palette(mid); }"
+        )
+        self.tag_table.setEditTriggers(
             QAbstractItemView.EditTrigger.DoubleClicked
             | QAbstractItemView.EditTrigger.SelectedClicked
             | QAbstractItemView.EditTrigger.EditKeyPressed
         )
-        self.tag_tree.setItemDelegate(TagTreeDelegate(self.tag_tree, self.db_id))
-        self.tag_tree.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self.tag_table.setItemDelegate(TagTreeDelegate(self.tag_table, self.db_id))
+        self.tag_table.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
 
         # Model and proxy for efficient filtering
-        self._model = QStandardItemModel(0, 4, self.tag_tree)
+        self._model = QStandardItemModel(0, 4, self.tag_table)
         self._model.setHorizontalHeaderLabels(["Tag Name", "Data Type", "Live Value", "Comment"])
-        self._proxy_model = TagFilterProxyModel(self.tag_tree)
+        self._proxy_model = TagFilterProxyModel(self.tag_table)
         self._proxy_model.setSourceModel(self._model)
-        self.tag_tree.setModel(self._proxy_model)
-        self.tag_tree.setSortingEnabled(True)
-        header = self.tag_tree.header()
+        self.tag_table.setModel(self._proxy_model)
+        self.tag_table.setSortingEnabled(True)
+        header = self.tag_table.header()
         header.setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
-        
-        layout.addWidget(self.tag_tree)
+
+        layout.addWidget(self.tag_table)
 
         # Cache to track current tags for incremental updates
         self._tags_cache: dict[str, dict] = {}
 
         tag_data_service.tags_changed.connect(self._schedule_refresh)
         self._model.itemChanged.connect(self._on_item_changed)
-        self.tag_tree.doubleClicked.connect(self._on_item_double_clicked)
-        self.tag_tree.selectionModel().selectionChanged.connect(lambda *_: self._update_button_states())
-        self.tag_tree.selectionModel().selectionChanged.connect(lambda *_: self.selection_changed.emit())
-        self.tag_tree.customContextMenuRequested.connect(self._show_context_menu)
-        self.tag_tree.delete_pressed.connect(self._remove_selected_tags)
-        self.tag_tree.edit_pressed.connect(self._handle_edit_key)
+        self.tag_table.doubleClicked.connect(self._on_item_double_clicked)
+        self.tag_table.selectionModel().selectionChanged.connect(lambda *_: self._update_button_states())
+        self.tag_table.selectionModel().selectionChanged.connect(lambda *_: self.selection_changed.emit())
+        self.tag_table.customContextMenuRequested.connect(self._show_context_menu)
+        self.tag_table.delete_pressed.connect(self._remove_selected_tags)
+        self.tag_table.edit_pressed.connect(self._handle_edit_key)
         
         self.refresh_table()
         self._update_button_states()
@@ -244,7 +251,7 @@ class TagEditorWidget(QWidget):
 
     def _show_context_menu(self, position):
         menu = QMenu()
-        if self.tag_tree.selectionModel().hasSelection():
+        if self.tag_table.selectionModel().hasSelection():
             menu.addAction("Cut").triggered.connect(self.cut_selected)
             menu.addAction("Copy").triggered.connect(self.copy_selected)
             menu.addAction("Delete").triggered.connect(self._remove_selected_tags)
@@ -255,7 +262,7 @@ class TagEditorWidget(QWidget):
             menu.addSeparator()
         paste_action = menu.addAction("Paste"); paste_action.triggered.connect(self.paste)
         content_type, _ = clipboard_service.get_content(); paste_action.setEnabled(content_type == constants.CLIPBOARD_TYPE_TAG)
-        menu.exec(self.tag_tree.viewport().mapToGlobal(position))
+        menu.exec(self.tag_table.viewport().mapToGlobal(position))
 
     def _on_item_double_clicked(self, index: QModelIndex):
         if index.column() < 2:
@@ -264,15 +271,15 @@ class TagEditorWidget(QWidget):
     def _handle_edit_key(self):
         if len(self._get_selected_tag_names()) != 1:
             return
-        index = self.tag_tree.currentIndex()
+        index = self.tag_table.currentIndex()
         if index.isValid() and index.column() < 2:
             self._open_edit_tag_dialog()
         else:
-            self.tag_tree.edit(index, QAbstractItemView.EditTrigger.EditKeyPressed, None)
+            self.tag_table.edit(index, QAbstractItemView.EditTrigger.EditKeyPressed, None)
 
     def _get_selected_tag_names(self):
         names = set()
-        for proxy_index in self.tag_tree.selectionModel().selectedRows():
+        for proxy_index in self.tag_table.selectionModel().selectedRows():
             source_index = self._proxy_model.mapToSource(proxy_index)
             name = self._model.itemFromIndex(source_index.siblingAtColumn(1)).data(Qt.ItemDataRole.UserRole)
             if name:
@@ -377,49 +384,20 @@ class TagEditorWidget(QWidget):
             raise ValueError(f"String length exceeds defined length.")
         return value
 
-    def _get_item_path(self, index: QModelIndex):
-        path = []
-        current = index
-        model = self._model
-        while current.isValid():
-            path.insert(0, model.data(current))
-            current = current.parent()
-        return tuple(path)
+    def _save_selection(self):
+        return self._get_selected_tag_names()
 
-    def _save_tree_state(self):
-        expanded_paths, selected_paths = set(), set()
-
-        def recurse(parent_index: QModelIndex, path):
-            model = self._model
-            for row in range(model.rowCount(parent_index)):
-                index = model.index(row, 0, parent_index)
-                new_path = path + (model.data(index),)
-                proxy_index = self._proxy_model.mapFromSource(index)
-                if self.tag_tree.isExpanded(proxy_index):
-                    expanded_paths.add(new_path)
-                if self.tag_tree.selectionModel().isSelected(proxy_index):
-                    selected_paths.add(new_path)
-                recurse(index, new_path)
-
-        recurse(QModelIndex(), tuple())
-        return expanded_paths, selected_paths
-
-    def _restore_tree_state(self, expanded_paths, selected_paths):
-        def recurse(parent_index: QModelIndex, path):
-            model = self._model
-            for row in range(model.rowCount(parent_index)):
-                index = model.index(row, 0, parent_index)
-                new_path = path + (model.data(index),)
-                proxy_index = self._proxy_model.mapFromSource(index)
-                if new_path in expanded_paths:
-                    self.tag_tree.setExpanded(proxy_index, True)
-                if new_path in selected_paths:
-                    self.tag_tree.selectionModel().select(
-                        proxy_index, QItemSelectionModel.SelectionFlag.Select | QItemSelectionModel.SelectionFlag.Rows
-                    )
-                recurse(index, new_path)
-
-        recurse(QModelIndex(), tuple())
+    def _restore_selection(self, names):
+        selection_model = self.tag_table.selectionModel()
+        selection_model.clearSelection()
+        row_map = self._get_tag_row_map()
+        for name in names:
+            row = row_map.get(name)
+            if row is not None:
+                proxy_index = self._proxy_model.mapFromSource(self._model.index(row, 0))
+                selection_model.select(
+                    proxy_index, QItemSelectionModel.SelectionFlag.Select | QItemSelectionModel.SelectionFlag.Rows
+                )
 
     def _get_tag_row_map(self) -> dict[str, int]:
         """Map top-level tag names to their row indices."""
@@ -432,7 +410,7 @@ class TagEditorWidget(QWidget):
     @pyqtSlot()
     def refresh_table(self):
         self._is_updating_table = True
-        expanded_paths, selected_paths = self._save_tree_state()
+        selected_names = self._save_selection()
 
         db = tag_data_service.get_tag_database(self.db_id)
         if not db:
@@ -459,15 +437,15 @@ class TagEditorWidget(QWidget):
                 if self._tags_cache.get(name) != tag:
                     row = current_rows[name]
                     self._model.removeRow(row)
-                    self._create_tag_tree_item(tag, row)
+                    self._create_table_item(tag, row)
             else:
-                self._create_tag_tree_item(tag)
+                self._create_table_item(tag)
 
         self._tags_cache = new_tags
-        self._restore_tree_state(expanded_paths, selected_paths)
+        self._restore_selection(selected_names)
         self._is_updating_table = False
 
-    def _create_tag_tree_item(self, tag, row: int | None = None):
+    def _create_table_item(self, tag, row: int | None = None):
         name = tag.get('name', 'N/A')
         data_type = tag.get('data_type', 'N/A')
         comment = tag.get('comment', '')
@@ -529,10 +507,10 @@ class TagEditorWidget(QWidget):
                 parent_item.appendRow([name_item, type_item, value_item, comment_item])
 
     def has_selection(self):
-        return self.tag_tree.selectionModel().hasSelection()
+        return self.tag_table.selectionModel().hasSelection()
 
     def clear_selection(self):
-        self.tag_tree.clearSelection()
+        self.tag_table.clearSelection()
     def copy_selected(self): self._copy_selected_tags()
     def cut_selected(self): self._cut_selected_tags()
     def paste(self): self._paste_tags()

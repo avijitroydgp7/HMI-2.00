@@ -177,7 +177,7 @@ def _update_focus_for_widget(win, widget):
             win.screen_dim_label.setText("W ----, H ----")
         widget.refresh_selection_status()
     elif isinstance(widget, TagEditorWidget):
-        widget.tag_tree.setFocus()
+        widget.tag_table.setFocus()
         win.screen_dim_label.setText("W ----, H ----")
     elif isinstance(widget, CommentTableWidget):
         widget.setFocus()
