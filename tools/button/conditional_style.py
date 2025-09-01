@@ -797,7 +797,30 @@ class PreviewButton(IconButton):
 
     def __init__(self, text: str = "", parent=None):
         super().__init__(parent)
+        # QLabel to handle text so we can control alignment
+        self._text_label = QLabel(self)
+        self._text_label.setStyleSheet("background: transparent;")
+        self._text_label.setAttribute(
+            Qt.WidgetAttribute.WA_TransparentForMouseEvents
+        )
+        self._text_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self._text_label.raise_()
         self.setText(text)
+
+    def resizeEvent(self, event):  # pragma: no cover - GUI behaviour
+        super().resizeEvent(event)
+        self._text_label.setGeometry(self.rect())
+
+    # Reimplemented to route through the internal label
+    def setText(self, text: str):  # pragma: no cover - GUI behaviour
+        self._text_label.setText(text)
+
+    def text(self) -> str:  # pragma: no cover - GUI behaviour
+        return self._text_label.text()
+
+    def setAlignment(self, alignment):  # pragma: no cover - GUI behaviour
+        """Allow external callers to align the preview text."""
+        self._text_label.setAlignment(alignment)
 
 
 class ConditionalStyleEditorDialog(QDialog):
