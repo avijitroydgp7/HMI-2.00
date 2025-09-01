@@ -1,7 +1,7 @@
 # components/screen/graphics_items.py
 # MODIFIED: All mouse event logic has been removed and moved to the DesignCanvas.
 
-from PyQt6.QtWidgets import QGraphicsObject, QGraphicsItem, QGraphicsProxyWidget
+from PyQt6.QtWidgets import QGraphicsObject, QGraphicsItem
 from PyQt6.QtGui import (
     QPainter,
     QColor,
@@ -16,8 +16,6 @@ from PyQt6.QtCore import QRectF, Qt, QPointF, QLineF
 import copy
 
 from services.screen_data_service import screen_service
-from tools.button.conditional_style import PreviewButton
-from tools.button.style_builder import build_button_qss
 
 
 def _apply_pen_style_from_name(pen: QPen, style_name: str):
@@ -153,13 +151,6 @@ class ButtonItem(BaseGraphicsItem):
         self._current_tag_values = {}
         self._state = 'normal'
         self._tooltip = ''
-
-        # Proxy/button used for previewing the style
-        self._proxy = QGraphicsProxyWidget(self)
-        self._button = PreviewButton()
-        self._proxy.setWidget(self._button)
-        self._update_geometry()
-        self._apply_style()
         # Initialize tooltip based on current style (with empty tag values)
         self._get_active_style_properties(self._state)
 
@@ -174,8 +165,6 @@ class ButtonItem(BaseGraphicsItem):
         super().update_data(new_instance_data)
         # Reset conditional style manager when data changes
         self._conditional_style_manager = None
-        self._update_geometry()
-        self._apply_style()
 
     def _get_conditional_style_manager(self):
         """Lazy load conditional style manager"""
@@ -239,30 +228,62 @@ class ButtonItem(BaseGraphicsItem):
 
         return final_props
 
-    def _update_geometry(self):
-        rect = self.boundingRect()
-        if getattr(self, '_button', None):
-            self._button.setFixedSize(int(rect.width()), int(rect.height()))
-            self._proxy.setPos(0, 0)
-
-    def _apply_style(self):
-        if not getattr(self, '_button', None):
-            return
-        base = self._get_active_style_properties('normal')
-        hover = self._get_active_style_properties('hover')
-        qss = build_button_qss(base, hover)
-        self._button.setStyleSheet(qss)
-        self._button.setText(base.get('label', 'Button'))
-        if hasattr(self._button, 'set_icon'):
-            self._button.set_icon(base.get('icon', ''))
-            self._button.set_hover_icon(hover.get('icon', base.get('icon', '')))
-            if base.get('icon_size') and hasattr(self._button, 'set_icon_size'):
-                self._button.set_icon_size(int(base.get('icon_size')))
-
     def paint(self, painter: QPainter, option, widget=None):
-        # Painting handled by proxy widget; ensure geometry up-to-date
-        self._update_geometry()
-        self._apply_style()
+        painter.save()
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        
+        # Get active style properties
+        props = self._get_active_style_properties(self._state)
+        
+        # Apply style properties
+        bg_color = QColor(props.get('background_color', '#5a6270'))
+        text_color = QColor(props.get('text_color', '#ffffff'))
+        label = props.get('label', 'Button')
+        border_radius = props.get('border_radius', 5)
+        border_width = props.get('border_width', 0)
+        border_color = QColor(props.get('border_color', '#000000'))
+        font_size = props.get('font_size', 10)
+        font_weight = props.get('font_weight', 'normal')
+        opacity = props.get('opacity', 1.0)
+        
+        # Apply opacity
+        bg_color.setAlphaF(opacity)
+        text_color.setAlphaF(opacity)
+        
+        # Draw background
+        if border_width > 0:
+            painter.setPen(QPen(border_color, border_width))
+        else:
+            painter.setPen(Qt.PenStyle.NoPen)
+            
+        painter.setBrush(bg_color)
+        painter.drawRoundedRect(self.boundingRect(), border_radius, border_radius)
+        
+        # Draw text
+        painter.setPen(text_color)
+        font = QFont("Arial", font_size)
+        if font_weight == 'bold':
+            font.setBold(True)
+        elif font_weight == 'light':
+            font.setWeight(QFont.Weight.Light)
+        painter.setFont(font)
+        painter.drawText(self.boundingRect(), Qt.AlignmentFlag.AlignCenter, label)
+        
+        # Handle animations (simplified for now)
+        animation = props.get('animation', {})
+        if animation.get('enabled', False):
+            # Basic animation support - could be enhanced with QPropertyAnimation
+            anim_type = animation.get('type', 'pulse')
+            intensity = animation.get('intensity', 1.0)
+            
+            if anim_type == 'pulse':
+                # Simple pulse effect by adjusting opacity
+                pulse_factor = 0.8 + 0.2 * intensity
+                bg_color.setAlphaF(opacity * pulse_factor)
+                painter.setBrush(bg_color)
+                painter.drawRoundedRect(self.boundingRect(), border_radius, border_radius)
+        
+        painter.restore()
     
     def update_tag_values(self, tag_values):
         """Update tag values and re-evaluate conditional styles"""
