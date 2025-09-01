@@ -4,7 +4,7 @@
         "company": "",
         "description": "",
         "creation_date": "2025-08-26 17:51:48",
-        "modification_date": "2025-08-29 20:00:29",
+        "modification_date": "2025-09-01 09:28:23",
         "save_history": [
             "Project Created on 2025-08-26 17:51:48",
             "Saved on 2025-08-26 17:54:13",
@@ -19,7 +19,8 @@
             "Saved on 2025-08-28 17:09:30",
             "Saved on 2025-08-28 23:42:15",
             "Saved on 2025-08-29 19:58:00",
-            "Saved on 2025-08-29 20:00:29"
+            "Saved on 2025-08-29 20:00:29",
+            "Saved on 2025-09-01 09:28:23"
         ]
     },
     "screens": {
@@ -122,6 +123,34 @@
                                         "indices": []
                                     }
                                 },
+                                "conditional_reset": {
+                                    "operator": "==",
+                                    "operand1": {
+                                        "main_tag": {
+                                            "source": "tag",
+                                            "value": {
+                                                "db_id": "7ac5de69-7a29-41ac-a3e5-49063243b05d",
+                                                "db_name": "1",
+                                                "tag_name": "dddd"
+                                            }
+                                        },
+                                        "indices": []
+                                    },
+                                    "reset_value": {
+                                        "main_tag": {
+                                            "source": "constant",
+                                            "value": "0"
+                                        },
+                                        "indices": []
+                                    },
+                                    "operand2": {
+                                        "main_tag": {
+                                            "source": "constant",
+                                            "value": "10"
+                                        },
+                                        "indices": []
+                                    }
+                                },
                                 "details": "[1]::dddd += 01"
                             }
                         ],
@@ -141,19 +170,23 @@
                     "tool_type": "line",
                     "properties": {
                         "start": {
-                            "x": 0,
-                            "y": 0
+                            "x": 0.0,
+                            "y": 0.0
                         },
                         "end": {
-                            "x": 271,
-                            "y": 192
+                            "x": 269.66271142942355,
+                            "y": 205.47072517436413
                         },
                         "color": "#000000",
                         "width": 2,
                         "style": "solid",
                         "position": {
-                            "x": 618,
-                            "y": 149
+                            "x": 618.0,
+                            "y": 149.0
+                        },
+                        "size": {
+                            "width": 273.6773807796592,
+                            "height": 209.47072517436413
                         }
                     }
                 }
