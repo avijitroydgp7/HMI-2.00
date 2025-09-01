@@ -4,7 +4,7 @@
         "company": "",
         "description": "",
         "creation_date": "2025-08-26 17:51:48",
-        "modification_date": "2025-09-01 09:28:23",
+        "modification_date": "2025-09-01 17:28:06",
         "save_history": [
             "Project Created on 2025-08-26 17:51:48",
             "Saved on 2025-08-26 17:54:13",
@@ -20,7 +20,8 @@
             "Saved on 2025-08-28 23:42:15",
             "Saved on 2025-08-29 19:58:00",
             "Saved on 2025-08-29 20:00:29",
-            "Saved on 2025-09-01 09:28:23"
+            "Saved on 2025-09-01 09:28:23",
+            "Saved on 2025-09-01 17:28:06"
         ]
     },
     "screens": {
@@ -154,7 +155,100 @@
                                 "details": "[1]::dddd += 01"
                             }
                         ],
-                        "conditional_styles": []
+                        "conditional_styles": [
+                            {
+                                "style_id": "style_1",
+                                "condition": null,
+                                "condition_data": {
+                                    "mode": "Ordinary"
+                                },
+                                "tooltip": "",
+                                "text_type": "Comment",
+                                "text_value": "",
+                                "comment_ref": {
+                                    "number": null,
+                                    "column": null,
+                                    "row": null
+                                },
+                                "font_family": "Agency FB",
+                                "font_size": 10,
+                                "bold": false,
+                                "italic": false,
+                                "underline": false,
+                                "background_color": "#2ecc71",
+                                "text_color": "#308dcb",
+                                "h_align": "center",
+                                "v_align": "middle",
+                                "offset": 0,
+                                "icon": "",
+                                "hover_icon": "",
+                                "properties": {
+                                    "component_type": "Standard Button",
+                                    "shape_style": "Flat",
+                                    "background_type": "Solid",
+                                    "background_color": "#2ecc71",
+                                    "background_color2": "#44ff93",
+                                    "gradient_type": "Top to Bottom",
+                                    "gradient_x1": 0,
+                                    "gradient_y1": 0,
+                                    "gradient_x2": 0,
+                                    "gradient_y2": 1,
+                                    "text_color": "#308dcb",
+                                    "font_size": 10,
+                                    "font_family": "Agency FB",
+                                    "bold": false,
+                                    "italic": false,
+                                    "underline": false,
+                                    "vertical_align": "middle",
+                                    "horizontal_align": "center",
+                                    "offset_to_frame": 0,
+                                    "border_radius_tl": 27,
+                                    "border_radius_tr": 27,
+                                    "border_radius_br": 27,
+                                    "border_radius_bl": 27,
+                                    "border_width": 0,
+                                    "border_style": "solid",
+                                    "border_color": "#1f884b",
+                                    "text_type": "Comment",
+                                    "comment_number": null,
+                                    "comment_column": null,
+                                    "comment_row": null,
+                                    "h_align": "center",
+                                    "v_align": "middle",
+                                    "offset": 0,
+                                    "comment_ref": {
+                                        "number": null,
+                                        "column": null,
+                                        "row": null
+                                    }
+                                },
+                                "hover_properties": {
+                                    "text_type": "Comment",
+                                    "text_value": "",
+                                    "comment_ref": {
+                                        "number": null,
+                                        "column": null,
+                                        "row": null
+                                    },
+                                    "font_family": "Agency FB",
+                                    "font_size": 10,
+                                    "bold": false,
+                                    "italic": false,
+                                    "underline": false,
+                                    "background_color": "#37f588",
+                                    "text_color": "#308dcb",
+                                    "h_align": "center",
+                                    "v_align": "middle",
+                                    "offset": 0
+                                },
+                                "animation": {
+                                    "enabled": false,
+                                    "type": "pulse",
+                                    "intensity": 1.0
+                                },
+                                "style_sheet": "QPushButton {\n    padding: 10px;\n    border-top-left-radius: 27px;\n    border-top-right-radius: 27px;\n    border-bottom-right-radius: 27px;\n    border-bottom-left-radius: 27px;\n    color: #308dcb;\n    font-size: 10pt;\n    font-family: 'Agency FB';\n    font-weight: normal;\n    font-style: normal;\n    text-decoration: none;\n    border-width: 0px;\n    border-style: solid;\n    border-color: #1f884b;\n    background-color: #2ecc71;\n}\nQPushButton:hover {\n    background-color: #37f588;\n    color: #308dcb;\n}\n"
+                            }
+                        ]
                     }
                 },
                 {

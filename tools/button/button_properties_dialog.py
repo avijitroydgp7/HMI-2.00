@@ -585,7 +585,10 @@ class ButtonPropertiesDialog(QDialog):
         """Create a small swatch widget to preview the style in the list."""
         container = QWidget()
         hl = QHBoxLayout(container)
-        hl.setContentsMargins(6, 4, 6, 4)
+        hl.setContentsMargins(
+            dpi_scale(6), dpi_scale(4), dpi_scale(6), dpi_scale(4)
+        )
+        hl.setSpacing(dpi_scale(8))
         hl.setSpacing(8)
 
         # Small preview button reflecting style text and formatting
@@ -662,7 +665,7 @@ class ButtonPropertiesDialog(QDialog):
 
         # Label for style id
         label = QLabel(style.style_id)
-        label.setMinimumWidth(120)
+        label.setMinimumWidth(dpi_scale(120))
         label.setToolTip(style.tooltip)
 
         hl.addWidget(preview)
@@ -674,7 +677,7 @@ class ButtonPropertiesDialog(QDialog):
         self.style_list.clear()
         for style in self.style_manager.conditional_styles:
             item = QListWidgetItem()
-            item.setSizeHint(QSize(240, 48))
+            item.setSizeHint(QSize(dpi_scale(240), dpi_scale(48)))
             self.style_list.addItem(item)
             widget = self._build_swatch_widget(style)
             self.style_list.setItemWidget(item, widget)
