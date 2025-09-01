@@ -83,6 +83,8 @@ class EmbeddedScreenItem(BaseGraphicsItem):
         self.is_resizable = True
         self.setAcceptHoverEvents(True)
         self._hovered = False
+        # Cache complex embedded rendering when static
+        self.setCacheMode(QGraphicsItem.CacheMode.DeviceCoordinateCache)
 
     def boundingRect(self) -> QRectF:
         # Use instance size if provided, otherwise use base screen size
@@ -380,6 +382,7 @@ class FreeformItem(BaseGraphicsItem):
         super().__init__(instance_data, parent)
         self.is_resizable = True
         self._offset = QPointF(0, 0)
+        self.setCacheMode(QGraphicsItem.CacheMode.DeviceCoordinateCache)
 
     def _points(self):
         props = self.instance_data.get("properties", {})
@@ -429,6 +432,7 @@ class RectItem(BaseGraphicsItem):
     def __init__(self, instance_data, parent=None):
         super().__init__(instance_data, parent)
         self.is_resizable = True
+        # Rect is simple; skip cache to avoid unnecessary memory
 
     def boundingRect(self) -> QRectF:
         props = self.instance_data.get("properties", {})
@@ -460,6 +464,7 @@ class PolygonItem(BaseGraphicsItem):
         super().__init__(instance_data, parent)
         self.is_resizable = True
         self._offset = QPointF(0, 0)
+        self.setCacheMode(QGraphicsItem.CacheMode.DeviceCoordinateCache)
 
     def _points(self):
         props = self.instance_data.get("properties", {})
@@ -500,6 +505,7 @@ class CircleItem(BaseGraphicsItem):
     def __init__(self, instance_data, parent=None):
         super().__init__(instance_data, parent)
         self.is_resizable = True
+        self.setCacheMode(QGraphicsItem.CacheMode.DeviceCoordinateCache)
 
     def boundingRect(self) -> QRectF:
         props = self.instance_data.get("properties", {})
@@ -535,6 +541,7 @@ class ArcItem(BaseGraphicsItem):
     def __init__(self, instance_data, parent=None):
         super().__init__(instance_data, parent)
         self.is_resizable = True
+        self.setCacheMode(QGraphicsItem.CacheMode.DeviceCoordinateCache)
 
     def boundingRect(self) -> QRectF:
         props = self.instance_data.get("properties", {})
@@ -569,6 +576,7 @@ class SectorItem(BaseGraphicsItem):
     def __init__(self, instance_data, parent=None):
         super().__init__(instance_data, parent)
         self.is_resizable = True
+        self.setCacheMode(QGraphicsItem.CacheMode.DeviceCoordinateCache)
 
     def boundingRect(self) -> QRectF:
         props = self.instance_data.get("properties", {})
@@ -608,6 +616,7 @@ class TableItem(BaseGraphicsItem):
     def __init__(self, instance_data, parent=None):
         super().__init__(instance_data, parent)
         self.is_resizable = True
+        self.setCacheMode(QGraphicsItem.CacheMode.DeviceCoordinateCache)
 
     def boundingRect(self) -> QRectF:
         props = self.instance_data.get("properties", {})
@@ -646,6 +655,7 @@ class ScaleItem(BaseGraphicsItem):
     def __init__(self, instance_data, parent=None):
         super().__init__(instance_data, parent)
         self.is_resizable = True
+        self.setCacheMode(QGraphicsItem.CacheMode.DeviceCoordinateCache)
 
     def boundingRect(self) -> QRectF:
         props = self.instance_data.get("properties", {})
@@ -751,6 +761,7 @@ class ImageItem(BaseGraphicsItem):
         self.is_resizable = True
         self._pixmap = None
         self._load_pixmap()
+        self.setCacheMode(QGraphicsItem.CacheMode.DeviceCoordinateCache)
 
     def _load_pixmap(self):
         props = self.instance_data.get("properties", {})
@@ -795,6 +806,7 @@ class DxfItem(BaseGraphicsItem):
     def __init__(self, instance_data, parent=None):
         super().__init__(instance_data, parent)
         self.is_resizable = True
+        self.setCacheMode(QGraphicsItem.CacheMode.DeviceCoordinateCache)
 
     def boundingRect(self) -> QRectF:
         props = self.instance_data.get("properties", {})

@@ -3,7 +3,8 @@ import os
 import copy
 import sys
 import subprocess
-from PyQt6.QtWidgets import QFileDialog, QMessageBox
+from PyQt6.QtWidgets import QFileDialog, QMessageBox, QApplication
+from PyQt6.QtCore import QThreadPool, Qt
 from services.project_service import project_service
 from services.command_history_service import command_history_service
 from services.commands import UpdateProjectInfoCommand
@@ -29,44 +30,18 @@ def open_project(win):
     file_path, _ = QFileDialog.getOpenFileName(win, "Open Project", last_dir, "HMI Project Files (*.hmi)")
     
     if file_path:
-        try:
-            current_path = project_service.project_file_path
-            project_service.load_project(file_path)
-            if project_service.project_file_path != current_path:
-                tabs._close_all_tabs(win)
-        except Exception as e:
-            msg_box = QMessageBox(win)
-            msg_box.setWindowTitle("Error Loading Project")
-            msg_box.setText(f"Could not load project file:\n{e}")
-            msg_box.setIcon(QMessageBox.Icon.Critical)
-            msg_box.exec()
+        _load_project_async_ui(win, file_path)
 
 def load_project(win, path):
     """Loads a specific project file, used for command-line loading."""
-    from . import tabs
-    try:
-        current_path = project_service.project_file_path
-        project_service.load_project(path)
-        if project_service.project_file_path != current_path:
-            tabs._close_all_tabs(win)
-    except Exception as e:
-        print(f"ERROR: Could not load project file '{path}': {e}")
+    _load_project_async_ui(win, path)
 
 def save_project(win):
     """Handles the 'Save Project' action, now with UI logic."""
     if not project_service.is_project_open() or project_service.project_file_path == "New Project":
         return save_project_as(win)
-    
-    try:
-        project_service.save_project(project_service.project_file_path)
-        return True
-    except Exception as e:
-        msg_box = QMessageBox(win)
-        msg_box.setWindowTitle("Error Saving Project")
-        msg_box.setText(f"Could not save project file:\n{e}")
-        msg_box.setIcon(QMessageBox.Icon.Critical)
-        msg_box.exec()
-        return False
+
+    return _save_project_async_ui(win, project_service.project_file_path)
 
 def save_project_as(win):
     """Handles the 'Save Project As' action, now with UI logic."""
@@ -77,15 +52,7 @@ def save_project_as(win):
     file_path, _ = QFileDialog.getSaveFileName(win, "Save Project As", last_dir, "HMI Project Files (*.hmi)")
     
     if file_path:
-        try:
-            project_service.save_project(file_path)
-            return True
-        except Exception as e:
-            msg_box = QMessageBox(win)
-            msg_box.setWindowTitle("Error Saving Project")
-            msg_box.setText(f"Could not save project file:\n{e}")
-            msg_box.setIcon(QMessageBox.Icon.Critical)
-            msg_box.exec()
+        return _save_project_async_ui(win, file_path)
     return False
 
 def prompt_to_save_if_dirty(win):
@@ -165,3 +132,96 @@ def run_simulator(win):
         msg_box.setText(f"Could not start simulator:\n{e}")
         msg_box.setIcon(QMessageBox.Icon.Critical)
         msg_box.exec()
+
+
+# ------------------------ Async helpers ------------------------
+
+def _set_busy(win, text: str):
+    try:
+        QApplication.setOverrideCursor(Qt.CursorShape.WaitCursor)
+    except Exception:
+        pass
+    if hasattr(win, 'status_bar'):
+        win.status_bar.showMessage(text)
+
+
+def _clear_busy(win):
+    try:
+        QApplication.restoreOverrideCursor()
+    except Exception:
+        pass
+    if hasattr(win, 'status_bar'):
+        win.status_bar.clearMessage()
+
+
+def _load_project_async_ui(win, file_path: str):
+    from . import tabs
+    current_path = project_service.project_file_path
+    signals, runnable = project_service.load_project_async(file_path)
+
+    def on_started():
+        _set_busy(win, "Loading project...")
+
+    def on_result(payload):
+        try:
+            pdata = payload.get('project_data')
+            fpath = payload.get('file_path')
+            project_service.apply_loaded_project(pdata, fpath)
+            # Close tabs if project path changed
+            if project_service.project_file_path != current_path:
+                tabs._close_all_tabs(win)
+        except Exception as e:
+            _show_error(win, "Error Loading Project", f"Could not load project file:\n{e}")
+
+    def on_error(message):
+        _show_error(win, "Error Loading Project", f"Could not load project file:\n{message}")
+
+    def on_finished():
+        _clear_busy(win)
+        update_window_title(win)
+        tabs.update_central_widget(win)
+
+    signals.started.connect(on_started)
+    signals.result.connect(on_result)
+    signals.error.connect(on_error)
+    signals.finished.connect(on_finished)
+
+    QThreadPool.globalInstance().start(runnable)
+
+
+def _save_project_async_ui(win, file_path: str) -> bool:
+    signals, runnable = project_service.save_project_async(file_path)
+
+    def on_started():
+        _set_busy(win, "Saving project...")
+
+    def on_result(payload):
+        try:
+            fpath = payload.get('file_path')
+            info = payload.get('project_info')
+            project_service._commit_successful_save(fpath, info)
+        except Exception as e:
+            _show_error(win, "Error Saving Project", f"Could not save project file:\n{e}")
+
+    def on_error(message):
+        _show_error(win, "Error Saving Project", f"Could not save project file:\n{message}")
+
+    def on_finished():
+        _clear_busy(win)
+        update_window_title(win)
+
+    signals.started.connect(on_started)
+    signals.result.connect(on_result)
+    signals.error.connect(on_error)
+    signals.finished.connect(on_finished)
+
+    QThreadPool.globalInstance().start(runnable)
+    return True
+
+
+def _show_error(win, title: str, text: str):
+    msg_box = QMessageBox(win)
+    msg_box.setWindowTitle(title)
+    msg_box.setText(text)
+    msg_box.setIcon(QMessageBox.Icon.Critical)
+    msg_box.exec()

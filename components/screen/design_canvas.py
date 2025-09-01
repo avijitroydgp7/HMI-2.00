@@ -13,6 +13,7 @@ from PyQt6.QtWidgets import (
     QGraphicsSimpleTextItem,
     QGraphicsItem,
 )
+from PyQt6.QtOpenGLWidgets import QOpenGLWidget
 from PyQt6.QtGui import (
     QPainter,
     QColor,
@@ -25,7 +26,7 @@ from PyQt6.QtGui import (
     QCursor,
     QBrush,
 )
-from PyQt6.QtCore import Qt, QPoint, QPointF, pyqtSignal, QRectF, QRect, QEvent, QLineF, QTimer
+from PyQt6.QtCore import Qt, QPoint, QPointF, pyqtSignal, QRectF, QRect, QEvent, QLineF, QTimer, QElapsedTimer
 import math
 import copy
 import uuid
@@ -111,6 +112,9 @@ class DesignCanvas(QGraphicsView):
         self._update_preview_style()
         self._update_cursor()
 
+        # Use OpenGL-backed viewport for GPU-accelerated rendering
+        self.setViewport(QOpenGLWidget())
+
         self.scene = QGraphicsScene(self)
         self.scene.setItemIndexMethod(QGraphicsScene.ItemIndexMethod.BspTreeIndex)
         self.setScene(self.scene)
@@ -145,7 +149,8 @@ class DesignCanvas(QGraphicsView):
         self.snap_lines_visible = settings_service.get_value("snap_lines_visible", True)
         self._snap_lines = []
 
-        self.setRenderHint(QPainter.RenderHint.Antialiasing)
+        # Disable global antialiasing; enable per-item where needed
+        self.setRenderHint(QPainter.RenderHint.Antialiasing, False)
         self.setDragMode(QGraphicsView.DragMode.NoDrag)
         self.setTransformationAnchor(QGraphicsView.ViewportAnchor.AnchorUnderMouse)
         self.setResizeAnchor(QGraphicsView.ViewportAnchor.AnchorViewCenter)
@@ -153,19 +158,17 @@ class DesignCanvas(QGraphicsView):
         self.setAcceptDrops(True)
         self.setObjectName("DesignCanvas")
         self.setBackgroundBrush(QColor("#1f1f1f"))
-        # Using a more efficient update mode avoids redrawing the entire view for
-        # every small change while still keeping interactions responsive.  The
-        # bounding rect mode updates only the area that actually changed,
-        # ensuring that dragging, zooming and selection continue to refresh
-        # correctly without the overhead of a full viewport repaint.
-        self.setViewportUpdateMode(
-            QGraphicsView.ViewportUpdateMode.BoundingRectViewportUpdate
-        )
+        # Prefer minimal viewport updates for dynamic scenes
+        self.setViewportUpdateMode(QGraphicsView.ViewportUpdateMode.MinimalViewportUpdate)
         self.viewport().installEventFilter(self)
 
         self.scene.selectionChanged.connect(self._on_selection_changed)
 
         self.update_screen_data()
+
+        # Frame throttling (~60 fps)
+        self._frame_timer = QElapsedTimer()
+        self._frame_timer.start()
         
     def drawBackground(self, painter: QPainter, rect: QRectF):
         """Draw the scene background without grid lines."""
@@ -195,8 +198,15 @@ class DesignCanvas(QGraphicsView):
 
     def eventFilter(self, source, event):
         if event.type() == QEvent.Type.HoverMove:
+            # Throttle hover computations
+            if self._frame_timer.isValid() and self._frame_timer.elapsed() < 16:
+                return False
+            self._frame_timer.restart()
             self._last_mouse_scene_pos = self._snap_position(self.mapToScene(event.position().toPoint()))
         elif event.type() == QEvent.Type.MouseMove and event.buttons() == Qt.MouseButton.NoButton:
+            if self._frame_timer.isValid() and self._frame_timer.elapsed() < 16:
+                return False
+            self._frame_timer.restart()
             self._last_mouse_scene_pos = self._snap_position(self.mapToScene(event.pos()))
         return False
 
@@ -551,6 +561,15 @@ class DesignCanvas(QGraphicsView):
              super().mousePressEvent(event)
 
     def mouseMoveEvent(self, event: QMouseEvent):
+        # Throttle drag/update computations to ~60 fps
+        if self._frame_timer.isValid() and self._frame_timer.elapsed() < 16:
+            # Keep last position updated for downstream consumers
+            self._last_mouse_scene_pos = self._snap_position(self.mapToScene(event.pos()))
+            # Still forward to path edit tool to keep editing responsive
+            if self.active_tool == constants.ToolType.PATH_EDIT:
+                super().mouseMoveEvent(event)
+            return
+        self._frame_timer.restart()
         current_scene_pos = self._snap_position(self.mapToScene(event.pos()))
         self.mouse_moved_on_scene.emit(current_scene_pos)
         if self.active_tool == constants.ToolType.PATH_EDIT:

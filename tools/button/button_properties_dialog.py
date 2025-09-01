@@ -1,7 +1,7 @@
 # components/button/button_properties_dialog.py
 from PyQt6.QtWidgets import (
     QTabWidget, QWidget, QDialogButtonBox, QLabel, QFormLayout,
-    QLineEdit, QTableWidget, QTableWidgetItem, QHeaderView,
+    QLineEdit, QTableView, QHeaderView,
     QPushButton, QHBoxLayout, QAbstractItemView, QVBoxLayout,
     QSplitter, QGroupBox, QStackedWidget, QDialog, QInputDialog,
     QListWidget, QListWidgetItem, QToolButton, QStyle
@@ -16,6 +16,7 @@ from tools.button.actions.select_action_type_dialog import SelectActionTypeDialo
 from tools.button.actions.bit_action_dialog import BitActionDialog
 from tools.button.actions.word_action_dialog import WordActionDialog
 from tools.button.actions.constants import ActionType, TriggerMode
+from .button_actions_model import ButtonActionsModel
 
 from .conditional_style import (
     ConditionalStyleManager,
@@ -86,16 +87,17 @@ class ButtonPropertiesDialog(QDialog):
         # Splitter for top area
         splitter = QSplitter(Qt.Orientation.Horizontal)
         
-        # Left panel: Action table
-        self.action_table = QTableWidget()
-        self.action_table.setColumnCount(6)
-        self.action_table.setHorizontalHeaderLabels([
-            "#", "Action Type", "Target Tag", "Trigger", "Conditional Reset", "Details"
-        ])
+        # Left panel: Action view bound to model
+        self.action_table = QTableView()
         self.action_table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         self.action_table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
         self.action_table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
         self.action_table.verticalHeader().setVisible(False)
+
+        # Bind model
+        self.action_model = ButtonActionsModel(self.properties['actions'], self)
+        self.action_table.setModel(self.action_model)
+
         header = self.action_table.horizontalHeader()
         header.setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
         header.setSectionResizeMode(1, QHeaderView.ResizeMode.ResizeToContents)
@@ -157,8 +159,8 @@ class ButtonPropertiesDialog(QDialog):
         self.action_move_up_btn.setEnabled(False)
         self.action_move_down_btn.setEnabled(False)
         
-        self.action_table.cellDoubleClicked.connect(self._on_action_double_click)
-        self.action_table.itemSelectionChanged.connect(self._on_action_selection_changed)
+        self.action_table.doubleClicked.connect(self._on_action_double_click)
+        self.action_table.selectionModel().selectionChanged.connect(lambda *_: self._on_action_selection_changed())
 
         self._refresh_action_table()
         self._on_action_selection_changed() # Set initial state
@@ -215,7 +217,7 @@ class ButtonPropertiesDialog(QDialog):
         self.action_remove_btn.setEnabled(True)
         self.action_duplicate_btn.setEnabled(True)
         self.action_move_up_btn.setEnabled(row > 0)
-        self.action_move_down_btn.setEnabled(row < len(self.properties['actions']) - 1)
+        self.action_move_down_btn.setEnabled(row < self.action_model.rowCount() - 1)
 
         if row >= len(self.properties['actions']):
             self.action_properties_stack.setCurrentIndex(0)
@@ -249,8 +251,11 @@ class ButtonPropertiesDialog(QDialog):
         self.word_action_mode_edit.setText(action_data.get("action_mode", "N/A"))
         self.word_value_edit.setText(value_str)
 
-    def _on_action_double_click(self, row, column):
+    def _on_action_double_click(self, index):
         # Open edit dialog for the selected action
+        if not index or not index.isValid():
+            return
+        row = index.row()
         if row < 0 or row >= len(self.properties.get('actions', [])):
             return
         action_data = self.properties['actions'][row]
@@ -263,8 +268,7 @@ class ButtonPropertiesDialog(QDialog):
         if action_dialog and action_dialog.exec():
             new_action_data = action_dialog.get_data()
             if new_action_data:
-                self.properties['actions'][row] = new_action_data
-                self._refresh_action_table()
+                self.action_model.update_action(row, new_action_data)
 
     def _format_operand_for_display(self, data: Optional[Dict]) -> str:
         if not data: return "N/A"
@@ -372,28 +376,9 @@ class ButtonPropertiesDialog(QDialog):
         return "COND"
 
     def _refresh_action_table(self):
-        self.action_table.setRowCount(0)
-        actions = self.properties.get('actions', [])
-        for i, action in enumerate(actions):
-            self.action_table.insertRow(i)
-            
-            action_type = action.get('action_type', '')
-            target_data = action.get('target_tag')
-            display_tag = self._format_operand_for_display(target_data)
-            
-            # Get trigger and conditional reset data
-            trigger_data = action.get('trigger')
-            conditional_reset_data = action.get('conditional_reset')
-            
-            trigger_display = self._format_trigger_for_display(trigger_data)
-            conditional_reset_display = self._format_conditional_reset_for_display(conditional_reset_data)
-
-            self.action_table.setItem(i, 0, QTableWidgetItem(str(i + 1)))
-            self.action_table.setItem(i, 1, QTableWidgetItem(action_type.capitalize()))
-            self.action_table.setItem(i, 2, QTableWidgetItem(display_tag))
-            self.action_table.setItem(i, 3, QTableWidgetItem(trigger_display))
-            self.action_table.setItem(i, 4, QTableWidgetItem(conditional_reset_display))
-            self.action_table.setItem(i, 5, QTableWidgetItem(action.get('details', '')))
+        # Underlying list may have changed externally; notify the model
+        if hasattr(self, 'action_model'):
+            self.action_model.refresh()
 
     def _add_action(self):
         type_dialog = SelectActionTypeDialog(self)
@@ -409,9 +394,8 @@ class ButtonPropertiesDialog(QDialog):
         if action_dialog and action_dialog.exec():
             action_data = action_dialog.get_data()
             if action_data:
-                self.properties['actions'].append(action_data)
-                self._refresh_action_table()
-                new_row = len(self.properties['actions']) - 1
+                new_row = self.action_model.rowCount()
+                self.action_model.insert_action(new_row, action_data)
                 self.action_table.selectRow(new_row)
                 self._on_action_selection_changed()
 
@@ -432,8 +416,7 @@ class ButtonPropertiesDialog(QDialog):
         if action_dialog and action_dialog.exec():
             new_action_data = action_dialog.get_data()
             if new_action_data:
-                self.properties['actions'][row] = new_action_data
-                self._refresh_action_table()
+                self.action_model.update_action(row, new_action_data)
                 self.action_table.selectRow(row)
                 self._on_action_selection_changed()
 
@@ -441,8 +424,7 @@ class ButtonPropertiesDialog(QDialog):
         selected_rows = self.action_table.selectionModel().selectedRows()
         if not selected_rows: return
         row = selected_rows[0].row()
-        del self.properties['actions'][row]
-        self._refresh_action_table()
+        self.action_model.remove_action(row)
         self._on_action_selection_changed()
 
     def _move_action_up(self):
@@ -450,8 +432,7 @@ class ButtonPropertiesDialog(QDialog):
         if not selected_rows: return
         row = selected_rows[0].row()
         if row > 0:
-            self.properties['actions'].insert(row - 1, self.properties['actions'].pop(row))
-            self._refresh_action_table()
+            self.action_model.move_action(row, row - 1)
             self.action_table.selectRow(row - 1)
             self._on_action_selection_changed()
 
@@ -459,9 +440,8 @@ class ButtonPropertiesDialog(QDialog):
         selected_rows = self.action_table.selectionModel().selectedRows()
         if not selected_rows: return
         row = selected_rows[0].row()
-        if row < len(self.properties['actions']) - 1:
-            self.properties['actions'].insert(row + 1, self.properties['actions'].pop(row))
-            self._refresh_action_table()
+        if row < self.action_model.rowCount() - 1:
+            self.action_model.move_action(row, row + 1)
             self.action_table.selectRow(row + 1)
             self._on_action_selection_changed()
 
@@ -471,15 +451,14 @@ class ButtonPropertiesDialog(QDialog):
         if not selected_rows: return
         row = selected_rows[0].row()
         
-        if row < len(self.properties['actions']):
+        if row < self.action_model.rowCount():
             # Create a deep copy of the action
             original_action = self.properties['actions'][row]
             duplicated_action = copy.deepcopy(original_action)
             
             # Insert the duplicated action after the original
             new_row = row + 1
-            self.properties['actions'].insert(new_row, duplicated_action)
-            self._refresh_action_table()
+            self.action_model.duplicate_action(row, duplicated_action)
             self.action_table.selectRow(new_row)
             self._on_action_selection_changed()
 
