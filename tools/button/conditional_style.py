@@ -60,6 +60,7 @@ from PyQt6.QtSvg import QSvgRenderer
 from utils.icon_manager import IconManager
 from dialogs.icon_picker_dialog import IconPickerDialog
 from utils.dpi import dpi_scale
+from tools.button.style_builder import build_button_qss
 import os
 from dialogs.widgets import TagSelector
 from services.comment_data_service import comment_data_service
@@ -2349,150 +2350,123 @@ class ConditionalStyleEditorDialog(QDialog):
         self.border_width_spin.setMaximum(border_limit)
 
     def generate_qss(self, component_type):
-        shape_style = self.shape_style_combo.currentText()
         bg_type = self.bg_type_combo.currentText()
         width = dpi_scale(200)
         height = dpi_scale(100)
         padding = min(width, height) // 10
-        tl_radius = self.tl_radius_spin.value()
-        tr_radius = self.tr_radius_spin.value()
-        br_radius = self.br_radius_spin.value()
-        bl_radius = self.bl_radius_spin.value()
-        border_width = self.border_width_spin.value()
-        border_style = self.border_style_combo.currentData()
-        bg_color = self._bg_color
-        hover_bg_color = self._hover_bg_color
-        border_color = self._border_color
+
+        # Component specific sizing
+        if component_type == "Circle Button":
+            size = max(width, height)
+            radius = size // 2
+            self.preview_button.setFixedSize(size, size)
+            border_radius = {"tl": radius, "tr": radius, "br": radius, "bl": radius}
+        elif component_type == "Toggle Switch":
+            self.preview_switch.setFixedSize(width, height)
+            border_radius = {"tl": 50, "tr": 50, "br": 50, "bl": 50}
+        else:
+            self.preview_button.setFixedSize(width, height)
+            border_radius = {
+                "tl": self.tl_radius_spin.value(),
+                "tr": self.tr_radius_spin.value(),
+                "br": self.br_radius_spin.value(),
+                "bl": self.bl_radius_spin.value(),
+            }
+
         text_color = (
             self._text_color
             or self.palette().color(QPalette.ColorRole.ButtonText).name()
         )
         hover_text_color = self._hover_text_color or text_color
-        font_size = self.font_size_spin.value()
-        font_family = self.base_controls["font_family_combo"].currentText()
-        font_weight = "bold" if self.base_controls["bold_btn"].isChecked() else "normal"
-        font_style = (
-            "italic" if self.base_controls["italic_btn"].isChecked() else "normal"
-        )
-        text_decoration = (
-            "underline" if self.base_controls["underline_btn"].isChecked() else "none"
-        )
 
-        if component_type == "Circle Button":
-            size = max(width, height)
-            radius = size // 2
-            tl_radius = tr_radius = br_radius = bl_radius = radius
-            self.preview_button.setFixedSize(size, size)
-        elif component_type == "Toggle Switch":
-            # Toggle switches always use a fixed 50px corner radius
-            tl_radius = tr_radius = br_radius = bl_radius = 50
-            self.preview_switch.setFixedSize(width, height)
-        else:
-            self.preview_button.setFixedSize(width, height)
+        base_props = {
+            "padding": padding,
+            "border_radius": border_radius,
+            "font_size": self.font_size_spin.value(),
+            "font_family": self.base_controls["font_family_combo"].currentText(),
+            "font_weight": "bold" if self.base_controls["bold_btn"].isChecked() else "normal",
+            "font_style": "italic" if self.base_controls["italic_btn"].isChecked() else "normal",
+            "text_decoration": "underline" if self.base_controls["underline_btn"].isChecked() else "none",
+            "text_color": text_color,
+            "h_align": (
+                self.base_controls["h_align_group"].checkedButton().property("align_value")
+                if self.base_controls["h_align_group"].checkedButton()
+                else "center"
+            ),
+            "v_align": (
+                self.base_controls["v_align_group"].checkedButton().property("align_value")
+                if self.base_controls["v_align_group"].checkedButton()
+                else "middle"
+            ),
+        }
 
-        main_qss, hover_qss = [], []
-        main_qss.extend(
-            [
-                f"padding: {padding}px;",
-                f"border-top-left-radius: {tl_radius}px;",
-                f"border-top-right-radius: {tr_radius}px;",
-                f"border-bottom-right-radius: {br_radius}px;",
-                f"border-bottom-left-radius: {bl_radius}px;",
-                f"color: {text_color};",
-                f"font-size: {font_size}pt;",
-                f"font-family: '{font_family}';",
-                f"font-weight: {font_weight};",
-                f"font-style: {font_style};",
-                f"text-decoration: {text_decoration};",
-            ]
-        )
+        hover_props = {"text_color": hover_text_color, "background_color": self._hover_bg_color.name()}
 
-        if shape_style == "Glass":
-            light_color, dark_color = bg_color.lighter(150).name(), bg_color.name()
-            border_c = self._border_color.name()
-            main_qss.append(
-                f"background-color: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 {light_color}, stop:1 {dark_color});"
+        border_color = self._border_color.name()
+        bg_color = self._bg_color.name()
+
+        if self.shape_style_combo.currentText() == "Glass":
+            light_color = self._bg_color.lighter(150).name()
+            base_props.update(
+                {
+                    "background_type": "Linear Gradient",
+                    "background_color": light_color,
+                    "background_color2": bg_color,
+                    "gradient_type": "Top to Bottom",
+                    "border_width": 1,
+                    "border_style": "solid",
+                    "border_color": border_color,
+                }
             )
-            main_qss.append(f"border: 1px solid {border_c};")
-            hover_qss.extend(
-                [
-                    f"background-color: {hover_bg_color.name()};",
-                    f"color: {hover_text_color};",
-                ]
-            )
-        elif shape_style == "3D":
-            main_qss.extend(
-                [
-                    f"border-width: {border_width}px;",
-                    f"border-color: {border_color.name()};",
-                    "border-style: outset;",
-                ]
+        elif self.shape_style_combo.currentText() == "3D":
+            base_props.update(
+                {
+                    "border_width": self.border_width_spin.value(),
+                    "border_style": "outset",
+                    "border_color": border_color,
+                    "background_type": bg_type,
+                }
             )
             if bg_type == "Solid":
-                main_qss.append(f"background-color: {bg_color.name()};")
+                base_props["background_color"] = bg_color
             else:
-                x1, y1, x2, y2 = (
-                    self.x1_spin.value(),
-                    self.y1_spin.value(),
-                    self.x2_spin.value(),
-                    self.y2_spin.value(),
+                base_props.update(
+                    {
+                        "background_color": bg_color,
+                        "background_color2": self._bg_color2.name(),
+                        "gradient_type": self.gradient_type_combo.currentText(),
+                    }
                 )
-                main_qss.append(
-                    f"background-color: qlineargradient(x1:{x1}, y1:{y1}, x2:{x2}, y2:{y2}, stop:0 {bg_color.name()}, stop:1 {self._bg_color2.name()});"
-                )
-            hover_qss.extend(
-                [
-                    f"background-color: {hover_bg_color.name()};",
-                    f"color: {hover_text_color};",
-                ]
-            )
-        elif shape_style == "Outline":
-            main_qss.extend(
-                [
-                    "background-color: transparent;",
-                    f"border: {border_width}px solid {bg_color.name()};",
-                    f"color: {text_color};",
-                ]
-            )
-            hover_qss.extend(
-                [
-                    f"background-color: {hover_bg_color.name()};",
-                    f"color: {hover_text_color};",
-                ]
+        elif self.shape_style_combo.currentText() == "Outline":
+            base_props.update(
+                {
+                    "background_color": "transparent",
+                    "border_width": self.border_width_spin.value(),
+                    "border_style": "solid",
+                    "border_color": bg_color,
+                }
             )
         else:
-            main_qss.extend(
-                [
-                    f"border-width: {border_width}px;",
-                    f"border-style: {border_style};",
-                    f"border-color: {border_color.name()};",
-                ]
+            base_props.update(
+                {
+                    "border_width": self.border_width_spin.value(),
+                    "border_style": self.border_style_combo.currentData(),
+                    "border_color": border_color,
+                    "background_type": bg_type,
+                }
             )
             if bg_type == "Solid":
-                main_qss.append(f"background-color: {bg_color.name()};")
+                base_props["background_color"] = bg_color
             else:
-                x1, y1, x2, y2 = (
-                    self.x1_spin.value(),
-                    self.y1_spin.value(),
-                    self.x2_spin.value(),
-                    self.y2_spin.value(),
+                base_props.update(
+                    {
+                        "background_color": bg_color,
+                        "background_color2": self._bg_color2.name(),
+                        "gradient_type": self.gradient_type_combo.currentText(),
+                    }
                 )
-                main_qss.append(
-                    f"background-color: qlineargradient(x1:{x1}, y1:{y1}, x2:{x2}, y2:{y2}, stop:0 {bg_color.name()}, stop:1 {self._bg_color2.name()});"
-                )
-            hover_qss.extend(
-                [
-                    f"background-color: {hover_bg_color.name()};",
-                    f"color: {hover_text_color};",
-                ]
-            )
 
-        main_qss_str = "\n    ".join(main_qss)
-        hover_qss_str = "\n    ".join(hover_qss) if hover_qss else ""
-        final_qss = f"QPushButton {{\n    {main_qss_str}\n}}\n"
-        if hover_qss_str:
-            final_qss += f"QPushButton:hover {{\n    {hover_qss_str}\n}}\n"
-        return final_qss
+        return build_button_qss(base_props, hover_props)
 
     def update_preview(self):
         component_type = self.component_type_combo.currentText()

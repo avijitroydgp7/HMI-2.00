@@ -14,10 +14,12 @@ from .button import (
     get_default_properties,
     set_default_properties,
 )
+from .style_builder import build_button_qss
 
 __all__ = [
     "DEFAULT_PROPERTIES",
     "get_default_properties",
     "set_default_properties",
+    "build_button_qss",
 ]
 

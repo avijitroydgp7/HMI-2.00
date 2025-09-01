@@ -3,16 +3,18 @@ from __future__ import annotations
 from typing import Any, Dict, Optional, Tuple, Callable, Set
 from dataclasses import dataclass
 
-from PyQt6.QtCore import QObject
+from PyQt6.QtCore import QObject, QSize, Qt
 from PyQt6.QtWidgets import QPushButton
-from PyQt6.QtGui import QColor
+from PyQt6.QtGui import QColor, QIcon
 
 from runtime_simulator.data_manager import DataManager
 
 # Reuse the designer's conditional style logic for evaluation
 from tools.button.conditional_style import ConditionalStyleManager
+from tools.button.style_builder import build_button_qss
 from tools.button.runtime_style import RuntimeConditionalStyle
 from tools.button.actions.constants import TriggerMode, ActionType
+from utils.icon_manager import IconManager
 
 
 @dataclass(slots=True)
@@ -105,24 +107,47 @@ class ButtonRuntimeController(QObject):
     def _apply_style(self, state: Optional[str]):
         if not self._button:
             return
-        props = self._manager.get_active_style(self._tag_values, state)
+        base = self._manager.get_active_style(self._tag_values, state)
+        hover = self._manager.get_active_style(self._tag_values, "hover")
+        qss = build_button_qss(base, hover)
+        self._button.setStyleSheet(qss)
+        self._button.setText(str(base.get('label', 'Button')))
+        # Alignment via property to support qproperty-alignment
+        h_map = {
+            'left': Qt.AlignmentFlag.AlignLeft,
+            'center': Qt.AlignmentFlag.AlignHCenter,
+            'right': Qt.AlignmentFlag.AlignRight,
+        }
+        v_map = {
+            'top': Qt.AlignmentFlag.AlignTop,
+            'middle': Qt.AlignmentFlag.AlignVCenter,
+            'bottom': Qt.AlignmentFlag.AlignBottom,
+        }
+        h_align = h_map.get(base.get('h_align', 'center'), Qt.AlignmentFlag.AlignHCenter)
+        v_align = v_map.get(base.get('v_align', 'middle'), Qt.AlignmentFlag.AlignVCenter)
+        self._button.setProperty('alignment', h_align | v_align)
 
-        # Minimal CSS application for runtime
-        bg = props.get('background_color', '#5a6270')
-        fg = props.get('text_color', '#ffffff')
-        br = int(props.get('border_radius', 5) or 0)
-        bw = int(props.get('border_width', 0) or 0)
-        bc = props.get('border_color', '#000000')
-        self._button.setText(str(props.get('label', 'Button')))
-        css = (
-            "QPushButton{"
-            f"background-color:{bg};color:{fg};"
-            f"border:{bw}px solid {bc};border-radius:{br}px;"
-            "}"
-        )
-        self._button.setStyleSheet(css)
+        # Icons
+        icon_path = base.get('icon', '')
+        hover_icon = hover.get('icon', icon_path)
+        icon_size = base.get('icon_size')
+        if hasattr(self._button, 'set_icon'):
+            self._button.set_icon(icon_path)
+            self._button.set_hover_icon(hover_icon)
+            if icon_size and hasattr(self._button, 'set_icon_size'):
+                self._button.set_icon_size(int(icon_size))
+        else:
+            if icon_path:
+                if icon_path.startswith('qta:'):
+                    icon = IconManager.create_icon(icon_path.split(':', 1)[1])
+                else:
+                    icon = QIcon(icon_path)
+                if icon_size:
+                    self._button.setIconSize(QSize(int(icon_size), int(icon_size)))
+                self._button.setIcon(icon)
+
         # ToolTip
-        self._button.setToolTip(str(props.get('tooltip', '') or ''))
+        self._button.setToolTip(str(base.get('tooltip', '') or ''))
 
     # --- Action execution -----------------------------------------------
     def _execute_bit_action(self, action: Dict[str, Any], pressed: bool):
