@@ -2435,11 +2435,6 @@ class ConditionalStyleEditorDialog(QDialog):
             self.preview_button.setFixedSize(width, height)
 
         main_qss, hover_qss = [], []
-        text_align = {
-            "left": "left",
-            "center": "center",
-            "right": "right"
-        }.get(h_align, "center")
 
         main_qss.extend(
             [
@@ -2454,7 +2449,6 @@ class ConditionalStyleEditorDialog(QDialog):
                 f"font-weight: {font_weight};",
                 f"font-style: {font_style};",
                 f"text-decoration: {text_decoration};",
-                f"text-align: {text_align};",
             ]
         )
 
