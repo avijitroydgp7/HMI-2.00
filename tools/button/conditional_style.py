@@ -265,115 +265,58 @@ class IconButton(QPushButton):
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        # SVG renderers
-        self.svg_renderer: Optional[QSvgRenderer] = None
-        self.svg_renderer_hover: Optional[QSvgRenderer] = None
-        # QtAwesome icon names (without the 'qta:' prefix)
-        self.qt_icon_name: Optional[str] = None
-        self.qt_icon_hover_name: Optional[str] = None
-        # Raster image fallbacks
-        self.pixmap: Optional[QPixmap] = None
-        self.pixmap_hover: Optional[QPixmap] = None
-
+        self._base_icon = QIcon()
+        self._hover_icon = QIcon()
         self.icon_size = QSize(dpi_scale(50), dpi_scale(50))
+        self.setIconSize(self.icon_size)
 
     def set_icon(self, source: str):
-        self._assign_icon_source(source, variant="base")
+        icon = self._create_icon_from_source(source)
+        self._base_icon = icon
+        self.setIcon(icon)
         self.update()
 
     def set_hover_icon(self, source: str):
-        self._assign_icon_source(source, variant="hover")
+        icon = self._create_icon_from_source(source)
+        self._hover_icon = icon
         self.update()
 
     def set_icon_size(self, size: int):
         self.icon_size = QSize(size, size)
+        self.setIconSize(self.icon_size)
         self.update()
 
-    def _assign_icon_source(self, source: Optional[str], variant: str):
-        # Reset variant slots
-        if variant == "base":
-            self.svg_renderer = None
-            self.qt_icon_name = None
-            self.pixmap = None
-        elif variant == "hover":
-            self.svg_renderer_hover = None
-            self.qt_icon_hover_name = None
-            self.pixmap_hover = None
-
+    def _create_icon_from_source(self, source: Optional[str]) -> QIcon:
         if not source:
-            return
+            return QIcon()
         src = str(source)
-        # QtAwesome shorthand
         if src.startswith("qta:"):
             name = src.split(":", 1)[1]
-            if variant == "base":
-                self.qt_icon_name = name
-            elif variant == "hover":
-                self.qt_icon_hover_name = name
-            return
-
-        # File path
+            return IconManager.create_icon(name)
         ext = os.path.splitext(src)[1].lower()
         if ext == ".svg":
             renderer = QSvgRenderer(src)
-            if not renderer.isValid():
-                return
-            if variant == "base":
-                self.svg_renderer = renderer
-            elif variant == "hover":
-                self.svg_renderer_hover = renderer
-            return
-        # Raster image
+            if renderer.isValid():
+                pixmap = QPixmap(self.icon_size)
+                pixmap.fill(Qt.GlobalColor.transparent)
+                painter = QPainter(pixmap)
+                renderer.render(painter)
+                painter.end()
+                return QIcon(pixmap)
+            return QIcon()
         pix = QPixmap(src)
         if pix and not pix.isNull():
-            if variant == "base":
-                self.pixmap = pix
-            elif variant == "hover":
-                self.pixmap_hover = pix
+            return QIcon(pix)
+        return QIcon()
 
     def enterEvent(self, e):
-        self.update()
+        if not self._hover_icon.isNull():
+            self.setIcon(self._hover_icon)
         super().enterEvent(e)
 
     def leaveEvent(self, e):
-        self.update()
+        self.setIcon(self._base_icon)
         super().leaveEvent(e)
-
-    def _current_sources(self):
-        if self.underMouse():
-            return (self.svg_renderer_hover, self.qt_icon_hover_name, self.pixmap_hover)
-        return (self.svg_renderer, self.qt_icon_name, self.pixmap)
-
-    def paintEvent(self, event):
-        super().paintEvent(event)
-        svg_renderer, qt_name, pixmap = self._current_sources()
-        target_rect = self.rect()
-        icon_rect = QRect(0, 0, self.icon_size.width(), self.icon_size.height())
-        icon_rect.moveCenter(target_rect.center())
-
-        if svg_renderer:
-            painter = QPainter(self)
-            svg_renderer.render(painter, QRectF(icon_rect))
-            return
-        if qt_name:
-            icon = IconManager.create_icon(qt_name)
-            if not icon.isNull():
-                pm = icon.pixmap(self.icon_size)
-                painter = QPainter(self)
-                x = icon_rect.x() + (icon_rect.width() - pm.width()) // 2
-                y = icon_rect.y() + (icon_rect.height() - pm.height()) // 2
-                painter.drawPixmap(x, y, pm)
-                return
-        if pixmap:
-            pm = pixmap.scaled(
-                self.icon_size,
-                Qt.AspectRatioMode.KeepAspectRatio,
-                Qt.TransformationMode.SmoothTransformation,
-            )
-            painter = QPainter(self)
-            x = icon_rect.x() + (icon_rect.width() - pm.width()) // 2
-            y = icon_rect.y() + (icon_rect.height() - pm.height()) // 2
-            painter.drawPixmap(x, y, pm)
 
 
 # Predefined gradient orientations used for visual selection
@@ -624,7 +567,7 @@ class ConditionalStyle:
 class ConditionalStyleManager(QObject):
     """Manages conditional styles for buttons"""
     # Emitted when a condition fails to evaluate; payload is an error message.
-    condition_error: ClassVar[pyqtSignal] = pyqtSignal(str)
+    condition_error = pyqtSignal(str)
     parent: Optional[QObject] = None
     conditional_styles: List[ConditionalStyle] = field(default_factory=list)
     default_style: Dict[str, Any] = field(default_factory=dict)
@@ -2348,7 +2291,9 @@ class ConditionalStyleEditorDialog(QDialog):
             s.setMaximum(radius_limit)
         self.border_width_spin.setMaximum(border_limit)
 
-    def generate_qss(self, component_type):
+    def generate_qss(self, component_type, props=None):
+        if props is None:
+            props = self.style.properties
         shape_style = self.shape_style_combo.currentText()
         bg_type = self.bg_type_combo.currentText()
         width = dpi_scale(200)
@@ -2391,6 +2336,13 @@ class ConditionalStyleEditorDialog(QDialog):
             self.preview_button.setFixedSize(width, height)
 
         main_qss, hover_qss = [], []
+        h_align = self.style.properties.get("h_align", "center")
+        text_align = {
+            "left": "left",
+            "center": "center",
+            "right": "right"
+        }.get(h_align, "center")
+
         main_qss.extend(
             [
                 f"padding: {padding}px;",
@@ -2404,6 +2356,7 @@ class ConditionalStyleEditorDialog(QDialog):
                 f"font-weight: {font_weight};",
                 f"font-style: {font_style};",
                 f"text-decoration: {text_decoration};",
+                f"text-align: {text_align};",
             ]
         )
 
@@ -2504,6 +2457,30 @@ class ConditionalStyleEditorDialog(QDialog):
         }
         widget = preview_map.get(component_type, self.preview_button)
         widget.setStyleSheet(qss)
+
+        # Set text alignment on the preview widget based on controls
+        h_align = self.base_controls["h_align_group"].checkedButton()
+        v_align = self.base_controls["v_align_group"].checkedButton()
+        if h_align and v_align:
+            h_val = h_align.property("align_value")
+            v_val = v_align.property("align_value")
+            alignment = Qt.AlignmentFlag.AlignAbsolute
+            if h_val == "left":
+                alignment |= Qt.AlignmentFlag.AlignLeft
+            elif h_val == "center":
+                alignment |= Qt.AlignmentFlag.AlignHCenter
+            elif h_val == "right":
+                alignment |= Qt.AlignmentFlag.AlignRight
+            if v_val == "top":
+                alignment |= Qt.AlignmentFlag.AlignTop
+            elif v_val == "middle":
+                alignment |= Qt.AlignmentFlag.AlignVCenter
+            elif v_val == "bottom":
+                alignment |= Qt.AlignmentFlag.AlignBottom
+            # Only set alignment if widget supports it (e.g., SwitchButton)
+            if hasattr(widget, "setAlignment"):
+                widget.setAlignment(alignment)
+
         if component_type != "Toggle Switch":
             self.preview_button.set_icon(self.base_controls["icon_edit"].text())
             self.preview_button.set_hover_icon(self.hover_controls["icon_edit"].text())
