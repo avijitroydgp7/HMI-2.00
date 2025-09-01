@@ -588,17 +588,21 @@ class ButtonPropertiesDialog(QDialog):
         hl.setContentsMargins(6, 4, 6, 4)
         hl.setSpacing(8)
 
-        # Small preview button
-        preview = PreviewButton("Aa")
+        # Small preview button reflecting style text and formatting
+        preview_text = style.text_value if style.text_type == "Text" else ""
+        preview = PreviewButton(preview_text or "Aa")
         preview.setFixedSize(dpi_scale(90), dpi_scale(36))
-        # Apply minimal styling based on base/hover props or stylesheet
+
+        # Determine base/hover properties for icons and colours
+        temp_manager = ConditionalStyleManager()
+        temp_manager.add_style(copy.deepcopy(style))
+        base_props = temp_manager.get_active_style()
+        hover_props = temp_manager.get_active_style(state='hover')
+
+        # Apply either stored style sheet or basic colours
         if style.style_sheet:
             preview.setStyleSheet(style.style_sheet)
         else:
-            temp_manager = ConditionalStyleManager()
-            temp_manager.add_style(copy.deepcopy(style))
-            base_props = temp_manager.get_active_style()
-            hover_props = temp_manager.get_active_style(state='hover')
             qss = (
                 "QPushButton {\n"
                 f"    background-color: {base_props.get('background_color', 'transparent')};\n"
@@ -611,10 +615,50 @@ class ButtonPropertiesDialog(QDialog):
                 "}\n"
             )
             preview.setStyleSheet(qss)
-            preview.set_icon(base_props.get('icon', ''))
-            preview.set_hover_icon(hover_props.get('icon', ''))
-            icon_sz = dpi_scale(base_props.get('icon_size', 20))
-            preview.set_icon_size(icon_sz)
+
+        # Icon handling
+        preview.set_icon(base_props.get("icon", ""))
+        preview.set_hover_icon(hover_props.get("icon", ""))
+        icon_sz = dpi_scale(base_props.get("icon_size", 20))
+        preview.set_icon_size(icon_sz)
+
+        # Text formatting
+        preview.set_text_font(
+            base_props.get("font_family", ""),
+            base_props.get("font_size", 0),
+            base_props.get("bold", False),
+            base_props.get("italic", False),
+            base_props.get("underline", False),
+        )
+        preview.set_text_colors(
+            base_props.get("text_color", "#000"),
+            hover_props.get("text_color", base_props.get("text_color", "#000")),
+        )
+        preview.set_text_offset(
+            base_props.get("offset_to_frame", base_props.get("offset", 0))
+        )
+
+        # Alignment
+        h_align = base_props.get(
+            "h_align", base_props.get("horizontal_align", "center")
+        )
+        v_align = base_props.get(
+            "v_align", base_props.get("vertical_align", "middle")
+        )
+        alignment = Qt.AlignmentFlag.AlignAbsolute
+        if h_align == "left":
+            alignment |= Qt.AlignmentFlag.AlignLeft
+        elif h_align == "center":
+            alignment |= Qt.AlignmentFlag.AlignHCenter
+        elif h_align == "right":
+            alignment |= Qt.AlignmentFlag.AlignRight
+        if v_align == "top":
+            alignment |= Qt.AlignmentFlag.AlignTop
+        elif v_align == "middle":
+            alignment |= Qt.AlignmentFlag.AlignVCenter
+        elif v_align == "bottom":
+            alignment |= Qt.AlignmentFlag.AlignBottom
+        preview.setAlignment(alignment)
 
         # Label for style id
         label = QLabel(style.style_id)
@@ -835,6 +879,43 @@ class ButtonPropertiesDialog(QDialog):
             text = style.text_value if style.text_type == "Text" else ""
             self.preview_button.setText(text or "Preview")
             self.preview_button.setToolTip(style.tooltip)
+
+            # Apply text formatting to mirror saved style
+            self.preview_button.set_text_font(
+                base_props.get("font_family", ""),
+                base_props.get("font_size", 0),
+                base_props.get("bold", False),
+                base_props.get("italic", False),
+                base_props.get("underline", False),
+            )
+            self.preview_button.set_text_colors(
+                base_props.get("text_color", "#000"),
+                hover_props.get("text_color", base_props.get("text_color", "#000")),
+            )
+            self.preview_button.set_text_offset(
+                base_props.get("offset_to_frame", base_props.get("offset", 0))
+            )
+
+            h_align = base_props.get(
+                "h_align", base_props.get("horizontal_align", "center")
+            )
+            v_align = base_props.get(
+                "v_align", base_props.get("vertical_align", "middle")
+            )
+            alignment = Qt.AlignmentFlag.AlignAbsolute
+            if h_align == "left":
+                alignment |= Qt.AlignmentFlag.AlignLeft
+            elif h_align == "center":
+                alignment |= Qt.AlignmentFlag.AlignHCenter
+            elif h_align == "right":
+                alignment |= Qt.AlignmentFlag.AlignRight
+            if v_align == "top":
+                alignment |= Qt.AlignmentFlag.AlignTop
+            elif v_align == "middle":
+                alignment |= Qt.AlignmentFlag.AlignVCenter
+            elif v_align == "bottom":
+                alignment |= Qt.AlignmentFlag.AlignBottom
+            self.preview_button.setAlignment(alignment)
 
     def _populate_extended_style_tab(self):
         pass
