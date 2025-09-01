@@ -4,7 +4,7 @@ from PyQt6.QtWidgets import (
     QLineEdit, QTableView, QHeaderView,
     QPushButton, QHBoxLayout, QAbstractItemView, QVBoxLayout,
     QSplitter, QGroupBox, QStackedWidget, QDialog, QInputDialog,
-    QListWidget, QListWidgetItem, QToolButton, QStyle
+    QListWidget, QListWidgetItem, QToolButton, QStyle, QSizePolicy
 )
 from PyQt6.QtCore import Qt, QSize
 from utils.dpi import dpi_scale
@@ -588,6 +588,7 @@ class ButtonPropertiesDialog(QDialog):
         hl.setContentsMargins(6, 4, 6, 4)
         hl.setSpacing(8)
 
+<<<<<<< ours
         # Small preview button reflecting style text and formatting
         preview_text = style.text_value if style.text_type == "Text" else ""
         preview = PreviewButton(preview_text or "Aa")
@@ -600,6 +601,13 @@ class ButtonPropertiesDialog(QDialog):
         hover_props = temp_manager.get_active_style(state='hover')
 
         # Apply either stored style sheet or basic colours
+=======
+        # Small preview button that adapts to available width
+        preview = PreviewButton("Aa")
+        preview.setFixedHeight(dpi_scale(36))
+        preview.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+        # Apply minimal styling based on base/hover props or stylesheet
+>>>>>>> theirs
         if style.style_sheet:
             preview.setStyleSheet(style.style_sheet)
         else:
@@ -674,7 +682,7 @@ class ButtonPropertiesDialog(QDialog):
         self.style_list.clear()
         for style in self.style_manager.conditional_styles:
             item = QListWidgetItem()
-            item.setSizeHint(QSize(240, 48))
+            item.setSizeHint(QSize(0, dpi_scale(48)))
             self.style_list.addItem(item)
             widget = self._build_swatch_widget(style)
             self.style_list.setItemWidget(item, widget)
