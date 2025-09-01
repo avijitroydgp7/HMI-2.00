@@ -2292,8 +2292,16 @@ class ConditionalStyleEditorDialog(QDialog):
         self.border_width_spin.setMaximum(border_limit)
 
     def generate_qss(self, component_type, props=None):
+        # Determine current horizontal alignment. When ``props`` is provided
+        # (e.g. when building a style object), prefer its values; otherwise use
+        # the live state from the alignment controls so preview updates
+        # immediately when the user toggles alignment buttons.
         if props is None:
-            props = self.style.properties
+            h_btn = self.base_controls["h_align_group"].checkedButton()
+            h_align = h_btn.property("align_value") if h_btn else "center"
+        else:
+            h_align = props.get("h_align", props.get("horizontal_align", "center"))
+
         shape_style = self.shape_style_combo.currentText()
         bg_type = self.bg_type_combo.currentText()
         width = dpi_scale(200)
@@ -2336,7 +2344,6 @@ class ConditionalStyleEditorDialog(QDialog):
             self.preview_button.setFixedSize(width, height)
 
         main_qss, hover_qss = [], []
-        h_align = self.style.properties.get("h_align", "center")
         text_align = {
             "left": "left",
             "center": "center",
@@ -2705,7 +2712,9 @@ class ConditionalStyleEditorDialog(QDialog):
             hover_properties=hover_properties,
             condition_data=condition_cfg,
         )
-        style.style_sheet = self.generate_qss(component_type)
+        # Generate the style sheet using the freshly collected properties so
+        # that saved styles reflect the current alignment and other settings.
+        style.style_sheet = self.generate_qss(component_type, properties)
         return style
 
     # ------------------------------------------------------------------
