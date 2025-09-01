@@ -807,11 +807,12 @@ class PreviewButton(IconButton):
         self._text_label.raise_()
         self._base_text_color = ""
         self._hover_text_color = ""
+        self._offset = 0
         self.setText(text)
 
     def resizeEvent(self, event):  # pragma: no cover - GUI behaviour
         super().resizeEvent(event)
-        self._text_label.setGeometry(self.rect())
+        self._update_label_geometry()
 
     # Reimplemented to route through the internal label
     def setText(self, text: str):  # pragma: no cover - GUI behaviour
@@ -823,6 +824,42 @@ class PreviewButton(IconButton):
     def setAlignment(self, alignment):  # pragma: no cover - GUI behaviour
         """Allow external callers to align the preview text."""
         self._text_label.setAlignment(alignment)
+
+    # ------------------------------------------------------------------
+    # Text font/offset handling
+    # ------------------------------------------------------------------
+    def set_text_font(
+        self,
+        family: str,
+        size: int,
+        bold: bool,
+        italic: bool,
+        underline: bool,
+    ) -> None:
+        """Apply font properties to the internal label."""
+        font = self._text_label.font()
+        if family:
+            font.setFamily(family)
+        if size > 0:
+            font.setPointSize(size)
+        font.setBold(bold)
+        font.setItalic(italic)
+        font.setUnderline(underline)
+        self._text_label.setFont(font)
+
+    def set_text_offset(self, offset: int) -> None:
+        """Offset the text label from the button frame."""
+        self._offset = offset
+        self._update_label_geometry()
+
+    def _update_label_geometry(self) -> None:
+        rect = self.rect().adjusted(
+            self._offset,
+            self._offset,
+            -self._offset,
+            -self._offset,
+        )
+        self._text_label.setGeometry(rect)
 
     # ------------------------------------------------------------------
     # Text colour handling
@@ -2519,6 +2556,16 @@ class ConditionalStyleEditorDialog(QDialog):
             ).name()
             hover = self._hover_text_color or base
             widget.set_text_colors(base, hover)
+        if hasattr(widget, "set_text_font"):
+            widget.set_text_font(
+                self.base_controls["font_family_combo"].currentText(),
+                self.font_size_spin.value(),
+                self.base_controls["bold_btn"].isChecked(),
+                self.base_controls["italic_btn"].isChecked(),
+                self.base_controls["underline_btn"].isChecked(),
+            )
+        if hasattr(widget, "set_text_offset"):
+            widget.set_text_offset(self.base_controls["offset_spin"].value())
 
         # Set text alignment on the preview widget based on controls
         h_align = self.base_controls["h_align_group"].checkedButton()
