@@ -805,6 +805,8 @@ class PreviewButton(IconButton):
         )
         self._text_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self._text_label.raise_()
+        self._base_text_color = ""
+        self._hover_text_color = ""
         self.setText(text)
 
     def resizeEvent(self, event):  # pragma: no cover - GUI behaviour
@@ -821,6 +823,30 @@ class PreviewButton(IconButton):
     def setAlignment(self, alignment):  # pragma: no cover - GUI behaviour
         """Allow external callers to align the preview text."""
         self._text_label.setAlignment(alignment)
+
+    # ------------------------------------------------------------------
+    # Text colour handling
+    # ------------------------------------------------------------------
+    def set_text_colors(self, base: str, hover: str) -> None:
+        """Set the base and hover text colours for the preview label."""
+        self._base_text_color = base or ""
+        self._hover_text_color = hover or base or ""
+        self._apply_text_color(self._base_text_color)
+
+    def _apply_text_color(self, color: str) -> None:
+        self._text_label.setStyleSheet(
+            f"background: transparent; color: {color};"
+        )
+
+    def enterEvent(self, event):  # pragma: no cover - GUI behaviour
+        if self._hover_text_color:
+            self._apply_text_color(self._hover_text_color)
+        super().enterEvent(event)
+
+    def leaveEvent(self, event):  # pragma: no cover - GUI behaviour
+        if self._base_text_color:
+            self._apply_text_color(self._base_text_color)
+        super().leaveEvent(event)
 
 
 class ConditionalStyleEditorDialog(QDialog):
@@ -2487,6 +2513,12 @@ class ConditionalStyleEditorDialog(QDialog):
         }
         widget = preview_map.get(component_type, self.preview_button)
         widget.setStyleSheet(qss)
+        if hasattr(widget, "set_text_colors"):
+            base = self._text_color or self.palette().color(
+                QPalette.ColorRole.ButtonText
+            ).name()
+            hover = self._hover_text_color or base
+            widget.set_text_colors(base, hover)
 
         # Set text alignment on the preview widget based on controls
         h_align = self.base_controls["h_align_group"].checkedButton()
