@@ -1,81 +1,126 @@
-from typing import List, Optional, Any
+from typing import List, Optional, Any, Dict, Tuple
 from PyQt6.QtCore import QObject
 from PyQt6.QtGui import QIcon, QPixmap, QMovie
 import qtawesome as qta
 
+
+_ICON_CACHE: Dict[Tuple[str, Optional[int], Optional[str], Optional[str]], QIcon] = {}
+"""Cache for generated :class:`QIcon` objects.
+
+The cache is unbounded and will grow until cleared via
+``IconManager.clear_cache``.
+"""
+
+_PIXMAP_CACHE: Dict[Tuple[str, int, Optional[str], Optional[str]], QPixmap] = {}
+"""Cache for generated :class:`QPixmap` objects.
+
+This cache has no eviction policy.
+"""
+
+
 class IconManager:
-    """
-    Centralized manager for creating and converting icons in the application.
-    Handles compatibility between PySide6 and PyQt6 icon types with a fixed color scheme.
+    """Centralized manager for creating and converting icons.
+
+    Icons and pixmaps are cached by ``(icon_name, size, color, active_color)``.
+    Call :meth:`clear_cache` to release memory.
     """
 
     @staticmethod
-    def create_icon(icon_name: str, color: Optional[str] = None, active_color: Optional[str] = None, size: Optional[int] = None):
-        """
-        Create a PyQt6 QIcon from a qtawesome icon name using a fixed color scheme.
+    def create_icon(
+        icon_name: str,
+        color: Optional[str] = None,
+        active_color: Optional[str] = None,
+        size: Optional[int] = None,
+    ):
+        """Create a PyQt6 ``QIcon`` from a qtawesome icon name.
+
+        Results are cached by ``(icon_name, size, color, active_color)``.
 
         Args:
             icon_name (str): The qtawesome icon name (e.g., 'fa5s.file').
             color (str, optional): The color of the icon. Defaults to the standard icon color.
             active_color (str, optional): The color of the icon when active. Defaults to the standard active color.
-            size (int, optional): The size of the icon in pixels. If None, returns a scalable icon.
+            size (int, optional): The size of the icon in pixels. If ``None`` a scalable icon is returned.
 
         Returns:
-            QIcon: A PyQt6-compatible QIcon.
+            QIcon: A PyQt6-compatible ``QIcon``.
         """
+        key = (icon_name, size, color, active_color)
+        if key in _ICON_CACHE:
+            return _ICON_CACHE[key]
+
         try:
             base_color = color if color is not None else "#DADADA"
             selected_color = active_color if active_color is not None else "#DADADA"
 
-            
             # Use different colors for normal and selected states
             qta_icon = qta.icon(
                 icon_name,
                 color=base_color,
                 color_active=selected_color,
-                color_selected=selected_color
+                color_selected=selected_color,
             )
-            
-            if qta_icon is None:
-                return QIcon()
 
-            if size is None:
-                return qta_icon
-                
-            pixmap = qta_icon.pixmap(size, size)
-            return QIcon(pixmap)
-            
+            if qta_icon is None:
+                result = QIcon()
+            elif size is None:
+                result = qta_icon
+            else:
+                result = QIcon(qta_icon.pixmap(size, size))
+
         except Exception as e:
             print(f"Error creating icon {icon_name}: {str(e)}")
-            return QIcon()
+            result = QIcon()
+
+        _ICON_CACHE[key] = result
+        return result
 
     @staticmethod
-    def create_pixmap(icon_name: str, size: int, color: Optional[str] = None):
-        """
-        Create a PyQt6 QPixmap from a qtawesome icon name with a fixed color.
+    def create_pixmap(
+        icon_name: str,
+        size: int,
+        color: Optional[str] = None,
+        active_color: Optional[str] = None,
+    ):
+        """Create a PyQt6 ``QPixmap`` from a qtawesome icon name.
+
+        Results are cached by ``(icon_name, size, color, active_color)``.
 
         Args:
             icon_name (str): The qtawesome icon name.
             size (int): The size of the pixmap in pixels.
             color (str, optional): The color of the icon. Defaults to the standard icon color.
+            active_color (str, optional): Active color for completeness; unused for static pixmaps.
 
         Returns:
-            QPixmap: A PyQt6-compatible QPixmap.
+            QPixmap: A PyQt6-compatible ``QPixmap``.
         """
+        key = (icon_name, size, color, active_color)
+        if key in _PIXMAP_CACHE:
+            return _PIXMAP_CACHE[key]
+
         try:
             base_color = color if color is not None else "#FFFFFF"
+            selected_color = active_color if active_color is not None else base_color
 
-            
-            qta_icon = qta.icon(icon_name, color=base_color)
+            qta_icon = qta.icon(
+                icon_name,
+                color=base_color,
+                color_active=selected_color,
+                color_selected=selected_color,
+            )
 
             if qta_icon is None:
-                return QPixmap()
+                result = QPixmap()
+            else:
+                result = qta_icon.pixmap(size, size)
 
-            return qta_icon.pixmap(size, size)
-            
         except Exception as e:
             print(f"Error creating pixmap {icon_name}: {str(e)}")
-            return QPixmap()
+            result = QPixmap()
+
+        _PIXMAP_CACHE[key] = result
+        return result
 
     @staticmethod
     def convert_to_pyqt_icon(icon) -> QIcon:
@@ -94,6 +139,16 @@ class IconManager:
         except Exception as e:
             print(f"Error converting icon: {str(e)}")
             return QIcon()
+
+    @staticmethod
+    def clear_cache():
+        """Clear cached icons and pixmaps.
+
+        The caches are unbounded and may consume memory over time. Call
+        this method to release stored ``QIcon`` and ``QPixmap`` instances.
+        """
+        _ICON_CACHE.clear()
+        _PIXMAP_CACHE.clear()
 
     @staticmethod
     def create_animated_icon(
