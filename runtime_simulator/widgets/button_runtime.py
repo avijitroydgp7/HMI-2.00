@@ -10,7 +10,8 @@ from PyQt6.QtGui import QColor
 from runtime_simulator.data_manager import DataManager
 
 # Reuse the designer's conditional style logic for evaluation
-from tools.button.conditional_style import ConditionalStyleManager, ConditionalStyle
+from tools.button.conditional_style import ConditionalStyleManager
+from tools.button.runtime_style import RuntimeConditionalStyle
 from tools.button.actions.constants import TriggerMode, ActionType
 
 
@@ -95,7 +96,7 @@ class ButtonRuntimeController(QObject):
         # Conditional styles
         for s in props.get('conditional_styles', []) or []:
             try:
-                m.add_style(ConditionalStyle.from_dict(s))
+                m.add_style(RuntimeConditionalStyle.from_dict(s))
             except Exception:
                 # Skip malformed style entries in runtime
                 pass
