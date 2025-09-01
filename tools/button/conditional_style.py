@@ -402,7 +402,7 @@ def get_style_by_id(style_id: str) -> Dict[str, Any]:
     return _get_style_by_id(style_id)
 
 
-@dataclass
+@dataclass(slots=True)
 class AnimationProperties:
     """Basic animation configuration for button styles."""
 
@@ -426,7 +426,7 @@ class AnimationProperties:
         )
 
 
-@dataclass
+@dataclass(slots=True)
 class ConditionalStyle:
     """A style that can be applied to a button.
 
@@ -620,7 +620,7 @@ class ConditionalStyle:
         return style
 
 
-@dataclass
+@dataclass(slots=True)
 class ConditionalStyleManager(QObject):
     """Manages conditional styles for buttons"""
     # Emitted when a condition fails to evaluate; payload is an error message.
@@ -630,7 +630,7 @@ class ConditionalStyleManager(QObject):
     default_style: Dict[str, Any] = field(default_factory=dict)
 
     def __post_init__(self):
-        super().__init__(self.parent)
+        QObject.__init__(self, self.parent)
 
     def _generate_unique_style_id(self, base_id: str) -> str:
         existing = {s.style_id for s in self.conditional_styles}

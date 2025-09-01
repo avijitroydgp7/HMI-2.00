@@ -15,7 +15,7 @@ from tools.button.runtime_style import RuntimeConditionalStyle
 from tools.button.actions.constants import TriggerMode, ActionType
 
 
-@dataclass
+@dataclass(slots=True)
 class ButtonRuntimeConfig:
     """Subset of button configuration used at runtime."""
     properties: Dict[str, Any]

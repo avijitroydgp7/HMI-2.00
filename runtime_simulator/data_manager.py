@@ -8,7 +8,7 @@ from services.tag_data_service import tag_data_service
 from services.tag_service import tag_service
 
 
-@dataclass
+@dataclass(slots=True)
 class Tag:
     name: str
     type: str
