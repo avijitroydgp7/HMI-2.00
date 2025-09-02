@@ -37,6 +37,7 @@ from services.clipboard_service import clipboard_service
 from services.command_history_service import command_history_service
 from services.commands import MoveChildCommand, RemoveChildCommand, AddChildCommand, UpdateChildPropertiesCommand, BulkUpdateChildPropertiesCommand, BulkMoveChildCommand
 from services.settings_service import settings_service
+from services.style_data_service import style_data_service
 from tools import (
     button as button_tool,
     line as line_tool,
@@ -170,6 +171,8 @@ class DesignCanvas(QGraphicsView):
         self.scene.selectionChanged.connect(self._on_selection_changed)
 
         self.update_screen_data()
+
+        style_data_service.styles_changed.connect(self._on_styles_changed)
 
         # Frame throttling (~60 fps)
         self._frame_timer = QElapsedTimer()
@@ -1351,6 +1354,41 @@ class DesignCanvas(QGraphicsView):
         self.update()
         self._update_shadow_for_zoom()
         self.update_visible_items()
+
+    def _on_styles_changed(self, style_id: str):
+        if not self.screen_data:
+            return
+        from tools.button import conditional_style as button_styles
+        changed = False
+        for child in self.screen_data.get('children', []):
+            if child.get('tool_type') != constants.ToolType.BUTTON:
+                continue
+            props = child.get('properties', {})
+            sid = props.get('style_id')
+            if style_id and sid != style_id:
+                continue
+            style_def = button_styles.get_style_by_id(sid)
+            if not style_def:
+                continue
+            props.update(copy.deepcopy(style_def.get('properties', {})))
+            if 'hover_properties' in style_def:
+                props['hover_properties'] = copy.deepcopy(style_def['hover_properties'])
+            else:
+                props.pop('hover_properties', None)
+            if style_def.get('icon'):
+                props['icon'] = style_def['icon']
+            else:
+                props.pop('icon', None)
+            if style_def.get('hover_icon'):
+                props['hover_icon'] = style_def['hover_icon']
+            else:
+                props.pop('hover_icon', None)
+            item = self._item_map.get(child.get('instance_id'))
+            if item:
+                item.update_data(copy.deepcopy(child))
+            changed = True
+        if changed:
+            self.update()
 
     def apply_default_colors(self):
         """Apply a fixed palette to the canvas."""

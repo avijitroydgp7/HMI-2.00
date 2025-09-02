@@ -5,10 +5,7 @@ import copy
 from typing import Any, Callable, Dict, List, Optional, Union
 
 from tools.button.actions.constants import TriggerMode
-from tools.button.default_styles import (
-    get_all_styles as _get_all_styles,
-    get_style_by_id as _get_style_by_id,
-)
+from services.style_data_service import style_data_service
 
 
 # Predefined gradient orientations used for visual selection
@@ -23,13 +20,13 @@ _GRADIENT_STYLES = {
 
 
 def get_styles() -> List[Dict[str, Any]]:
-    """Return the list of built-in button style definitions."""
-    return _get_all_styles()
+    """Return the list of available button style definitions."""
+    return style_data_service.get_all_styles()
 
 
 def get_style_by_id(style_id: str) -> Dict[str, Any]:
     """Return a style definition by its unique ID."""
-    return _get_style_by_id(style_id)
+    return style_data_service.get_style(style_id) or style_data_service.get_default_style()
 
 
 @dataclass(slots=True)

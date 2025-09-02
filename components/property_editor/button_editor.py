@@ -5,6 +5,7 @@ import copy
 
 from services.command_history_service import command_history_service
 from services.commands import UpdateChildPropertiesCommand
+from services.style_data_service import style_data_service
 
 
 def build(host) -> QWidget:
@@ -102,6 +103,24 @@ def build(host) -> QWidget:
     style_combo.activated.connect(_on_style_activated)
     bg_color_edit.editingFinished.connect(on_property_changed)
     text_color_edit.editingFinished.connect(on_property_changed)
+
+    def _on_styles_changed(changed_id: str):
+        current = style_combo.currentData()
+        with QSignalBlocker(style_combo):
+            style_combo.clear()
+            for s in button_styles.get_styles():
+                icon_path = s.get("icon") or s.get("svg_icon")
+                if icon_path:
+                    style_combo.addItem(QIcon(icon_path), s["name"], s["id"])
+                else:
+                    style_combo.addItem(s["name"], s["id"])
+            idx = style_combo.findData(current)
+            if idx != -1:
+                style_combo.setCurrentIndex(idx)
+        if changed_id in ("", current):
+            _apply_style_field_updates(style_combo.currentData())
+
+    style_data_service.styles_changed.connect(_on_styles_changed)
 
     return editor_widget
 
