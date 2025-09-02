@@ -159,6 +159,7 @@ class DesignCanvas(QGraphicsView):
         self.setTransformationAnchor(QGraphicsView.ViewportAnchor.AnchorUnderMouse)
         self.setResizeAnchor(QGraphicsView.ViewportAnchor.AnchorViewCenter)
         self.setMouseTracking(True)
+        self.viewport().setMouseTracking(True)
         self.setAcceptDrops(True)
         self.setObjectName("DesignCanvas")
         self.setBackgroundBrush(QColor("#1f1f1f"))
@@ -206,12 +207,26 @@ class DesignCanvas(QGraphicsView):
             if self._frame_timer.isValid() and self._frame_timer.elapsed() < 16:
                 return False
             self._frame_timer.restart()
-            self._last_mouse_scene_pos = self._snap_position(self.mapToScene(event.position().toPoint()))
+            pos = event.position().toPoint()
+            self._last_mouse_scene_pos = self._snap_position(self.mapToScene(pos))
+            if self.scene.selectedItems():
+                handle = self.get_handle_at(pos)
+                if handle:
+                    self._set_cursor_for_handle(handle)
+                else:
+                    self.viewport().setCursor(QCursor(Qt.CursorShape.ArrowCursor))
         elif event.type() == QEvent.Type.MouseMove and event.buttons() == Qt.MouseButton.NoButton:
             if self._frame_timer.isValid() and self._frame_timer.elapsed() < 16:
                 return False
             self._frame_timer.restart()
-            self._last_mouse_scene_pos = self._snap_position(self.mapToScene(event.pos()))
+            pos = event.pos()
+            self._last_mouse_scene_pos = self._snap_position(self.mapToScene(pos))
+            if self.scene.selectedItems():
+                handle = self.get_handle_at(pos)
+                if handle:
+                    self._set_cursor_for_handle(handle)
+                else:
+                    self.viewport().setCursor(QCursor(Qt.CursorShape.ArrowCursor))
         return False
 
     def set_shadow_enabled(self, enabled: bool):
@@ -249,11 +264,11 @@ class DesignCanvas(QGraphicsView):
 
     def _update_cursor(self):
         if self.active_tool == constants.ToolType.TEXT:
-            self.setCursor(QCursor(Qt.CursorShape.IBeamCursor))
+            self.viewport().setCursor(QCursor(Qt.CursorShape.IBeamCursor))
         elif self.active_tool == constants.ToolType.SELECT:
-            self.setCursor(QCursor(Qt.CursorShape.ArrowCursor))
+            self.viewport().setCursor(QCursor(Qt.CursorShape.ArrowCursor))
         else:
-            self.setCursor(QCursor(Qt.CursorShape.CrossCursor))
+            self.viewport().setCursor(QCursor(Qt.CursorShape.CrossCursor))
 
     def _snap_position(self, pos: QPointF) -> QPointF:
         self._snap_lines.clear()
@@ -416,15 +431,15 @@ class DesignCanvas(QGraphicsView):
     def _set_cursor_for_handle(self, handle: str):
         """Set the appropriate cursor based on the resize handle."""
         if handle in {"top_left", "bottom_right"}:
-            self.setCursor(QCursor(Qt.CursorShape.SizeFDiagCursor))
+            self.viewport().setCursor(QCursor(Qt.CursorShape.SizeFDiagCursor))
         elif handle in {"top_right", "bottom_left"}:
-            self.setCursor(QCursor(Qt.CursorShape.SizeBDiagCursor))
+            self.viewport().setCursor(QCursor(Qt.CursorShape.SizeBDiagCursor))
         elif handle in {"top", "bottom"}:
-            self.setCursor(QCursor(Qt.CursorShape.SizeVerCursor))
+            self.viewport().setCursor(QCursor(Qt.CursorShape.SizeVerCursor))
         elif handle in {"left", "right"}:
-            self.setCursor(QCursor(Qt.CursorShape.SizeHorCursor))
+            self.viewport().setCursor(QCursor(Qt.CursorShape.SizeHorCursor))
         else:
-            self.setCursor(QCursor(Qt.CursorShape.ArrowCursor))
+            self.viewport().setCursor(QCursor(Qt.CursorShape.ArrowCursor))
 
     def resizeEvent(self, event):
         super().resizeEvent(event)
@@ -713,9 +728,9 @@ class DesignCanvas(QGraphicsView):
                 if handle:
                     self._set_cursor_for_handle(handle)
                 else:
-                    self.setCursor(QCursor(Qt.CursorShape.ArrowCursor))
+                    self.viewport().setCursor(QCursor(Qt.CursorShape.ArrowCursor))
             else:
-                self.setCursor(QCursor(Qt.CursorShape.ArrowCursor))
+                self.viewport().setCursor(QCursor(Qt.CursorShape.ArrowCursor))
 
         self._raw_last_scene_pos = raw_scene_pos
         self._last_mouse_scene_pos = snapped_scene_pos
@@ -1254,7 +1269,7 @@ class DesignCanvas(QGraphicsView):
             self._update_shadow_for_zoom()
             self._snap_lines.clear()
             self.viewport().update()
-            self.setCursor(QCursor(Qt.CursorShape.ArrowCursor))
+            self.viewport().setCursor(QCursor(Qt.CursorShape.ArrowCursor))
 
         super().mouseReleaseEvent(event)
 
