@@ -233,6 +233,7 @@ class IconPickerDialog(QDialog):
             if text:
                 visible = visible and (text in full.lower())
             btn.setVisible(visible)
+        self._reflow_grid(self.qt_grid, self._qt_items)
 
     # --------------------- SVG page -------------------------
     def _build_svg_page(self) -> QWidget:
@@ -322,6 +323,21 @@ class IconPickerDialog(QDialog):
             if text:
                 visible = visible and (text in base)
             btn.setVisible(visible)
+        self._reflow_grid(self.svg_grid, self._svg_items)
+
+    def _reflow_grid(self, grid: QGridLayout, items: List[_ThumbButton]):
+        cols = 6
+        r = c = 0
+        for btn in items:
+            grid.removeWidget(btn)
+        for btn in items:
+            if not btn.isVisible():
+                continue
+            grid.addWidget(btn, r, c)
+            c += 1
+            if c >= cols:
+                c = 0
+                r += 1
 
     # ------------------- Selection handling ----------------
     def _on_select(self, kind: str, value: str, btn: _ThumbButton):
