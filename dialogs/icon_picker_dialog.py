@@ -4,7 +4,7 @@ from typing import Dict, List, Optional, Tuple
 import os
 import json
 
-from PyQt6.QtCore import Qt, QSize
+from PyQt6.QtCore import Qt, QSize, QEvent, QObject
 from PyQt6.QtGui import QIcon, QPixmap
 from PyQt6.QtWidgets import (
     QDialog,
@@ -113,6 +113,7 @@ class IconPickerDialog(QDialog):
         self.qt_grid.setContentsMargins(6, 6, 6, 6)
 
         scroll = QScrollArea(); scroll.setWidgetResizable(True); scroll.setWidget(self.qt_grid_container)
+        self.qt_grid_container.installEventFilter(self)
         content.addWidget(scroll, 1)
 
         # Load icons from curated JSON list
@@ -207,7 +208,7 @@ class IconPickerDialog(QDialog):
         # Create buttons
         self._qt_items.clear()
         self._qt_meta.clear()
-        cols = 6
+        cols = self._compute_grid_cols(grid)
         r = c = 0
         for grp, full in items:
             try:
@@ -259,6 +260,7 @@ class IconPickerDialog(QDialog):
         self.svg_grid.setSpacing(6)
         self.svg_grid.setContentsMargins(6, 6, 6, 6)
         scroll = QScrollArea(); scroll.setWidgetResizable(True); scroll.setWidget(self.svg_grid_container)
+        self.svg_grid_container.installEventFilter(self)
         content.addWidget(scroll, 1)
 
         # Load SVG files from root
@@ -302,7 +304,7 @@ class IconPickerDialog(QDialog):
                 w.deleteLater()
         self._svg_items.clear()
         self._svg_meta.clear()
-        cols = 6
+        cols = self._compute_grid_cols(self.svg_grid)
         r = c = 0
         for p in files:
             icon = QIcon(p)
@@ -336,7 +338,7 @@ class IconPickerDialog(QDialog):
         self._reflow_grid(self.svg_grid, self._svg_items)
 
     def _reflow_grid(self, grid: QGridLayout, items: List[_ThumbButton]):
-        cols = 6
+        cols = self._compute_grid_cols(grid)
         r = c = 0
         for btn in items:
             grid.removeWidget(btn)
@@ -353,6 +355,23 @@ class IconPickerDialog(QDialog):
             if c >= cols:
                 c = 0
                 r += 1
+
+    def _compute_grid_cols(self, grid: QGridLayout) -> int:
+        """Determine number of columns based on available width."""
+        container = grid.parentWidget()
+        if not container:
+            return 6
+        spacing = grid.horizontalSpacing() or 0
+        cell = 96 + spacing  # button width + spacing
+        return max(1, container.width() // cell)
+
+    def eventFilter(self, obj: QObject, event: QEvent):
+        if event.type() == QEvent.Type.Resize:
+            if obj is self.qt_grid_container:
+                self._reflow_grid(self.qt_grid, self._qt_items)
+            elif obj is self.svg_grid_container:
+                self._reflow_grid(self.svg_grid, self._svg_items)
+        return super().eventFilter(obj, event)
 
     # ------------------- Selection handling ----------------
     def _on_select(self, kind: str, value: str, btn: _ThumbButton):

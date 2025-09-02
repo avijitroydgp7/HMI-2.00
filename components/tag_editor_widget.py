@@ -176,7 +176,7 @@ class TagEditorWidget(QWidget):
         self.tag_table.setRootIsDecorated(True)
         self.tag_table.setUniformRowHeights(True)
         self.tag_table.setStyleSheet(
-            "QTreeView::item { border-right: 1px solid palette(mid);"
+            "QTreeView::item { height: 24px; border-right: 1px solid palette(mid);"
             " border-bottom: 1px solid palette(mid); }"
             "QTreeView { border: 1px solid palette(mid); }"
         )
@@ -196,7 +196,8 @@ class TagEditorWidget(QWidget):
         self.tag_table.setModel(self._proxy_model)
         self.tag_table.setSortingEnabled(True)
         header = self.tag_table.header()
-        header.setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+        header.setSectionResizeMode(QHeaderView.ResizeMode.Interactive)
+        header.setStretchLastSection(True)
 
         layout.addWidget(self.tag_table)
 

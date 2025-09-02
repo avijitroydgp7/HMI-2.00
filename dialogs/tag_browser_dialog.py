@@ -54,11 +54,11 @@ class TagBrowserDialog(QDialog):
         self.tree.setHeaderLabels(["Name", "Data Type", "Comment"])
         self.tree.setSortingEnabled(True)
         self.tree.sortByColumn(0, Qt.SortOrder.AscendingOrder)
-        
+        self.tree.setStyleSheet("QTreeWidget::item { height: 24px; }")
+
         header = self.tree.header()
-        header.setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
-        header.setSectionResizeMode(1, QHeaderView.ResizeMode.ResizeToContents)
-        header.setSectionResizeMode(2, QHeaderView.ResizeMode.Stretch)
+        header.setSectionResizeMode(QHeaderView.ResizeMode.Interactive)
+        header.setStretchLastSection(True)
         
         self.tree.itemDoubleClicked.connect(self.accept)
         
