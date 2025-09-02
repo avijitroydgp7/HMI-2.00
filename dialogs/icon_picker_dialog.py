@@ -27,7 +27,6 @@ from PyQt6.QtWidgets import (
 )
 
 from utils.icon_manager import IconManager
-from tools.button.conditional_style.widgets import IconButton
 
 
 class _ThumbButton(QToolButton):
@@ -73,6 +72,7 @@ class IconPickerDialog(QDialog):
         parent: Optional[QWidget] = None,
         initial: Optional[Dict[str, Any]] = None,
         source: Optional[str] = None,
+        preview_style: Optional[Dict[str, Any]] = None,
     ):
         super().__init__(parent)
         self.setWindowTitle("Select Icon")
@@ -80,6 +80,7 @@ class IconPickerDialog(QDialog):
         self._selected: Optional[Tuple[str, str]] = None  # (kind, value)
         self._initial = initial or {}
         self._initial_source = source or ""
+        self._preview_style = preview_style or {}
 
         root = QVBoxLayout(self)
 
@@ -101,8 +102,30 @@ class IconPickerDialog(QDialog):
         self.stack.addWidget(self._build_svg_page())
         root.addWidget(self.stack)
         # Preview button
-        self.preview_btn = IconButton()
+        from tools.button.conditional_style.widgets import PreviewButton
+
+        text = self._preview_style.get("text", "")
+        self.preview_btn = PreviewButton(text)
         self.preview_btn.setFixedSize(80, 80)
+        if self._preview_style.get("style_sheet"):
+            self.preview_btn.setStyleSheet(self._preview_style["style_sheet"])
+        base_col = self._preview_style.get("text_color")
+        if base_col:
+            hover_col = self._preview_style.get(
+                "hover_text_color", base_col
+            )
+            self.preview_btn.set_text_colors(base_col, hover_col)
+        font = self._preview_style.get("font")
+        if font:
+            self.preview_btn.set_text_font(
+                font.get("family", ""),
+                font.get("size", 0),
+                font.get("bold", False),
+                font.get("italic", False),
+                font.get("underline", False),
+            )
+        if "offset" in self._preview_style:
+            self.preview_btn.set_text_offset(self._preview_style.get("offset", 0))
         root.addWidget(self.preview_btn, alignment=Qt.AlignmentFlag.AlignCenter)
 
         # --- Parameter controls -------------------------------------

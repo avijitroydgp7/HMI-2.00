@@ -12,9 +12,13 @@ def main():
     from PyQt6.QtWidgets import QApplication
     from PyQt6.QtGui import QPixmapCache
 
-    # Configure high-DPI behavior and pixmap cache before creating the application
+    # Configure rendering and high-DPI behavior before creating the application
     if hasattr(Qt.ApplicationAttribute, "AA_UseHighDpiPixmaps"):
         QApplication.setAttribute(Qt.ApplicationAttribute.AA_UseHighDpiPixmaps)
+
+    # Request desktop OpenGL so the GPU is engaged from startup
+    if hasattr(Qt.ApplicationAttribute, "AA_UseDesktopOpenGL"):
+        QApplication.setAttribute(Qt.ApplicationAttribute.AA_UseDesktopOpenGL)
 
     QApplication.setHighDpiScaleFactorRoundingPolicy(
         Qt.HighDpiScaleFactorRoundingPolicy.PassThrough

@@ -1379,7 +1379,32 @@ class ConditionalStyleEditorDialog(QDialog):
             "color": self.style.properties.get("icon_color", ""),
             "align": self.style.properties.get("icon_align", "center"),
         }
-        dlg = IconPickerDialog(icons_root, self, initial=initial, source=edit.text())
+        qss = self.generate_qss(self.component_type_combo.currentText())
+        base_col = self._text_color or self.palette().color(
+            QPalette.ColorRole.ButtonText
+        ).name()
+        hover_col = self._hover_text_color or base_col
+        preview_style = {
+            "style_sheet": qss,
+            "text_color": base_col,
+            "hover_text_color": hover_col,
+            "font": {
+                "family": self.base_controls["font_family_combo"].currentText(),
+                "size": self.font_size_spin.value(),
+                "bold": self.base_controls["bold_btn"].isChecked(),
+                "italic": self.base_controls["italic_btn"].isChecked(),
+                "underline": self.base_controls["underline_btn"].isChecked(),
+            },
+            "offset": self.base_controls["offset_spin"].value(),
+            "text": self.preview_button.text(),
+        }
+        dlg = IconPickerDialog(
+            icons_root,
+            self,
+            initial=initial,
+            source=edit.text(),
+            preview_style=preview_style,
+        )
         if dlg.exec() == QDialog.DialogCode.Accepted:
             value = dlg.selected_value()
             if value:
