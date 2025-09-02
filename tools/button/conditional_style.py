@@ -199,16 +199,18 @@ def _safe_eval(expr: str, variables: Dict[str, Any]) -> Tuple[Any, Optional[str]
 
 
 class SwitchButton(QPushButton):
-    """A custom toggle switch used for previewing switch styles.
-
-    Toggle switches always use a fixed 50px corner radius.
-    """
+    """A custom toggle switch used for previewing switch styles."""
 
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setMinimumSize(200, 100)
 
-        self._handle_x_pos = 50
+        self._handle_x_pos = 0
+        self._handle_radius = 0
+        self._margin = 0
+        self._on_pos = 0
+        self._off_pos = 0
+
         self.animation = QPropertyAnimation(self, b"handle_x_pos", self)
         self.animation.setEasingCurve(QEasingCurve.Type.InOutCubic)
         self.animation.setDuration(200)
@@ -228,11 +230,33 @@ class SwitchButton(QPushButton):
         self._handle_x_pos = pos
         self.update()
 
+    def _update_geometry(self):
+        """Recalculate handle size and positions based on current widget size."""
+        prev_on = getattr(self, "_on_pos", None)
+        prev_off = getattr(self, "_off_pos", None)
+        progress = 0.0
+        if prev_on is not None and prev_off is not None and prev_on != prev_off:
+            progress = (self._handle_x_pos - prev_off) / (prev_on - prev_off)
+        # scale handle size based on height (with 10% margins)
+        self._handle_radius = int(self.height() * 0.4)
+        self._margin = int(self.height() * 0.1)
+        left = self._margin + self._handle_radius
+        right = self.width() - self._margin - self._handle_radius
+        if self._on_is_left:
+            self._on_pos, self._off_pos = left, right
+        else:
+            self._on_pos, self._off_pos = right, left
+        # keep previous relative position if possible
+        self.handle_x_pos = int(self._off_pos + progress * (self._on_pos - self._off_pos))
+
     def set_alignment(self, on_is_left):
         """Sets the toggle direction and initial state."""
         self._on_is_left = on_is_left
-        off_pos = self.width() - 50 if self._on_is_left else 50
-        self.handle_x_pos = off_pos
+        self._update_geometry()
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        self._update_geometry()
 
     def paintEvent(self, event):
         super().paintEvent(event)
@@ -245,17 +269,15 @@ class SwitchButton(QPushButton):
 
         handle_y = self.height() / 2
         handle_center = QPoint(self.handle_x_pos, int(handle_y))
-        painter.drawEllipse(handle_center, 40, 40)
+        painter.drawEllipse(handle_center, self._handle_radius, self._handle_radius)
 
     def mousePressEvent(self, e):
-        on_pos = 50 if self._on_is_left else self.width() - 50
-        self.animation.setEndValue(on_pos)
+        self.animation.setEndValue(self._on_pos)
         self.animation.start()
         super().mousePressEvent(e)
 
     def mouseReleaseEvent(self, e):
-        off_pos = self.width() - 50 if self._on_is_left else 50
-        self.animation.setEndValue(off_pos)
+        self.animation.setEndValue(self._off_pos)
         self.animation.start()
         super().mouseReleaseEvent(e)
 
