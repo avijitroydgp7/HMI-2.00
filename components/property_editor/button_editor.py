@@ -29,7 +29,7 @@ def build(host) -> QWidget:
         else:
             style_combo.addItem(style["name"], style["id"])
 
-    current_style_id = host.current_properties.get("style_id", "default_rounded")
+    current_style_id = host.current_properties.get("style_id", "qt_default")
     index = style_combo.findData(current_style_id)
     if index != -1:
         style_combo.setCurrentIndex(index)

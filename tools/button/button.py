@@ -4,7 +4,7 @@ import copy
 
 from tools.button.conditional_style import get_style_by_id
 
-_default_style = get_style_by_id("default_rounded")
+_default_style = get_style_by_id("qt_default")
 DEFAULT_PROPERTIES = {
     "label": "Button",
     "size": {"width": 100, "height": 40},
