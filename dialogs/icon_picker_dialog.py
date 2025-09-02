@@ -24,6 +24,8 @@ from PyQt6.QtWidgets import (
     QButtonGroup,
     QSpinBox,
     QComboBox,
+    QFormLayout,
+    QSizePolicy,
 )
 
 from utils.icon_manager import IconManager
@@ -107,6 +109,7 @@ class IconPickerDialog(QDialog):
         text = self._preview_style.get("text", "")
         self.preview_btn = PreviewButton(text)
         self.preview_btn.setFixedSize(80, 80)
+        self.preview_btn.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
         if self._preview_style.get("style_sheet"):
             self.preview_btn.setStyleSheet(self._preview_style["style_sheet"])
         base_col = self._preview_style.get("text_color")
@@ -126,12 +129,14 @@ class IconPickerDialog(QDialog):
             )
         if "offset" in self._preview_style:
             self.preview_btn.set_text_offset(self._preview_style.get("offset", 0))
-        root.addWidget(self.preview_btn, alignment=Qt.AlignmentFlag.AlignCenter)
 
         # --- Parameter controls -------------------------------------
         params = QHBoxLayout()
         params.setContentsMargins(0, 0, 0, 0)
         params.setSpacing(12)
+
+        # Preview button in bottom-left
+        params.addWidget(self.preview_btn)
 
         # Alignment grid (3x3)
         align_box = QVBoxLayout()
@@ -179,20 +184,21 @@ class IconPickerDialog(QDialog):
         align_box.addWidget(align_widget)
         params.addLayout(align_box)
 
+        # Style box containing size and color controls
+        style_box = QVBoxLayout()
+        style_box.setContentsMargins(0, 0, 0, 0)
+        style_box.addWidget(QLabel("Style"))
+        form = QFormLayout()
+        form.setContentsMargins(0, 0, 0, 0)
+        form.setSpacing(4)
+
         # Size selector
-        size_box = QVBoxLayout()
-        size_box.setContentsMargins(0, 0, 0, 0)
-        size_box.addWidget(QLabel("Size:"))
         self.size_spin = QSpinBox()
         self.size_spin.setRange(1, 512)
         self.size_spin.setValue(48)
-        size_box.addWidget(self.size_spin)
-        params.addLayout(size_box)
+        form.addRow("Size", self.size_spin)
 
         # Color selector (Qt icons only)
-        color_box = QVBoxLayout()
-        color_box.setContentsMargins(0, 0, 0, 0)
-        color_box.addWidget(QLabel("Color:"))
         color_layout = QHBoxLayout()
         color_layout.setContentsMargins(0, 0, 0, 0)
         self.color_base_combo = QComboBox()
@@ -204,8 +210,11 @@ class IconPickerDialog(QDialog):
         color_layout.addWidget(self.color_base_combo)
         color_layout.addWidget(self.color_shade_combo)
         color_widget = QWidget(); color_widget.setLayout(color_layout)
-        color_box.addWidget(color_widget)
-        params.addLayout(color_box)
+        form.addRow("Color", color_widget)
+
+        style_box.addLayout(form)
+        params.addLayout(style_box)
+        params.addStretch()
 
         root.addLayout(params)
 
