@@ -29,6 +29,7 @@ from PyQt6.QtWidgets import (
 )
 
 from utils.icon_manager import IconManager
+from utils.dpi import dpi_scale
 
 
 class _ThumbButton(QToolButton):
@@ -104,14 +105,33 @@ class IconPickerDialog(QDialog):
         self.stack.addWidget(self._build_svg_page())
         root.addWidget(self.stack)
         # Preview button
-        from tools.button.conditional_style.widgets import PreviewButton
+        from tools.button.conditional_style.widgets import PreviewButton, SwitchButton
 
         text = self._preview_style.get("text", "")
         self.preview_btn = PreviewButton(text)
-        self.preview_btn.setFixedSize(80, 80)
-        self.preview_btn.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
-        if self._preview_style.get("style_sheet"):
-            self.preview_btn.setStyleSheet(self._preview_style["style_sheet"])
+        self.preview_switch = SwitchButton()
+        self.preview_stack = QStackedWidget()
+        self.preview_stack.addWidget(self.preview_btn)
+        self.preview_stack.addWidget(self.preview_switch)
+
+        component_type = self._preview_style.get("component_type", "")
+        width = dpi_scale(200)
+        height = dpi_scale(100)
+        if component_type == "Circle Button":
+            size = max(width, height)
+            self.preview_btn.setFixedSize(size, size)
+            self.preview_stack.setCurrentWidget(self.preview_btn)
+        elif component_type == "Toggle Switch":
+            self.preview_switch.setFixedSize(width, height)
+            self.preview_stack.setCurrentWidget(self.preview_switch)
+        else:
+            self.preview_btn.setFixedSize(width, height)
+            self.preview_stack.setCurrentWidget(self.preview_btn)
+        self.preview_stack.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
+        style_sheet = self._preview_style.get("style_sheet")
+        if style_sheet:
+            self.preview_btn.setStyleSheet(style_sheet)
+            self.preview_switch.setStyleSheet(style_sheet)
         base_col = self._preview_style.get("text_color")
         if base_col:
             hover_col = self._preview_style.get(
@@ -136,7 +156,7 @@ class IconPickerDialog(QDialog):
         params.setSpacing(12)
 
         # Preview button in bottom-left
-        params.addWidget(self.preview_btn)
+        params.addWidget(self.preview_stack)
 
         # Alignment grid (3x3)
         align_box = QVBoxLayout()
@@ -330,6 +350,8 @@ class IconPickerDialog(QDialog):
             self._update_preview()
 
     def _update_preview(self):
+        if self.preview_stack.currentWidget() is not self.preview_btn:
+            return
         if not self._selected:
             self.preview_btn.set_icon("", None)
             return

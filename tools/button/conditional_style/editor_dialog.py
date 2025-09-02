@@ -1397,6 +1397,7 @@ class ConditionalStyleEditorDialog(QDialog):
             },
             "offset": self.base_controls["offset_spin"].value(),
             "text": self.preview_button.text(),
+            "component_type": self.component_type_combo.currentText(),
         }
         dlg = IconPickerDialog(
             icons_root,
