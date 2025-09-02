@@ -1,4 +1,4 @@
-from PyQt6.QtWidgets import QTreeWidget, QTreeWidgetItem
+from PyQt6.QtWidgets import QTreeWidget, QTreeWidgetItem, QStyleFactory
 from PyQt6.QtGui import QPainter, QMouseEvent
 from PyQt6.QtCore import QModelIndex, QRect
 from utils.icon_manager import IconManager
@@ -7,6 +7,8 @@ from .array_tree_handler import ArrayTreeHandler
 class CustomTreeWidget(QTreeWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
+        # Use Windows style to ensure branch lines are displayed consistently
+        self.setStyle(QStyleFactory.create("windows"))
         # Disable the default behavior of expanding/collapsing on double-click.
         # This ensures that only a single click on the branch indicator (+)
         # will trigger the action.
@@ -100,6 +102,7 @@ class CustomTreeWidget(QTreeWidget):
 
     def drawBranches(self, painter: QPainter, rect: QRect, index: QModelIndex):
         # First, let the base class draw the tracking lines and default indicator.
+        super().drawBranches(painter, rect, index)
 
         # Now, we will draw our custom icon over the default indicator.
         item = self.itemFromIndex(index)

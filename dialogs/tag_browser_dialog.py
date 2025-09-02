@@ -2,9 +2,10 @@
 # A reusable dialog for browsing and selecting tags from all databases.
 
 from PyQt6.QtWidgets import (
-    QVBoxLayout, QTreeWidget, QTreeWidgetItem, QDialogButtonBox,
+    QVBoxLayout, QTreeWidgetItem, QDialogButtonBox,
     QHeaderView, QLineEdit, QTreeWidgetItemIterator, QHBoxLayout, QWidget, QDialog
 )
+from components.tree_widget import CustomTreeWidget
 from PyQt6.QtCore import Qt
 from typing import List, Optional, Tuple
 
@@ -50,7 +51,7 @@ class TagBrowserDialog(QDialog):
         filter_layout.addWidget(self.type_filter_input)
         filter_layout.addWidget(self.comment_filter_input)
         
-        self.tree = QTreeWidget()
+        self.tree = CustomTreeWidget()
         self.tree.setHeaderLabels(["Name", "Data Type", "Comment"])
         self.tree.setSortingEnabled(True)
         self.tree.sortByColumn(0, Qt.SortOrder.AscendingOrder)

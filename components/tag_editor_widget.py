@@ -2,7 +2,7 @@
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QTreeView,
     QPushButton, QAbstractItemView, QStyledItemDelegate,
-    QLineEdit, QMenu, QFileDialog, QHeaderView
+    QLineEdit, QMenu, QFileDialog, QHeaderView, QStyleFactory
 )
 from PyQt6.QtCore import (
     Qt, pyqtSlot, pyqtSignal, QSortFilterProxyModel,
@@ -77,6 +77,11 @@ class TagTreeWidget(QTreeView):
 
     delete_pressed = pyqtSignal()
     edit_pressed = pyqtSignal()
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        # Use Windows style so branch lines are visible
+        self.setStyle(QStyleFactory.create("windows"))
 
     def edit(self, index, trigger, event=None):
         if index.column() < 2:
