@@ -28,6 +28,7 @@ from typing import Callable, Dict
 from contextlib import contextmanager
 import copy
 from services.screen_data_service import screen_service
+from services.data_context import data_context
 from utils import constants
 from utils.editing_guard import EditingGuard
 from .factory import get_editor
@@ -79,7 +80,7 @@ class PropertyEditor(QStackedWidget):
         self.setCurrentWidget(self.blank_page)
 
         # Refresh properties when the underlying screen data changes
-        screen_service.screen_modified.connect(self._on_screen_modified)
+        data_context.screens_changed.connect(self._handle_screen_event)
 
         # Initialize tool schema registry
         self._init_schemas()
@@ -107,6 +108,11 @@ class PropertyEditor(QStackedWidget):
         return EditingGuard(
             self, screen_service, active_widget=active_widget, emit_final=_emit_final
         ).begin()
+
+    def _handle_screen_event(self, event: dict):
+        """Dispatch screen events from the shared data context."""
+        if event.get("action") == "screen_modified":
+            self._on_screen_modified(event.get("screen_id", ""))
 
     def _init_schemas(self):
         """Build the tool schema registry to reduce branching."""

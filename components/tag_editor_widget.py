@@ -16,6 +16,7 @@ from PyQt6.QtGui import (
 import copy
 from utils.icon_manager import IconManager
 from services.tag_data_service import tag_data_service
+from services.data_context import data_context
 from services.clipboard_service import clipboard_service
 from services.command_history_service import command_history_service
 from services.csv_service import csv_service
@@ -214,7 +215,7 @@ class TagEditorWidget(QWidget):
         # Cache to track current tags for incremental updates
         self._tags_cache: dict[str, dict] = {}
 
-        tag_data_service.tags_changed.connect(self._schedule_refresh)
+        data_context.tags_changed.connect(lambda _evt: self._schedule_refresh())
         self._model.itemChanged.connect(self._on_item_changed)
         self.tag_table.doubleClicked.connect(self._on_item_double_clicked)
         self.tag_table.selectionModel().selectionChanged.connect(lambda *_: self._update_button_states())

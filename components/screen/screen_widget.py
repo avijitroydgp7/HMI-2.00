@@ -5,6 +5,7 @@ from PyQt6.QtWidgets import QWidget, QLabel, QVBoxLayout
 from PyQt6.QtCore import pyqtSignal, pyqtSlot, QPointF
 from PyQt6.QtGui import QCursor
 from services.screen_data_service import screen_service
+from services.data_context import data_context
 from .design_canvas import DesignCanvas
 
 class ScreenWidget(QWidget):
@@ -37,7 +38,11 @@ class ScreenWidget(QWidget):
         # MODIFIED: Connect the new signal to the existing one.
         self.design_canvas.view_zoomed.connect(self.zoom_changed.emit)
 
-        screen_service.screen_modified.connect(self.on_screen_modified)
+        data_context.screens_changed.connect(
+            lambda evt: self.on_screen_modified(evt.get("screen_id", ""))
+            if evt.get("action") == "screen_modified"
+            else None
+        )
 
     def set_active_tool(self, tool_name: str):
         self.design_canvas.set_active_tool(tool_name)

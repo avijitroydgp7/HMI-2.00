@@ -7,6 +7,7 @@ import copy
 
 from services.tag_data_service import tag_data_service
 from services.comment_data_service import comment_data_service
+from services.data_context import data_context
 from services.clipboard_service import clipboard_service
 from services.command_history_service import command_history_service
 from services.commands import (
@@ -65,8 +66,8 @@ class ProjectDock(QDockWidget):
         layout.addWidget(self.tree)
         self.setWidget(container)
         self._populate_tree()
-        tag_data_service.database_list_changed.connect(self._populate_tree)
-        comment_data_service.comment_group_list_changed.connect(self._populate_tree)
+        data_context.tags_changed.connect(lambda _evt: self._populate_tree())
+        data_context.comments_changed.connect(lambda _evt: self._populate_tree())
 
     def _populate_tree(self):
         self.tree.clear()

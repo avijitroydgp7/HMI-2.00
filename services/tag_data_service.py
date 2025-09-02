@@ -5,6 +5,7 @@ import uuid
 import copy
 from PyQt6.QtCore import QObject, pyqtSignal
 from typing import Dict, Any, List, Optional
+from .data_context import DataContext, data_context
 
 class TagDataService(QObject):
     """
@@ -14,12 +15,21 @@ class TagDataService(QObject):
     tags_changed = pyqtSignal()
     database_list_changed = pyqtSignal()
 
-    def __init__(self):
+    def __init__(self, bus: DataContext):
         super().__init__()
+        self._bus = bus
         self._tag_databases = {}
         # Dictionaries for O(1) lookups
         self._db_name_index: Dict[str, str] = {}  # database name -> id
         self._tag_name_index: Dict[str, Dict[str, Dict[str, Any]]] = {}
+
+        # Bridge existing signals into the shared data context
+        self.tags_changed.connect(
+            lambda: self._bus.tags_changed.emit({"action": "tags_changed"})
+        )
+        self.database_list_changed.connect(
+            lambda: self._bus.tags_changed.emit({"action": "database_list_changed"})
+        )
 
     def clear_all(self):
         """Resets the service by clearing all tag data."""
@@ -195,4 +205,4 @@ class TagDataService(QObject):
         self.database_list_changed.emit()
         self.tags_changed.emit()
 
-tag_data_service = TagDataService()
+tag_data_service = TagDataService(data_context)

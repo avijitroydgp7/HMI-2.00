@@ -4,6 +4,7 @@
 import uuid
 import copy
 from PyQt6.QtCore import QObject, pyqtSignal
+from .data_context import DataContext, data_context
 
 class ScreenDataService(QObject):
     """
@@ -13,10 +14,19 @@ class ScreenDataService(QObject):
     screen_list_changed = pyqtSignal()
     screen_modified = pyqtSignal(str)
 
-    def __init__(self):
+    def __init__(self, bus: DataContext):
         super().__init__()
+        self._bus = bus
         self._screens = {}
         self._child_to_parents = {}
+
+        # Bridge existing signals into the shared data context
+        self.screen_list_changed.connect(
+            lambda: self._bus.screens_changed.emit({"action": "screen_list_changed"})
+        )
+        self.screen_modified.connect(
+            lambda sid: self._bus.screens_changed.emit({"action": "screen_modified", "screen_id": sid})
+        )
 
     def _index_add_child(self, parent_id, child_screen_id):
         if not child_screen_id:
@@ -268,4 +278,4 @@ class ScreenDataService(QObject):
         self.rebuild_reverse_index()
         self.screen_list_changed.emit()
 
-screen_service = ScreenDataService()
+screen_service = ScreenDataService(data_context)

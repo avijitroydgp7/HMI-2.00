@@ -2,6 +2,7 @@ from PyQt6.QtCore import QObject, pyqtSignal
 import uuid
 import copy
 from typing import Dict, Any, List
+from .data_context import DataContext, data_context
 
 
 class CommentDataService(QObject):
@@ -10,11 +11,20 @@ class CommentDataService(QObject):
     comment_group_list_changed = pyqtSignal()
     comments_changed = pyqtSignal(str)
 
-    def __init__(self) -> None:
+    def __init__(self, bus: DataContext) -> None:
         super().__init__()
+        self._bus = bus
         self._groups: Dict[str, Dict[str, Any]] = {}
         self._number_index: Dict[str, str] = {}
         self._name_index: Dict[str, str] = {}
+
+        # Bridge existing signals into the shared data context
+        self.comment_group_list_changed.connect(
+            lambda: self._bus.comments_changed.emit({"action": "group_list_changed"})
+        )
+        self.comments_changed.connect(
+            lambda gid: self._bus.comments_changed.emit({"action": "comments_changed", "group_id": gid})
+        )
 
     # --- Group management -------------------------------------------------
     def clear_all(self) -> None:
@@ -140,4 +150,4 @@ class CommentDataService(QObject):
         self.comment_group_list_changed.emit()
 
 
-comment_data_service = CommentDataService()
+comment_data_service = CommentDataService(data_context)

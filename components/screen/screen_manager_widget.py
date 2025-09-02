@@ -7,6 +7,7 @@ from PyQt6.QtGui import QKeyEvent
 import qtawesome as qta
 import copy
 from services.screen_data_service import screen_service
+from services.data_context import data_context
 from services.clipboard_service import clipboard_service
 from services.command_history_service import command_history_service
 from services.commands import AddScreenCommand, RemoveScreenCommand, UpdateScreenPropertiesCommand
@@ -34,9 +35,8 @@ class ScreenManagerWidget(QWidget):
         self.tree.delete_key_pressed.connect(self.handle_delete_key_press)
         self.tree.rename_key_pressed.connect(self.handle_rename_key_press)
         self.tree.itemSelectionChanged.connect(self.selection_changed.emit)
-        
-        screen_service.screen_list_changed.connect(self.sync_tree_with_service)
-        screen_service.screen_modified.connect(self._on_screen_modified)
+
+        data_context.screens_changed.connect(self._handle_screen_event)
         
         self.sync_tree_with_service()
 
@@ -104,6 +104,13 @@ class ScreenManagerWidget(QWidget):
     @pyqtSlot(str)
     def _on_screen_modified(self, screen_id: str):
         self.sync_tree_with_service()
+
+    def _handle_screen_event(self, event: dict):
+        action = event.get("action")
+        if action == "screen_list_changed":
+            self.sync_tree_with_service()
+        elif action == "screen_modified":
+            self._on_screen_modified(event.get("screen_id", ""))
 
     def _get_or_create_root_item(self, type_name, display_text, icon, color):
         if type_name in self.root_items: return self.root_items[type_name]

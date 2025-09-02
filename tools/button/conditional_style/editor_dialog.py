@@ -49,6 +49,7 @@ from dialogs.icon_picker_dialog import IconPickerDialog
 from utils.icon_manager import IconManager
 from utils.dpi import dpi_scale
 from services.comment_data_service import comment_data_service
+from services.data_context import data_context
 from tools.button.actions.constants import TriggerMode
 
 from .manager import ConditionalStyleManager
@@ -608,11 +609,11 @@ class ConditionalStyleEditorDialog(QDialog):
         _update_comment_number_suggestions()
         _update_column_row_suggestions()
         try:
-            comment_data_service.comment_group_list_changed.connect(
-                _update_comment_number_suggestions
+            data_context.comments_changed.connect(
+                lambda _evt: _update_comment_number_suggestions()
             )
-            comment_data_service.comments_changed.connect(
-                lambda _gid: _update_column_row_suggestions()
+            data_context.comments_changed.connect(
+                lambda _evt: _update_column_row_suggestions()
             )
         except Exception:
             pass
