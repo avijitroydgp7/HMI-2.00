@@ -459,7 +459,7 @@ class ConditionalStyleEditorDialog(QDialog):
         preview_group_layout.setSpacing(8)
         preview_group_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.preview_stack = QStackedWidget()
-        self.preview_button = PreviewButton("Preview")
+        self.preview_button = PreviewButton("")
         self.preview_button.setMinimumSize(dpi_scale(200), dpi_scale(100))
         self.preview_switch = SwitchButton()
         self.preview_stack.addWidget(self.preview_button)
@@ -1845,7 +1845,7 @@ class ConditionalStyleEditorDialog(QDialog):
                                     text = str(row_vals[col - 1])
                 except Exception:
                     pass
-            self.preview_button.setText(text or "Preview")
+            self.preview_button.setText(text or "")
 
     def get_style(self) -> ConditionalStyle:
         if self.copy_hover_chk.isChecked():

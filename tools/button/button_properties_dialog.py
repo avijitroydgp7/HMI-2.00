@@ -523,7 +523,7 @@ class ButtonPropertiesDialog(QDialog):
         right_layout.addWidget(self.style_properties_group)
 
         # Preview widgets
-        self.preview_button = PreviewButton("Preview")
+        self.preview_button = PreviewButton("")
         self.preview_button.setMinimumSize(dpi_scale(200), dpi_scale(100))
         self.preview_switch = SwitchButton()
         self.preview_stack = QStackedWidget()
@@ -611,7 +611,7 @@ class ButtonPropertiesDialog(QDialog):
             swatch_h = dpi_scale(36)
         else:
             preview_text = style.text_value if style.text_type == "Text" else ""
-            preview = PreviewButton(preview_text or "Aa")
+            preview = PreviewButton(preview_text or "")
             if component_type == "Circle Button":
                 swatch_w = swatch_h = dpi_scale(36)
             else:
@@ -803,7 +803,7 @@ class ButtonPropertiesDialog(QDialog):
             self.style_properties_stack.setCurrentIndex(0)
             self.style_properties_group.setTitle("Style Properties")
             self.preview_button.setStyleSheet("")
-            self.preview_button.setText("Preview")
+            self.preview_button.setText("")
             self.preview_button.set_icon("")
             self.preview_button.set_hover_icon("")
             self.preview_button.setFixedSize(dpi_scale(200), dpi_scale(100))
@@ -881,7 +881,7 @@ class ButtonPropertiesDialog(QDialog):
             self.preview_button.set_icon_size(icon_sz)
             self.preview_button.set_icon_alignment(base_props.get('icon_align', 'center'))
             text = style.text_value if style.text_type == "Text" else ""
-            self.preview_button.setText(text or "Preview")
+            self.preview_button.setText(text or "")
             self.preview_button.setToolTip(style.tooltip)
 
             # Apply text formatting to mirror saved style
