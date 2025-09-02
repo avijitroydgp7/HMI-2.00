@@ -218,7 +218,12 @@ class IconPickerDialog(QDialog):
             btn.clicked.connect(lambda _=False, b=btn, v=full: self._on_select("qta", v, b))
             self._qt_items.append(btn)
             self._qt_meta[btn] = (grp, full)
-            grid.addWidget(btn, r, c)
+            grid.addWidget(
+                btn,
+                r,
+                c,
+                alignment=Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop,
+            )
             c += 1
             if c >= cols:
                 c = 0
@@ -307,7 +312,12 @@ class IconPickerDialog(QDialog):
             self._svg_items.append(btn)
             grp = text.split("-", 1)[0] if "-" in text else text[:1].upper()
             self._svg_meta[btn] = (grp, p)
-            self.svg_grid.addWidget(btn, r, c)
+            self.svg_grid.addWidget(
+                btn,
+                r,
+                c,
+                alignment=Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop,
+            )
             c += 1
             if c >= cols:
                 c = 0
@@ -333,7 +343,12 @@ class IconPickerDialog(QDialog):
         for btn in items:
             if not btn.isVisible():
                 continue
-            grid.addWidget(btn, r, c)
+            grid.addWidget(
+                btn,
+                r,
+                c,
+                alignment=Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop,
+            )
             c += 1
             if c >= cols:
                 c = 0
