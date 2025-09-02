@@ -24,31 +24,24 @@ class ConditionalStyleManager(QObject):
 
     def __post_init__(self):
         QObject.__init__(self, self.parent)
-
-    def _generate_unique_style_id(self, base_id: str) -> str:
-        existing = {s.style_id for s in self.conditional_styles}
-        base = base_id or "style"
-        if base != "style" and base not in existing:
-            return base
-        suffix = 1
-        candidate = f"{base}_{suffix}"
-        while candidate in existing:
-            suffix += 1
-            candidate = f"{base}_{suffix}"
-        return candidate
+        
+    def renumber_styles(self) -> None:
+        for idx, style in enumerate(self.conditional_styles, 1):
+            style.style_id = str(idx)
 
     def add_style(self, style: ConditionalStyle):
-        base_id = style.style_id or "style"
-        style.style_id = self._generate_unique_style_id(base_id)
         self.conditional_styles.append(style)
+        self.renumber_styles()
 
     def remove_style(self, index: int):
         if 0 <= index < len(self.conditional_styles):
             del self.conditional_styles[index]
+            self.renumber_styles()
 
     def update_style(self, index: int, style: ConditionalStyle):
         if 0 <= index < len(self.conditional_styles):
             self.conditional_styles[index] = style
+            self.renumber_styles()
 
     def get_active_style(
         self, tag_values: Optional[Dict[str, Any]] = None, state: Optional[str] = None
@@ -198,4 +191,5 @@ class ConditionalStyleManager(QObject):
             for style_data in data.get("conditional_styles", [])
         ]
         manager.default_style = data.get("default_style", {})
+        manager.renumber_styles()
         return manager

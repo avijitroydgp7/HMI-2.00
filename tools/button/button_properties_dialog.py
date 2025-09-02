@@ -3,7 +3,7 @@ from PyQt6.QtWidgets import (
     QTabWidget, QWidget, QDialogButtonBox, QLabel, QFormLayout,
     QLineEdit, QTableView, QHeaderView,
     QPushButton, QHBoxLayout, QAbstractItemView, QVBoxLayout,
-    QSplitter, QGroupBox, QStackedWidget, QDialog, QInputDialog,
+    QSplitter, QGroupBox, QStackedWidget, QDialog,
     QListWidget, QListWidgetItem, QToolButton, QStyle
 )
 from PyQt6.QtCore import Qt, QSize
@@ -710,50 +710,11 @@ class ButtonPropertiesDialog(QDialog):
             widget = self._build_swatch_widget(style)
             self.style_list.setItemWidget(item, widget)
 
-    def _generate_unique_style_id(self, base_id: str) -> str:
-        """Return a unique style id based on ``base_id``.
-
-        The first generated id for an empty or generic ``base_id`` will be
-        ``style_1`` and subsequent ids will increment the suffix.
-        """
-        existing = {s.style_id for s in self.style_manager.conditional_styles}
-        base = base_id or "style"
-        if base != "style" and base not in existing:
-            return base
-        suffix = 1
-        candidate = f"{base}_{suffix}"
-        while candidate in existing:
-            suffix += 1
-            candidate = f"{base}_{suffix}"
-        return candidate
-
-    def _ensure_unique_style(self, style: ConditionalStyle):
-        """Ensure ``style`` has a non-empty and unique ``style_id``."""
-        existing = {s.style_id for s in self.style_manager.conditional_styles}
-        if not style.style_id or style.style_id in existing:
-            suggestion = self._generate_unique_style_id(style.style_id)
-            title = "Missing Style ID" if not style.style_id else "Duplicate Style ID"
-            prompt = (
-                "Style ID is required. "
-                if not style.style_id
-                else f"Style ID '{style.style_id}' already exists. "
-            )
-            new_id, ok = QInputDialog.getText(
-                self,
-                title,
-                f"{prompt}Enter a new ID or leave blank to use '{suggestion}':",
-            )
-            candidate = (new_id.strip() if ok else "") or suggestion
-            if candidate in existing:
-                candidate = self._generate_unique_style_id(style.style_id or "style")
-            style.style_id = candidate
-
     def _add_style(self):
         dialog = ConditionalStyleEditorDialog(self)
         if dialog.exec():
             new_style = dialog.get_style()
             if new_style:
-                self._ensure_unique_style(new_style)
                 self.style_manager.add_style(new_style)
                 self._refresh_style_list()
                 row = len(self.style_manager.conditional_styles) - 1
@@ -793,8 +754,8 @@ class ButtonPropertiesDialog(QDialog):
         if 0 <= row < len(self.style_manager.conditional_styles):
             original = self.style_manager.conditional_styles[row]
             duplicated = copy.deepcopy(original)
-            self._ensure_unique_style(duplicated)
             self.style_manager.conditional_styles.insert(row + 1, duplicated)
+            self.style_manager.renumber_styles()
             self._refresh_style_list()
             self.style_list.setCurrentRow(row + 1)
             self._on_style_selection_changed()
@@ -806,6 +767,7 @@ class ButtonPropertiesDialog(QDialog):
         styles = self.style_manager.conditional_styles
         if row > 0:
             styles.insert(row - 1, styles.pop(row))
+            self.style_manager.renumber_styles()
             self._refresh_style_list()
             self.style_list.setCurrentRow(row - 1)
             self._on_style_selection_changed()
@@ -817,6 +779,7 @@ class ButtonPropertiesDialog(QDialog):
         styles = self.style_manager.conditional_styles
         if row < len(styles) - 1:
             styles.insert(row + 1, styles.pop(row))
+            self.style_manager.renumber_styles()
             self._refresh_style_list()
             self.style_list.setCurrentRow(row + 1)
             self._on_style_selection_changed()
