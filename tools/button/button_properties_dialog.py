@@ -602,11 +602,21 @@ class ButtonPropertiesDialog(QDialog):
         hl.setSpacing(dpi_scale(8))
         hl.setSpacing(8)
 
-        # Small preview button reflecting style text and formatting
-        preview_text = style.text_value if style.text_type == "Text" else ""
-        preview = PreviewButton(preview_text or "Aa")
-        swatch_w = dpi_scale(90)
-        swatch_h = dpi_scale(36)
+        component_type = style.properties.get("component_type", "Standard Button")
+
+        # Small preview widget reflecting style type
+        if component_type == "Toggle Switch":
+            preview = SwitchButton()
+            swatch_w = dpi_scale(90)
+            swatch_h = dpi_scale(36)
+        else:
+            preview_text = style.text_value if style.text_type == "Text" else ""
+            preview = PreviewButton(preview_text or "Aa")
+            if component_type == "Circle Button":
+                swatch_w = swatch_h = dpi_scale(36)
+            else:
+                swatch_w = dpi_scale(90)
+                swatch_h = dpi_scale(36)
         preview.setFixedSize(swatch_w, swatch_h)
         scale = min(swatch_w / dpi_scale(200), swatch_h / dpi_scale(100))
 
@@ -633,52 +643,53 @@ class ButtonPropertiesDialog(QDialog):
             )
             preview.setStyleSheet(qss)
 
-        # Icon handling
-        preview.set_icon(base_props.get("icon", ""))
-        preview.set_hover_icon(hover_props.get("icon", ""))
-        icon_sz = dpi_scale(base_props.get("icon_size", 20) * scale)
-        preview.set_icon_size(icon_sz)
+        if component_type != "Toggle Switch":
+            # Icon handling
+            preview.set_icon(base_props.get("icon", ""))
+            preview.set_hover_icon(hover_props.get("icon", ""))
+            icon_sz = dpi_scale(base_props.get("icon_size", 20) * scale)
+            preview.set_icon_size(icon_sz)
 
-        # Text formatting
-        preview.set_text_font(
-            base_props.get("font_family", ""),
-            max(1, int(base_props.get("font_size", 0) * scale)),
-            base_props.get("bold", False),
-            base_props.get("italic", False),
-            base_props.get("underline", False),
-        )
-        preview.set_text_colors(
-            base_props.get("text_color", "#000"),
-            hover_props.get("text_color", base_props.get("text_color", "#000")),
-        )
-        preview.set_text_offset(
-            int(
-                base_props.get("offset_to_frame", base_props.get("offset", 0))
-                * scale
+            # Text formatting
+            preview.set_text_font(
+                base_props.get("font_family", ""),
+                max(1, int(base_props.get("font_size", 0) * scale)),
+                base_props.get("bold", False),
+                base_props.get("italic", False),
+                base_props.get("underline", False),
             )
-        )
+            preview.set_text_colors(
+                base_props.get("text_color", "#000"),
+                hover_props.get("text_color", base_props.get("text_color", "#000")),
+            )
+            preview.set_text_offset(
+                int(
+                    base_props.get("offset_to_frame", base_props.get("offset", 0))
+                    * scale
+                )
+            )
 
-        # Alignment
-        h_align = base_props.get(
-            "h_align", base_props.get("horizontal_align", "center")
-        )
-        v_align = base_props.get(
-            "v_align", base_props.get("vertical_align", "middle")
-        )
-        alignment = Qt.AlignmentFlag.AlignAbsolute
-        if h_align == "left":
-            alignment |= Qt.AlignmentFlag.AlignLeft
-        elif h_align == "center":
-            alignment |= Qt.AlignmentFlag.AlignHCenter
-        elif h_align == "right":
-            alignment |= Qt.AlignmentFlag.AlignRight
-        if v_align == "top":
-            alignment |= Qt.AlignmentFlag.AlignTop
-        elif v_align == "middle":
-            alignment |= Qt.AlignmentFlag.AlignVCenter
-        elif v_align == "bottom":
-            alignment |= Qt.AlignmentFlag.AlignBottom
-        preview.setAlignment(alignment)
+            # Alignment
+            h_align = base_props.get(
+                "h_align", base_props.get("horizontal_align", "center")
+            )
+            v_align = base_props.get(
+                "v_align", base_props.get("vertical_align", "middle")
+            )
+            alignment = Qt.AlignmentFlag.AlignAbsolute
+            if h_align == "left":
+                alignment |= Qt.AlignmentFlag.AlignLeft
+            elif h_align == "center":
+                alignment |= Qt.AlignmentFlag.AlignHCenter
+            elif h_align == "right":
+                alignment |= Qt.AlignmentFlag.AlignRight
+            if v_align == "top":
+                alignment |= Qt.AlignmentFlag.AlignTop
+            elif v_align == "middle":
+                alignment |= Qt.AlignmentFlag.AlignVCenter
+            elif v_align == "bottom":
+                alignment |= Qt.AlignmentFlag.AlignBottom
+            preview.setAlignment(alignment)
 
         # Label for style id
         label = QLabel(style.style_id)
