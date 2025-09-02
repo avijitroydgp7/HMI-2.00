@@ -101,34 +101,55 @@ class IconButton(QPushButton):
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        self._base_icon = QIcon()
-        self._hover_icon = QIcon()
+        self._icon_label = QLabel(self)
+        self._icon_label.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
+        self._icon_label.setStyleSheet("background: transparent;")
+        self._base_pixmap = QPixmap()
+        self._hover_pixmap = QPixmap()
+        self._current_source = ""
+        self._hover_source = ""
+        self._icon_color: Optional[str] = None
+        self._icon_alignment = "center"
         self.icon_size = QSize(dpi_scale(50), dpi_scale(50))
-        self.setIconSize(self.icon_size)
 
-    def set_icon(self, source: str):
-        icon = self._create_icon_from_source(source)
-        self._base_icon = icon
-        self.setIcon(icon)
-        self.update()
+    def set_icon(self, source: str, color: Optional[str] = None):
+        self._current_source = source or ""
+        self._icon_color = color
+        self._base_pixmap = self._create_pixmap_from_source(source, color)
+        self._icon_label.setPixmap(self._base_pixmap)
+        self._update_icon_geometry()
 
-    def set_hover_icon(self, source: str):
-        icon = self._create_icon_from_source(source)
-        self._hover_icon = icon
-        self.update()
+    def set_hover_icon(self, source: str, color: Optional[str] = None):
+        self._hover_source = source or ""
+        col = color if color is not None else self._icon_color
+        self._hover_pixmap = self._create_pixmap_from_source(source, col)
 
     def set_icon_size(self, size: int):
         self.icon_size = QSize(size, size)
-        self.setIconSize(self.icon_size)
-        self.update()
+        if self._current_source:
+            self._base_pixmap = self._create_pixmap_from_source(
+                self._current_source, self._icon_color
+            )
+            self._icon_label.setPixmap(self._base_pixmap)
+        if self._hover_source:
+            self._hover_pixmap = self._create_pixmap_from_source(
+                self._hover_source, self._icon_color
+            )
+        self._update_icon_geometry()
 
-    def _create_icon_from_source(self, source: Optional[str]) -> QIcon:
+    def set_icon_alignment(self, alignment: str):
+        self._icon_alignment = alignment or "center"
+        self._update_icon_geometry()
+
+    def _create_pixmap_from_source(
+        self, source: Optional[str], color: Optional[str] = None
+    ) -> QPixmap:
         if not source:
-            return QIcon()
+            return QPixmap()
         src = str(source)
         if src.startswith("qta:"):
             name = src.split(":", 1)[1]
-            return IconManager.create_icon(name)
+            return IconManager.create_pixmap(name, self.icon_size.width(), color=color)
         ext = os.path.splitext(src)[1].lower()
         if ext == ".svg":
             renderer = QSvgRenderer(src)
@@ -138,20 +159,47 @@ class IconButton(QPushButton):
                 painter = QPainter(pixmap)
                 renderer.render(painter)
                 painter.end()
-                return QIcon(pixmap)
-            return QIcon()
+                return pixmap
+            return QPixmap()
         pix = QPixmap(src)
         if pix and not pix.isNull():
-            return QIcon(pix)
-        return QIcon()
+            return pix.scaled(
+                self.icon_size, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation
+            )
+        return QPixmap()
+
+    def _update_icon_geometry(self):
+        pix = self._icon_label.pixmap()
+        if pix is None or pix.isNull():
+            self._icon_label.setGeometry(0, 0, 0, 0)
+            return
+        w = pix.width()
+        h = pix.height()
+        x = (self.width() - w) // 2
+        y = (self.height() - h) // 2
+        align = self._icon_alignment
+        if "left" in align:
+            x = 0
+        elif "right" in align:
+            x = self.width() - w
+        if "top" in align:
+            y = 0
+        elif "bottom" in align:
+            y = self.height() - h
+        self._icon_label.setGeometry(x, y, w, h)
+        self._icon_label.raise_()
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        self._update_icon_geometry()
 
     def enterEvent(self, e):
-        if not self._hover_icon.isNull():
-            self.setIcon(self._hover_icon)
+        if not self._hover_pixmap.isNull():
+            self._icon_label.setPixmap(self._hover_pixmap)
         super().enterEvent(e)
 
     def leaveEvent(self, e):
-        self.setIcon(self._base_icon)
+        self._icon_label.setPixmap(self._base_pixmap)
         super().leaveEvent(e)
 
 

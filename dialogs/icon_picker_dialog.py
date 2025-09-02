@@ -1,11 +1,11 @@
 from __future__ import annotations
 
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple, Any
 import os
 import json
 
 from PyQt6.QtCore import Qt, QSize, QEvent, QObject
-from PyQt6.QtGui import QIcon, QPixmap
+from PyQt6.QtGui import QIcon, QPixmap, QColor
 from PyQt6.QtWidgets import (
     QDialog,
     QVBoxLayout,
@@ -22,6 +22,8 @@ from PyQt6.QtWidgets import (
     QStackedWidget,
     QRadioButton,
     QButtonGroup,
+    QSpinBox,
+    QColorDialog,
 )
 
 from utils.icon_manager import IconManager
@@ -44,16 +46,23 @@ class _ThumbButton(QToolButton):
 class IconPickerDialog(QDialog):
     """Icon browser to select QtAwesome or SVG icons from ``lib/icon``.
 
-    Result is available via :meth:`selected_value` as either ``"qta:<name>"``
-    (e.g. ``qta:mdi.home``) or an absolute file path to an SVG under
-    ``lib/icon``.
+    The selected data is returned as a dictionary containing ``source``,
+    ``size``, ``color`` and ``align``.
     """
 
-    def __init__(self, icons_root: str, parent: Optional[QWidget] = None):
+    def __init__(
+        self,
+        icons_root: str,
+        parent: Optional[QWidget] = None,
+        initial: Optional[Dict[str, Any]] = None,
+        source: Optional[str] = None,
+    ):
         super().__init__(parent)
         self.setWindowTitle("Select Icon")
         self._icons_root = icons_root
         self._selected: Optional[Tuple[str, str]] = None  # (kind, value)
+        self._initial = initial or {}
+        self._initial_source = source or ""
 
         root = QVBoxLayout(self)
 
@@ -75,6 +84,89 @@ class IconPickerDialog(QDialog):
         self.stack.addWidget(self._build_svg_page())
         root.addWidget(self.stack)
 
+        # --- Parameter controls -------------------------------------
+        params = QGridLayout()
+        params.setContentsMargins(0, 0, 0, 0)
+        params.setHorizontalSpacing(6)
+        params.setVerticalSpacing(4)
+
+        # Alignment grid (3x3)
+        params.addWidget(QLabel("Alignment:"), 0, 0, Qt.AlignmentFlag.AlignTop)
+        self.align_group = QButtonGroup(self)
+        align_widget = QWidget()
+        align_layout = QGridLayout(align_widget)
+        align_layout.setContentsMargins(0, 0, 0, 0)
+        align_layout.setSpacing(2)
+        positions = [
+            ("top_left", 0, 0),
+            ("top", 0, 1),
+            ("top_right", 0, 2),
+            ("left", 1, 0),
+            ("center", 1, 1),
+            ("right", 1, 2),
+            ("bottom_left", 2, 0),
+            ("bottom", 2, 1),
+            ("bottom_right", 2, 2),
+        ]
+        self._align_buttons: Dict[str, QToolButton] = {}
+        for name, r, c in positions:
+            btn = QToolButton()
+            btn.setCheckable(True)
+            btn.setFixedSize(24, 24)
+            btn.setProperty("align", name)
+            align_layout.addWidget(btn, r, c)
+            self.align_group.addButton(btn)
+            self._align_buttons[name] = btn
+        params.addWidget(align_widget, 0, 1)
+
+        # Size selector
+        params.addWidget(QLabel("Size:"), 1, 0)
+        self.size_spin = QSpinBox()
+        self.size_spin.setRange(1, 512)
+        self.size_spin.setValue(48)
+        params.addWidget(self.size_spin, 1, 1)
+
+        # Color selector (Qt icons only)
+        params.addWidget(QLabel("Color:"), 2, 0)
+        color_layout = QHBoxLayout()
+        color_layout.setContentsMargins(0, 0, 0, 0)
+        self.color_edit = QLineEdit()
+        self.color_btn = QToolButton()
+        self.color_btn.setText("...")
+        def _pick_color():
+            col = QColorDialog.getColor(QColor(self.color_edit.text() or "#000000"), self)
+            if col.isValid():
+                self.color_edit.setText(col.name())
+        self.color_btn.clicked.connect(_pick_color)
+        color_layout.addWidget(self.color_edit)
+        color_layout.addWidget(self.color_btn)
+        color_widget = QWidget()
+        color_widget.setLayout(color_layout)
+        params.addWidget(color_widget, 2, 1)
+
+        root.addLayout(params)
+
+        def _update_color_enabled():
+            en = self.qt_radio.isChecked()
+            self.color_edit.setEnabled(en)
+            self.color_btn.setEnabled(en)
+        self.qt_radio.toggled.connect(lambda _: _update_color_enabled())
+        _update_color_enabled()
+
+        # Apply initial selections
+        if self._initial_source.startswith("qta:"):
+            self.qt_radio.setChecked(True)
+        elif self._initial_source:
+            self.svg_radio.setChecked(True)
+        self.size_spin.setValue(int(self._initial.get("size", 48)))
+        if self._initial.get("color"):
+            self.color_edit.setText(str(self._initial.get("color")))
+        align_btn = self._align_buttons.get(self._initial.get("align", "center"))
+        if align_btn:
+            align_btn.setChecked(True)
+        else:
+            self._align_buttons.get("center").setChecked(True)
+
         self.qt_radio.toggled.connect(lambda s: self.stack.setCurrentIndex(0 if s else 1))
 
         self.button_box = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
@@ -84,11 +176,16 @@ class IconPickerDialog(QDialog):
         root.addWidget(self.button_box)
 
     # ---------------------- Public API ----------------------
-    def selected_value(self) -> Optional[str]:
+    def selected_value(self) -> Optional[Dict[str, Any]]:
         if not self._selected:
             return None
         kind, value = self._selected
-        return f"qta:{value}" if kind == "qta" else value
+        source = f"qta:{value}" if kind == "qta" else value
+        align_btn = self.align_group.checkedButton()
+        align = align_btn.property("align") if align_btn else "center"
+        color = self.color_edit.text().strip() if kind == "qta" else ""
+        size = int(self.size_spin.value())
+        return {"source": source, "align": align, "color": color, "size": size}
 
     # ------------------- QtAwesome page ---------------------
     def _build_qtawesome_page(self) -> QWidget:

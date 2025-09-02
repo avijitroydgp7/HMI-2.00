@@ -13,9 +13,12 @@ from PyQt6.QtGui import (
     QPolygonF,
 )
 from PyQt6.QtCore import QRectF, Qt, QPointF, QLineF
+from PyQt6.QtSvg import QSvgRenderer
+import os
 import copy
 
 from services.screen_data_service import screen_service
+from utils.icon_manager import IconManager
 
 
 def _apply_pen_style_from_name(pen: QPen, style_name: str):
@@ -258,7 +261,47 @@ class ButtonItem(BaseGraphicsItem):
             
         painter.setBrush(bg_color)
         painter.drawRoundedRect(self.boundingRect(), border_radius, border_radius)
-        
+
+        # Draw icon if available
+        icon_src = props.get('icon', '')
+        if icon_src:
+            size = int(props.get('icon_size', 24))
+            color = props.get('icon_color')
+            align = props.get('icon_align', 'center')
+            pix = QPixmap()
+            if str(icon_src).startswith('qta:'):
+                name = icon_src.split(':', 1)[1]
+                pix = IconManager.create_pixmap(name, size, color=color)
+            else:
+                ext = os.path.splitext(icon_src)[1].lower()
+                if ext == '.svg':
+                    renderer = QSvgRenderer(icon_src)
+                    if renderer.isValid():
+                        pix = QPixmap(size, size)
+                        pix.fill(Qt.GlobalColor.transparent)
+                        p = QPainter(pix)
+                        renderer.render(p)
+                        p.end()
+                else:
+                    pix = QPixmap(icon_src)
+                    if not pix.isNull():
+                        pix = pix.scaled(
+                            size, size, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation
+                        )
+            if not pix.isNull():
+                br = self.boundingRect()
+                x = br.left() + (br.width() - pix.width()) / 2
+                y = br.top() + (br.height() - pix.height()) / 2
+                if 'left' in align:
+                    x = br.left()
+                elif 'right' in align:
+                    x = br.right() - pix.width()
+                if 'top' in align:
+                    y = br.top()
+                elif 'bottom' in align:
+                    y = br.bottom() - pix.height()
+                painter.drawPixmap(int(x), int(y), pix)
+
         # Draw text
         painter.setPen(text_color)
         font = QFont("Arial", font_size)

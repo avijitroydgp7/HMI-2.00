@@ -645,10 +645,15 @@ class ButtonPropertiesDialog(QDialog):
 
         if component_type != "Toggle Switch":
             # Icon handling
-            preview.set_icon(base_props.get("icon", ""))
-            preview.set_hover_icon(hover_props.get("icon", ""))
+            preview.set_icon(
+                base_props.get("icon", ""), base_props.get("icon_color")
+            )
+            preview.set_hover_icon(
+                hover_props.get("icon", ""), base_props.get("icon_color")
+            )
             icon_sz = dpi_scale(base_props.get("icon_size", 20) * scale)
             preview.set_icon_size(icon_sz)
+            preview.set_icon_alignment(base_props.get("icon_align", "center"))
 
             # Text formatting
             preview.set_text_font(
@@ -866,10 +871,15 @@ class ButtonPropertiesDialog(QDialog):
                 )
                 self.preview_button.setStyleSheet(qss)
 
-            self.preview_button.set_icon(base_props.get('icon', ''))
-            self.preview_button.set_hover_icon(hover_props.get('icon', ''))
+            self.preview_button.set_icon(
+                base_props.get('icon', ''), base_props.get('icon_color')
+            )
+            self.preview_button.set_hover_icon(
+                hover_props.get('icon', ''), base_props.get('icon_color')
+            )
             icon_sz = base_props.get('icon_size', 48)
             self.preview_button.set_icon_size(icon_sz)
+            self.preview_button.set_icon_alignment(base_props.get('icon_align', 'center'))
             text = style.text_value if style.text_type == "Text" else ""
             self.preview_button.setText(text or "Preview")
             self.preview_button.setToolTip(style.tooltip)

@@ -3,9 +3,12 @@ from __future__ import annotations
 from typing import Any, Dict, Optional, Tuple, Callable, Set
 from dataclasses import dataclass
 
-from PyQt6.QtCore import QObject
+import os
+
+from PyQt6.QtCore import QObject, QSize, Qt
 from PyQt6.QtWidgets import QPushButton
-from PyQt6.QtGui import QColor
+from PyQt6.QtGui import QColor, QIcon, QPixmap, QPainter
+from PyQt6.QtSvg import QSvgRenderer
 
 from runtime_simulator.data_manager import DataManager
 
@@ -13,6 +16,7 @@ from runtime_simulator.data_manager import DataManager
 from tools.button.conditional_style import ConditionalStyleManager
 from tools.button.runtime_style import RuntimeConditionalStyle
 from tools.button.actions.constants import TriggerMode, ActionType
+from utils.icon_manager import IconManager
 
 
 @dataclass(slots=True)
@@ -123,6 +127,33 @@ class ButtonRuntimeController(QObject):
         self._button.setStyleSheet(css)
         # ToolTip
         self._button.setToolTip(str(props.get('tooltip', '') or ''))
+
+        # Icon handling
+        icon_src = props.get('icon', '')
+        if icon_src:
+            size = int(props.get('icon_size', 24))
+            color = props.get('icon_color')
+            icon = QIcon()
+            if str(icon_src).startswith('qta:'):
+                name = icon_src.split(':', 1)[1]
+                icon = IconManager.create_icon(name, size=size, color=color)
+            else:
+                ext = os.path.splitext(icon_src)[1].lower()
+                if ext == '.svg':
+                    renderer = QSvgRenderer(icon_src)
+                    if renderer.isValid():
+                        pix = QPixmap(size, size)
+                        pix.fill(Qt.GlobalColor.transparent)
+                        p = QPainter(pix)
+                        renderer.render(p)
+                        p.end()
+                        icon = QIcon(pix)
+                else:
+                    pix = QPixmap(icon_src)
+                    if not pix.isNull():
+                        icon = QIcon(pix)
+            self._button.setIcon(icon)
+            self._button.setIconSize(QSize(size, size))
 
     # --- Action execution -----------------------------------------------
     def _execute_bit_action(self, action: Dict[str, Any], pressed: bool):

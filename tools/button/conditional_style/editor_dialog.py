@@ -1374,11 +1374,24 @@ class ConditionalStyleEditorDialog(QDialog):
             icons_root = os.path.join(base_dir, "lib", "icon")
         except Exception:
             icons_root = os.path.join(os.getcwd(), "lib", "icon")
-        dlg = IconPickerDialog(icons_root, self)
+        initial = {
+            "size": self.style.properties.get("icon_size", 48),
+            "color": self.style.properties.get("icon_color", ""),
+            "align": self.style.properties.get("icon_align", "center"),
+        }
+        dlg = IconPickerDialog(icons_root, self, initial=initial, source=edit.text())
         if dlg.exec() == QDialog.DialogCode.Accepted:
             value = dlg.selected_value()
             if value:
-                edit.setText(value)
+                edit.setText(value.get("source", ""))
+                self.style.properties["icon_size"] = value.get("size", 48)
+                self.style.properties["icon_align"] = value.get("align", "center")
+                col = value.get("color")
+                if col:
+                    self.style.properties["icon_color"] = col
+                elif "icon_color" in self.style.properties:
+                    del self.style.properties["icon_color"]
+                self.update_preview()
 
     def on_corner_radius_changed(self, corner, value):
         if self.link_radius_btn.isChecked():
@@ -1760,10 +1773,18 @@ class ConditionalStyleEditorDialog(QDialog):
                 widget.setAlignment(alignment)
 
         if component_type != "Toggle Switch":
-            self.preview_button.set_icon(self.base_controls["icon_edit"].text())
-            self.preview_button.set_hover_icon(self.hover_controls["icon_edit"].text())
+            color = self.style.properties.get("icon_color")
+            self.preview_button.set_icon(
+                self.base_controls["icon_edit"].text(), color
+            )
+            self.preview_button.set_hover_icon(
+                self.hover_controls["icon_edit"].text(), color
+            )
             icon_sz = self.style.properties.get("icon_size", 48)
             self.preview_button.set_icon_size(icon_sz)
+            self.preview_button.set_icon_alignment(
+                self.style.properties.get("icon_align", "center")
+            )
             text = ""
             if self.base_controls["text_type_combo"].currentText() == "Text":
                 text = self.base_controls["text_edit"].toPlainText()
@@ -1869,6 +1890,14 @@ class ConditionalStyleEditorDialog(QDialog):
             }
         else:
             properties["text_value"] = properties.get("text", "")
+
+        # Icon related properties from picker
+        if "icon_size" in self.style.properties:
+            properties["icon_size"] = self.style.properties.get("icon_size", 48)
+        if "icon_color" in self.style.properties:
+            properties["icon_color"] = self.style.properties.get("icon_color")
+        if "icon_align" in self.style.properties:
+            properties["icon_align"] = self.style.properties.get("icon_align")
 
         hover_properties = {
             "background_color": self._hover_bg_color.name(),
