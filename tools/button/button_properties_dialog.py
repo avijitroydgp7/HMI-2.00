@@ -11,6 +11,7 @@ from utils.dpi import dpi_scale
 from typing import Dict, Any, Optional
 import logging
 import copy
+import re
 
 from tools.button.actions.select_action_type_dialog import SelectActionTypeDialog
 from tools.button.actions.bit_action_dialog import BitActionDialog
@@ -25,6 +26,16 @@ from .conditional_style import (
     PreviewButton,
     SwitchButton,
 )
+
+
+def scale_stylesheet(qss: str, scale: float) -> str:
+    """Scale numeric px/pt values in ``qss`` by ``scale``."""
+    def repl(match: re.Match) -> str:
+        value = float(match.group(1))
+        unit = match.group(2)
+        return f"{value * scale:.0f}{unit}"
+
+    return re.sub(r"(\d+(?:\.\d+)?)(px|pt)", repl, qss)
 
 
 class ButtonPropertiesDialog(QDialog):
@@ -594,7 +605,10 @@ class ButtonPropertiesDialog(QDialog):
         # Small preview button reflecting style text and formatting
         preview_text = style.text_value if style.text_type == "Text" else ""
         preview = PreviewButton(preview_text or "Aa")
-        preview.setFixedSize(dpi_scale(90), dpi_scale(36))
+        swatch_w = dpi_scale(90)
+        swatch_h = dpi_scale(36)
+        preview.setFixedSize(swatch_w, swatch_h)
+        scale = min(swatch_w / dpi_scale(200), swatch_h / dpi_scale(100))
 
         # Determine base/hover properties for icons and colours
         temp_manager = ConditionalStyleManager()
@@ -604,13 +618,13 @@ class ButtonPropertiesDialog(QDialog):
 
         # Apply either stored style sheet or basic colours
         if style.style_sheet:
-            preview.setStyleSheet(style.style_sheet)
+            preview.setStyleSheet(scale_stylesheet(style.style_sheet, scale))
         else:
             qss = (
                 "QPushButton {\n"
                 f"    background-color: {base_props.get('background_color', 'transparent')};\n"
                 f"    color: {base_props.get('text_color', '#000')};\n"
-                f"    border-radius: {base_props.get('border_radius', 4)}px;\n"
+                f"    border-radius: {int(base_props.get('border_radius', 4) * scale)}px;\n"
                 "}\n"
                 "QPushButton:hover {\n"
                 f"    background-color: {hover_props.get('background_color', base_props.get('background_color', 'transparent'))};\n"
@@ -622,13 +636,13 @@ class ButtonPropertiesDialog(QDialog):
         # Icon handling
         preview.set_icon(base_props.get("icon", ""))
         preview.set_hover_icon(hover_props.get("icon", ""))
-        icon_sz = dpi_scale(base_props.get("icon_size", 20))
+        icon_sz = dpi_scale(base_props.get("icon_size", 20) * scale)
         preview.set_icon_size(icon_sz)
 
         # Text formatting
         preview.set_text_font(
             base_props.get("font_family", ""),
-            base_props.get("font_size", 0),
+            max(1, int(base_props.get("font_size", 0) * scale)),
             base_props.get("bold", False),
             base_props.get("italic", False),
             base_props.get("underline", False),
@@ -638,7 +652,10 @@ class ButtonPropertiesDialog(QDialog):
             hover_props.get("text_color", base_props.get("text_color", "#000")),
         )
         preview.set_text_offset(
-            base_props.get("offset_to_frame", base_props.get("offset", 0))
+            int(
+                base_props.get("offset_to_frame", base_props.get("offset", 0))
+                * scale
+            )
         )
 
         # Alignment
