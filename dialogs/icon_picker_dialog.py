@@ -245,6 +245,19 @@ class IconPickerDialog(QDialog):
         root.addWidget(self.button_box)
 
         _update_color_enabled()
+        if self._initial_source:
+            if self._initial_source.startswith("qta:"):
+                target = self._initial_source.split(":", 1)[1]
+                for btn, (_grp, full) in self._qt_meta.items():
+                    if full == target:
+                        self._on_select("qta", full, btn)
+                        break
+            else:
+                target = os.path.abspath(self._initial_source)
+                for btn, (_grp, path) in self._svg_meta.items():
+                    if os.path.abspath(path) == target:
+                        self._on_select("svg", path, btn)
+                        break
         self._update_preview()
 
     # ---------------------- Public API ----------------------
