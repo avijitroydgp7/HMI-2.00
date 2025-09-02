@@ -95,10 +95,14 @@ class DesignCanvas(QGraphicsView):
         self._rubber_band_origin = None
         self._rubber_band_rect = QRect()
 
-        self._drag_mode = None 
+        self._drag_mode = None
         self._resize_handle = None
         self._start_selection_states = {}
+        # Track both snapped and raw cursor positions separately.  The raw
+        # position is used for drag deltas so that snapping does not shift the
+        # cursor-to-item offset during a move/resize.
         self._last_mouse_scene_pos = QPointF()
+        self._raw_last_scene_pos = QPointF()
         self._shift_pressed = False
 
         # State used while creating new items with drawing tools
@@ -499,7 +503,9 @@ class DesignCanvas(QGraphicsView):
             return
 
         if event.button() == Qt.MouseButton.LeftButton:
-            self._last_mouse_scene_pos = self._snap_position(self.mapToScene(event.pos()))
+            # Cache both raw and snapped cursor positions at the start of a drag
+            self._raw_last_scene_pos = self.mapToScene(event.pos())
+            self._last_mouse_scene_pos = self._snap_position(self._raw_last_scene_pos)
             
             # Priority 1: Check for resize handle click
             self._resize_handle = self.get_handle_at(event.pos())
@@ -561,26 +567,29 @@ class DesignCanvas(QGraphicsView):
              super().mousePressEvent(event)
 
     def mouseMoveEvent(self, event: QMouseEvent):
+        raw_scene_pos = self.mapToScene(event.pos())
+        snapped_scene_pos = self._snap_position(raw_scene_pos)
+
         # Throttle drag/update computations to ~60 fps
         if self._frame_timer.isValid() and self._frame_timer.elapsed() < 16:
-            # Keep last position updated for downstream consumers
-            self._last_mouse_scene_pos = self._snap_position(self.mapToScene(event.pos()))
-            # Still forward to path edit tool to keep editing responsive
+            # Still provide position updates but defer drag processing
+            self.mouse_moved_on_scene.emit(snapped_scene_pos)
             if self.active_tool == constants.ToolType.PATH_EDIT:
                 super().mouseMoveEvent(event)
             return
+
         self._frame_timer.restart()
-        current_scene_pos = self._snap_position(self.mapToScene(event.pos()))
-        self.mouse_moved_on_scene.emit(current_scene_pos)
+        self.mouse_moved_on_scene.emit(snapped_scene_pos)
         if self.active_tool == constants.ToolType.PATH_EDIT:
             super().mouseMoveEvent(event)
-            self._last_mouse_scene_pos = current_scene_pos
+            self._last_mouse_scene_pos = snapped_scene_pos
+            self._raw_last_scene_pos = raw_scene_pos
             return
 
         if self.active_tool != constants.ToolType.SELECT:
             if self._drawing and self._preview_item:
                 if self.active_tool == constants.ToolType.FREEFORM:
-                    self._draw_points.append(current_scene_pos)
+                    self._draw_points.append(snapped_scene_pos)
                     path = QPainterPath(self._draw_points[0])
                     for p in self._draw_points[1:]:
                         path.lineTo(p)
@@ -590,7 +599,7 @@ class DesignCanvas(QGraphicsView):
                         path = QPainterPath(self._draw_points[0])
                         for p in self._draw_points[1:]:
                             path.lineTo(p)
-                        candidate = current_scene_pos
+                        candidate = snapped_scene_pos
                         modifiers = event.modifiers()
                         if modifiers & Qt.KeyboardModifier.ShiftModifier:
                             start = self._draw_points[-1]
@@ -606,7 +615,7 @@ class DesignCanvas(QGraphicsView):
                     # Apply drawing modifiers: Shift (45° lock), Ctrl (from center)
                     modifiers = event.modifiers()
                     start = self._start_pos
-                    v = current_scene_pos - start
+                    v = snapped_scene_pos - start
                     if modifiers & Qt.KeyboardModifier.ShiftModifier:
                         angle = math.degrees(math.atan2(v.y(), v.x()))
                         snapped = round(angle / 45.0) * 45.0
@@ -630,7 +639,7 @@ class DesignCanvas(QGraphicsView):
                     modifiers = event.modifiers()
                     start = self._start_pos
                     if modifiers & Qt.KeyboardModifier.ControlModifier:
-                        v = current_scene_pos - start
+                        v = snapped_scene_pos - start
                         w = abs(v.x())
                         h = abs(v.y())
                         if modifiers & Qt.KeyboardModifier.ShiftModifier:
@@ -638,7 +647,7 @@ class DesignCanvas(QGraphicsView):
                             w = h = m
                         rect = QRectF(start.x() - w, start.y() - h, 2 * w, 2 * h).normalized()
                     else:
-                        rect = QRectF(start, current_scene_pos).normalized()
+                        rect = QRectF(start, snapped_scene_pos).normalized()
                         if modifiers & Qt.KeyboardModifier.ShiftModifier:
                             w = rect.width()
                             h = rect.height()
@@ -654,7 +663,7 @@ class DesignCanvas(QGraphicsView):
                     modifiers = event.modifiers()
                     start = self._start_pos
                     if modifiers & Qt.KeyboardModifier.ControlModifier:
-                        v = current_scene_pos - start
+                        v = snapped_scene_pos - start
                         w = abs(v.x())
                         h = abs(v.y())
                         if modifiers & Qt.KeyboardModifier.ShiftModifier:
@@ -662,17 +671,19 @@ class DesignCanvas(QGraphicsView):
                             w = h = m
                         rect = QRectF(start.x() - w, start.y() - h, 2 * w, 2 * h).normalized()
                     else:
-                        rect = QRectF(start, current_scene_pos).normalized()
+                        rect = QRectF(start, snapped_scene_pos).normalized()
                         if modifiers & Qt.KeyboardModifier.ShiftModifier:
                             w = rect.width()
                             h = rect.height()
                             m = max(w, h)
                             rect = QRectF(rect.left(), rect.top(), m, m)
                     self._preview_item.setRect(rect)
-                self._update_dimension_label(current_scene_pos)
+                self._update_dimension_label(snapped_scene_pos)
+            self._raw_last_scene_pos = raw_scene_pos
+            self._last_mouse_scene_pos = snapped_scene_pos
             return
 
-        delta = current_scene_pos - self._last_mouse_scene_pos
+        delta = raw_scene_pos - self._raw_last_scene_pos
 
         if self._drag_mode == 'resize':
             self._perform_group_resize(delta)
@@ -697,8 +708,9 @@ class DesignCanvas(QGraphicsView):
                     self.setCursor(QCursor(Qt.CursorShape.ArrowCursor))
             else:
                 self.setCursor(QCursor(Qt.CursorShape.ArrowCursor))
-        
-        self._last_mouse_scene_pos = current_scene_pos
+
+        self._raw_last_scene_pos = raw_scene_pos
+        self._last_mouse_scene_pos = snapped_scene_pos
 
     def _update_dimension_label(self, current_scene_pos: QPointF):
         if not self._drawing or not self._preview_item:
@@ -777,12 +789,23 @@ class DesignCanvas(QGraphicsView):
         super().leaveEvent(event)
 
     def _perform_group_move(self, delta: QPointF):
-        """Applies a move delta to all selected items."""
+        """Applies a move delta to all selected items and snaps the result."""
         for item in self.scene.selectedItems():
             if isinstance(item, BaseGraphicsItem):
                 item.moveBy(delta.x(), delta.y())
+
+        # Snap the whole group based on its bounding rect
+        group_rect = self.get_group_bounding_rect()
+        if group_rect:
+            snapped_top_left = self._snap_position(group_rect.topLeft())
+            offset = snapped_top_left - group_rect.topLeft()
+            if offset.x() or offset.y():
+                for item in self.scene.selectedItems():
+                    if isinstance(item, BaseGraphicsItem):
+                        item.moveBy(offset.x(), offset.y())
+
         self.viewport().update()
-        
+
         # Emit real-time position updates during drag
         if self.scene.selectedItems():
             first_item = self.scene.selectedItems()[0]
@@ -975,6 +998,16 @@ class DesignCanvas(QGraphicsView):
                 new_group_rect.left() + relative_x - offset_rect.left(),
                 new_group_rect.top() + relative_y - offset_rect.top(),
             )
+
+        # After resizing, snap the group's top-left corner
+        group_rect = self.get_group_bounding_rect()
+        if group_rect:
+            snapped_top_left = self._snap_position(group_rect.topLeft())
+            offset = snapped_top_left - group_rect.topLeft()
+            if offset.x() or offset.y():
+                for item in self.scene.selectedItems():
+                    if isinstance(item, BaseGraphicsItem):
+                        item.moveBy(offset.x(), offset.y())
 
         self.viewport().update()
         
