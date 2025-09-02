@@ -1,5 +1,5 @@
 from PyQt6.QtWidgets import QTreeWidget, QTreeWidgetItem, QStyleFactory
-from PyQt6.QtGui import QMouseEvent
+from PyQt6.QtGui import QMouseEvent, QPalette, QColor
 from PyQt6.QtCore import QRect
 from .array_tree_handler import ArrayTreeHandler
 
@@ -8,6 +8,10 @@ class CustomTreeWidget(QTreeWidget):
         super().__init__(parent)
         # Use Windows style to ensure branch lines are displayed consistently
         self.setStyle(QStyleFactory.create("windows"))
+        # Adjust palette so branch lines remain visible on dark themes
+        palette = self.palette()
+        palette.setColor(QPalette.ColorRole.Dark, QColor(200, 200, 200))
+        self.setPalette(palette)
         # Disable the default behavior of expanding/collapsing on double-click.
         # This ensures that only a single click on the branch indicator (+)
         # will trigger the action.

@@ -10,7 +10,8 @@ from PyQt6.QtCore import (
 )
 from PyQt6.QtGui import (
     QKeyEvent, QStandardItemModel, QStandardItem,
-    QIntValidator, QDoubleValidator, QRegularExpressionValidator
+    QIntValidator, QDoubleValidator, QRegularExpressionValidator,
+    QPalette, QColor
 )
 import copy
 from utils.icon_manager import IconManager
@@ -82,6 +83,10 @@ class TagTreeWidget(QTreeView):
         super().__init__(parent)
         # Use Windows style so branch lines are visible
         self.setStyle(QStyleFactory.create("windows"))
+        # Adjust palette so branch lines remain visible on dark themes
+        palette = self.palette()
+        palette.setColor(QPalette.ColorRole.Dark, QColor(200, 200, 200))
+        self.setPalette(palette)
 
     def edit(self, index, trigger, event=None):
         if index.column() < 2:
