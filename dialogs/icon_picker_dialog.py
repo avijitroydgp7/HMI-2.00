@@ -138,6 +138,7 @@ class IconPickerDialog(QDialog):
         align_box.setContentsMargins(0, 0, 0, 0)
         align_box.addWidget(QLabel("Alignment:"))
         self.align_group = QButtonGroup(self)
+        self.align_group.setExclusive(True)
         align_widget = QWidget()
         align_layout = QGridLayout(align_widget)
         align_layout.setContentsMargins(0, 0, 0, 0)
@@ -153,12 +154,25 @@ class IconPickerDialog(QDialog):
             ("bottom", 2, 1),
             ("bottom_right", 2, 2),
         ]
+        arrow_map = {
+            "top_left": "\u2196",
+            "top": "\u2191",
+            "top_right": "\u2197",
+            "left": "\u2190",
+            "center": "\u2022",
+            "right": "\u2192",
+            "bottom_left": "\u2199",
+            "bottom": "\u2193",
+            "bottom_right": "\u2198",
+        }
         self._align_buttons: Dict[str, QToolButton] = {}
         for name, r, c in positions:
             btn = QToolButton()
             btn.setCheckable(True)
             btn.setFixedSize(24, 24)
             btn.setProperty("align", name)
+            btn.setText(arrow_map.get(name, ""))
+            btn.setToolTip(name.replace("_", " ").title())
             align_layout.addWidget(btn, r, c)
             self.align_group.addButton(btn)
             self._align_buttons[name] = btn
