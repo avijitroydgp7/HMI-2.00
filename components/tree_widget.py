@@ -1,7 +1,6 @@
 from PyQt6.QtWidgets import QTreeWidget, QTreeWidgetItem, QStyleFactory
-from PyQt6.QtGui import QPainter, QMouseEvent
-from PyQt6.QtCore import QModelIndex, QRect
-from utils.icon_manager import IconManager
+from PyQt6.QtGui import QMouseEvent
+from PyQt6.QtCore import QRect
 from .array_tree_handler import ArrayTreeHandler
 
 class CustomTreeWidget(QTreeWidget):
@@ -100,43 +99,8 @@ class CustomTreeWidget(QTreeWidget):
             child = item.child(i)
             self._collapse_all_children(child)
 
-    def drawBranches(self, painter: QPainter, rect: QRect, index: QModelIndex):
-        # First, let the base class draw the tracking lines and default indicator.
+    def drawBranches(self, painter, rect, index):
+        """Draw branch lines and default indicators without custom icons."""
+        # Allow the base class to handle drawing. Custom FontAwesome icons that
+        # previously replaced the expand/collapse indicators have been removed.
         super().drawBranches(painter, rect, index)
-
-        # Now, we will draw our custom icon over the default indicator.
-        item = self.itemFromIndex(index)
-        if not item:
-            return
-
-        # An indicator should be drawn if the item has children, or if its policy
-        # is to show an indicator even when childless (i.e., it's a "folder").
-        has_children = item.childCount() > 0
-        show_indicator_policy = (item.childIndicatorPolicy() == QTreeWidgetItem.ChildIndicatorPolicy.ShowIndicator)
-
-        if not (has_children or show_indicator_policy):
-            return
-
-        # Determine the state (open or closed) using the widget's isExpanded() method.
-        is_expanded = self.isExpanded(index)
-
-        icon_name = 'fa5s.minus-square' if is_expanded else 'fa5s.plus-square'
-        icon = IconManager.create_animated_icon(icon_name).icon
-        icon_size = 16
-
-        # Calculate the exact position for the icon based on tree level
-        # This ensures all expand/collapse buttons align vertically regardless of depth
-        level = 0
-        parent = index.parent()
-        while parent.isValid():
-            level += 1
-            parent = parent.parent()
-        
-        # Position the icon consistently based on tree level
-        # This creates consistent alignment across all tree levels
-        indent = self.indentation()
-        icon_x = rect.left() + (level * indent) + (indent - icon_size) // 2
-        icon_y = rect.top() + (rect.height() - icon_size) // 2
-        
-        # Paint our custom icon at the calculated position
-        icon.paint(painter, icon_x, icon_y, icon_size, icon_size)

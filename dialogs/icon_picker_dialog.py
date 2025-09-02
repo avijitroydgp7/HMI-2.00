@@ -23,10 +23,11 @@ from PyQt6.QtWidgets import (
     QRadioButton,
     QButtonGroup,
     QSpinBox,
-    QColorDialog,
+    QComboBox,
 )
 
 from utils.icon_manager import IconManager
+from tools.button.conditional_style.widgets import IconButton
 
 
 class _ThumbButton(QToolButton):
@@ -49,6 +50,22 @@ class IconPickerDialog(QDialog):
     The selected data is returned as a dictionary containing ``source``,
     ``size``, ``color`` and ``align``.
     """
+
+    _BASE_COLORS: Dict[str, QColor] = {
+        "Blue": QColor("#3498db"),
+        "Red": QColor("#e74c3c"),
+        "Green": QColor("#2ecc71"),
+        "Orange": QColor("#e67e22"),
+        "Cyan": QColor("#1abc9c"),
+        "Purple": QColor("#9b59b6"),
+        "Pink": QColor("#fd79a8"),
+        "Teal": QColor("#008080"),
+        "Indigo": QColor("#3F51B5"),
+        "Crimson": QColor("#DC143C"),
+        "Gray": QColor("#95a5a6"),
+        "Black": QColor("#34495e"),
+        "White": QColor("#ecf0f1"),
+    }
 
     def __init__(
         self,
@@ -83,20 +100,25 @@ class IconPickerDialog(QDialog):
         self.stack.addWidget(self._build_qtawesome_page())
         self.stack.addWidget(self._build_svg_page())
         root.addWidget(self.stack)
+        # Preview button
+        self.preview_btn = IconButton()
+        self.preview_btn.setFixedSize(80, 80)
+        root.addWidget(self.preview_btn, alignment=Qt.AlignmentFlag.AlignCenter)
 
         # --- Parameter controls -------------------------------------
-        params = QGridLayout()
+        params = QHBoxLayout()
         params.setContentsMargins(0, 0, 0, 0)
-        params.setHorizontalSpacing(6)
-        params.setVerticalSpacing(4)
+        params.setSpacing(12)
 
         # Alignment grid (3x3)
-        params.addWidget(QLabel("Alignment:"), 0, 0, Qt.AlignmentFlag.AlignTop)
+        align_box = QVBoxLayout()
+        align_box.setContentsMargins(0, 0, 0, 0)
+        align_box.addWidget(QLabel("Alignment:"))
         self.align_group = QButtonGroup(self)
         align_widget = QWidget()
         align_layout = QGridLayout(align_widget)
         align_layout.setContentsMargins(0, 0, 0, 0)
-        align_layout.setSpacing(2)
+        align_layout.setSpacing(1)
         positions = [
             ("top_left", 0, 0),
             ("top", 0, 1),
@@ -117,41 +139,51 @@ class IconPickerDialog(QDialog):
             align_layout.addWidget(btn, r, c)
             self.align_group.addButton(btn)
             self._align_buttons[name] = btn
-        params.addWidget(align_widget, 0, 1)
+        align_box.addWidget(align_widget)
+        params.addLayout(align_box)
 
         # Size selector
-        params.addWidget(QLabel("Size:"), 1, 0)
+        size_box = QVBoxLayout()
+        size_box.setContentsMargins(0, 0, 0, 0)
+        size_box.addWidget(QLabel("Size:"))
         self.size_spin = QSpinBox()
         self.size_spin.setRange(1, 512)
         self.size_spin.setValue(48)
-        params.addWidget(self.size_spin, 1, 1)
+        size_box.addWidget(self.size_spin)
+        params.addLayout(size_box)
 
         # Color selector (Qt icons only)
-        params.addWidget(QLabel("Color:"), 2, 0)
+        color_box = QVBoxLayout()
+        color_box.setContentsMargins(0, 0, 0, 0)
+        color_box.addWidget(QLabel("Color:"))
         color_layout = QHBoxLayout()
         color_layout.setContentsMargins(0, 0, 0, 0)
-        self.color_edit = QLineEdit()
-        self.color_btn = QToolButton()
-        self.color_btn.setText("...")
-        def _pick_color():
-            col = QColorDialog.getColor(QColor(self.color_edit.text() or "#000000"), self)
-            if col.isValid():
-                self.color_edit.setText(col.name())
-        self.color_btn.clicked.connect(_pick_color)
-        color_layout.addWidget(self.color_edit)
-        color_layout.addWidget(self.color_btn)
-        color_widget = QWidget()
-        color_widget.setLayout(color_layout)
-        params.addWidget(color_widget, 2, 1)
+        self.color_base_combo = QComboBox()
+        for name, col in self._BASE_COLORS.items():
+            pixmap = QPixmap(16, 16)
+            pixmap.fill(col)
+            self.color_base_combo.addItem(QIcon(pixmap), name)
+        self.color_shade_combo = QComboBox()
+        color_layout.addWidget(self.color_base_combo)
+        color_layout.addWidget(self.color_shade_combo)
+        color_widget = QWidget(); color_widget.setLayout(color_layout)
+        color_box.addWidget(color_widget)
+        params.addLayout(color_box)
 
         root.addLayout(params)
 
+        # Hooks for controls
+        self.size_spin.valueChanged.connect(lambda _: self._update_preview())
+        self.color_base_combo.currentTextChanged.connect(self._update_shades)
+        self.color_shade_combo.currentIndexChanged.connect(lambda _: self._update_preview())
+        self.align_group.buttonClicked.connect(lambda _: self._update_preview())
+
         def _update_color_enabled():
             en = self.qt_radio.isChecked()
-            self.color_edit.setEnabled(en)
-            self.color_btn.setEnabled(en)
+            self.color_base_combo.setEnabled(en)
+            self.color_shade_combo.setEnabled(en)
+            self._update_preview()
         self.qt_radio.toggled.connect(lambda _: _update_color_enabled())
-        _update_color_enabled()
 
         # Apply initial selections
         if self._initial_source.startswith("qta:"):
@@ -159,8 +191,22 @@ class IconPickerDialog(QDialog):
         elif self._initial_source:
             self.svg_radio.setChecked(True)
         self.size_spin.setValue(int(self._initial.get("size", 48)))
-        if self._initial.get("color"):
-            self.color_edit.setText(str(self._initial.get("color")))
+
+        initial_color = str(self._initial.get("color", ""))
+        if initial_color:
+            for name in self._BASE_COLORS:
+                shades = self._get_shades(name)
+                for i, shade in enumerate(shades):
+                    if shade.name().lower() == initial_color.lower():
+                        self.color_base_combo.setCurrentText(name)
+                        self._update_shades(name, i, emit=False)
+                        break
+                else:
+                    continue
+                break
+        else:
+            self._update_shades(self.color_base_combo.currentText(), emit=False)
+
         align_btn = self._align_buttons.get(self._initial.get("align", "center"))
         if align_btn:
             align_btn.setChecked(True)
@@ -175,6 +221,9 @@ class IconPickerDialog(QDialog):
         self.button_box.rejected.connect(self.reject)
         root.addWidget(self.button_box)
 
+        _update_color_enabled()
+        self._update_preview()
+
     # ---------------------- Public API ----------------------
     def selected_value(self) -> Optional[Dict[str, Any]]:
         if not self._selected:
@@ -183,9 +232,61 @@ class IconPickerDialog(QDialog):
         source = f"qta:{value}" if kind == "qta" else value
         align_btn = self.align_group.checkedButton()
         align = align_btn.property("align") if align_btn else "center"
-        color = self.color_edit.text().strip() if kind == "qta" else ""
+        color = ""
+        if kind == "qta":
+            col = self.color_shade_combo.currentData()
+            if isinstance(col, QColor):
+                color = col.name()
         size = int(self.size_spin.value())
         return {"source": source, "align": align, "color": color, "size": size}
+
+    def _get_shades(self, color_name: str) -> List[QColor]:
+        base = self._BASE_COLORS.get(color_name, QColor("#000000"))
+        shades: List[QColor] = []
+        for i in range(16):
+            factor = 1.2 - (i / 15.0) * 0.6
+            shades.append(
+                base.lighter(int(100 * factor))
+                if factor > 1.0
+                else base.darker(int(100 / factor))
+            )
+        return shades
+
+    def _update_shades(
+        self, color_name: str, select_index: Optional[int] = None, emit: bool = True
+    ):
+        self.color_shade_combo.blockSignals(True)
+        self.color_shade_combo.clear()
+        shades = self._get_shades(color_name)
+        for i, shade in enumerate(shades):
+            pixmap = QPixmap(16, 16)
+            pixmap.fill(shade)
+            self.color_shade_combo.addItem(QIcon(pixmap), f"Shade {i+1}")
+            self.color_shade_combo.setItemData(i, shade)
+        self.color_shade_combo.setCurrentIndex(
+            select_index if select_index is not None else 7
+        )
+        self.color_shade_combo.blockSignals(False)
+        if emit:
+            self._update_preview()
+
+    def _update_preview(self):
+        if not self._selected:
+            self.preview_btn.set_icon("", None)
+            return
+        kind, value = self._selected
+        align_btn = self.align_group.checkedButton()
+        align = align_btn.property("align") if align_btn else "center"
+        size = int(self.size_spin.value())
+        color = ""
+        if kind == "qta":
+            col = self.color_shade_combo.currentData()
+            if isinstance(col, QColor):
+                color = col.name()
+        source = f"qta:{value}" if kind == "qta" else value
+        self.preview_btn.set_icon(source, color if color else None)
+        self.preview_btn.set_icon_size(size)
+        self.preview_btn.set_icon_alignment(align)
 
     # ------------------- QtAwesome page ---------------------
     def _build_qtawesome_page(self) -> QWidget:
@@ -483,3 +584,4 @@ class IconPickerDialog(QDialog):
         btn.setChecked(True)
         self._selected = (kind, value)
         self.button_box.button(QDialogButtonBox.StandardButton.Ok).setEnabled(True)
+        self._update_preview()
