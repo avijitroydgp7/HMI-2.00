@@ -37,9 +37,8 @@ class _ThumbButton(QToolButton):
 
     def __init__(self, text: str, icon: QIcon, parent: Optional[QWidget] = None):
         super().__init__(parent)
-        self.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextUnderIcon)
         self.setIcon(icon)
-        self.setText(text)
+        self.setToolTip(text)
         self.setIconSize(QSize(32, 32))
         self.setCheckable(True)
         # Improve density
