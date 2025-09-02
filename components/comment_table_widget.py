@@ -623,6 +623,14 @@ class CommentTableWidget(QWidget):
         self.table = CommentTableView(self)
         self.table.setSelectionBehavior(QTableView.SelectionBehavior.SelectItems)
         self.table.setSelectionMode(QTableView.SelectionMode.ExtendedSelection)
+
+        # Set grid line styling for better visibility in both light and dark themes
+        self.table.setStyleSheet(
+            "QTableView { gridline-color: rgba(200, 200, 200, 0.3); }"
+            "QTableView::item { border: 0.3px solid rgba(200, 200, 200, 0.3); }"
+        )
+        self.table.setShowGrid(True)
+
         main_layout.addWidget(self.table)
         self.table.setItemDelegate(CommentItemDelegate(self.table))
 

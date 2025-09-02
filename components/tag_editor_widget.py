@@ -181,9 +181,9 @@ class TagEditorWidget(QWidget):
         self.tag_table.setRootIsDecorated(True)
         self.tag_table.setUniformRowHeights(True)
         self.tag_table.setStyleSheet(
-            "QTreeView::item { height: 24px; border-right: 1px solid palette(mid);"
-            " border-bottom: 1px solid palette(mid); }"
-            "QTreeView { border: 1px solid palette(mid); }"
+            "QTreeView::item { height: 24px; border-right: 1px solid rgba(128, 128, 128, 0.5);"
+            " border-bottom: 1px solid rgba(200, 200, 200, 0.3); }"
+            "QTreeView { border: 1px solid rgba(200, 200, 200, 0.3); }"
         )
         self.tag_table.setEditTriggers(
             QAbstractItemView.EditTrigger.DoubleClicked
