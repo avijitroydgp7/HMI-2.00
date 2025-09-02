@@ -413,6 +413,19 @@ class DesignCanvas(QGraphicsView):
                 return handle
         return None
 
+    def _set_cursor_for_handle(self, handle: str):
+        """Set the appropriate cursor based on the resize handle."""
+        if handle in {"top_left", "bottom_right"}:
+            self.setCursor(QCursor(Qt.CursorShape.SizeFDiagCursor))
+        elif handle in {"top_right", "bottom_left"}:
+            self.setCursor(QCursor(Qt.CursorShape.SizeBDiagCursor))
+        elif handle in {"top", "bottom"}:
+            self.setCursor(QCursor(Qt.CursorShape.SizeVerCursor))
+        elif handle in {"left", "right"}:
+            self.setCursor(QCursor(Qt.CursorShape.SizeHorCursor))
+        else:
+            self.setCursor(QCursor(Qt.CursorShape.ArrowCursor))
+
     def resizeEvent(self, event):
         super().resizeEvent(event)
         self._schedule_visible_items_update()
@@ -511,6 +524,7 @@ class DesignCanvas(QGraphicsView):
             self._resize_handle = self.get_handle_at(event.pos())
             if self._resize_handle:
                 self._drag_mode = 'resize'
+                self._set_cursor_for_handle(self._resize_handle)
                 self._start_selection_states.clear()
                 for item in self.scene.selectedItems():
                     if isinstance(item, BaseGraphicsItem):
@@ -687,6 +701,7 @@ class DesignCanvas(QGraphicsView):
 
         if self._drag_mode == 'resize':
             self._perform_group_resize(delta)
+            self._set_cursor_for_handle(self._resize_handle)
         elif self._drag_mode == 'move':
             self._perform_group_move(delta)
         elif self._drag_mode == 'rubberband':
@@ -696,14 +711,7 @@ class DesignCanvas(QGraphicsView):
             if self.scene.selectedItems():
                 handle = self.get_handle_at(event.pos())
                 if handle:
-                    if handle in ['top_left', 'bottom_right']:
-                        self.setCursor(QCursor(Qt.CursorShape.SizeFDiagCursor))
-                    elif handle in ['top_right', 'bottom_left']:
-                        self.setCursor(QCursor(Qt.CursorShape.SizeBDiagCursor))
-                    elif handle in ['top', 'bottom']:
-                        self.setCursor(QCursor(Qt.CursorShape.SizeVerCursor))
-                    elif handle in ['left', 'right']:
-                        self.setCursor(QCursor(Qt.CursorShape.SizeHorCursor))
+                    self._set_cursor_for_handle(handle)
                 else:
                     self.setCursor(QCursor(Qt.CursorShape.ArrowCursor))
             else:
@@ -1246,6 +1254,7 @@ class DesignCanvas(QGraphicsView):
             self._update_shadow_for_zoom()
             self._snap_lines.clear()
             self.viewport().update()
+            self.setCursor(QCursor(Qt.CursorShape.ArrowCursor))
 
         super().mouseReleaseEvent(event)
 
