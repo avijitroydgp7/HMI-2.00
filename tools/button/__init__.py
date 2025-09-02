@@ -2,7 +2,7 @@
 
 This package consolidates all button-related code:
 - `button.py` with default properties helpers
-- `conditional_style.py` for conditional styles
+- `conditional_style/` package for conditional styles
 - `button_properties_dialog.py` for the properties dialog
 - `actions/` for button action dialogs and helpers
 
