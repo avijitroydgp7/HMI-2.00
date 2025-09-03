@@ -1,12 +1,27 @@
 # components/button/button_properties_dialog.py
 from PyQt6.QtWidgets import (
-    QTabWidget, QWidget, QDialogButtonBox, QLabel, QFormLayout,
-    QLineEdit, QTableView, QHeaderView,
-    QPushButton, QHBoxLayout, QAbstractItemView, QVBoxLayout,
-    QSplitter, QGroupBox, QStackedWidget, QDialog,
-    QListWidget, QListWidgetItem, QToolButton, QStyle
+    QTabWidget,
+    QWidget,
+    QDialogButtonBox,
+    QLabel,
+    QFormLayout,
+    QLineEdit,
+    QTableView,
+    QHeaderView,
+    QPushButton,
+    QHBoxLayout,
+    QAbstractItemView,
+    QVBoxLayout,
+    QSplitter,
+    QGroupBox,
+    QStackedWidget,
+    QDialog,
+    QListWidget,
+    QListWidgetItem,
+    QToolButton,
+    QStyle,
 )
-from PyQt6.QtCore import Qt, QSize
+from PyQt6.QtCore import Qt, QSize, pyqtSignal
 from utils.dpi import dpi_scale
 from typing import Dict, Any, Optional
 import logging
@@ -38,16 +53,22 @@ def scale_stylesheet(qss: str, scale: float) -> str:
     return re.sub(r"(\d+(?:\.\d+)?)(px|pt)", repl, qss)
 
 
-class ButtonPropertiesDialog(QDialog):
+class ButtonPropertiesWidget(QWidget):
+    """Widget exposing the Action and Style tabs used by the dialog and
+    the property editor."""
+
+    properties_changed = pyqtSignal(dict)
+
     def __init__(self, properties: Dict[str, Any], parent=None):
         super().__init__(parent)
         self.properties = copy.deepcopy(properties)
-        if 'actions' not in self.properties:
-            self.properties['actions'] = []
+        if "actions" not in self.properties:
+            self.properties["actions"] = []
 
         # Initialize conditional style manager
         self.style_manager = ConditionalStyleManager()
-        for style_data in self.properties.get('conditional_styles', []):
+        self.style_manager.default_style = self.properties.get("default_style", {})
+        for style_data in self.properties.get("conditional_styles", []):
             # Typical failure reasons when importing styles from dict:
             # - Missing or misspelled keys like 'properties' or 'hover_properties'
             # - Wrong data types (e.g., strings where dicts are expected)
@@ -61,35 +82,76 @@ class ButtonPropertiesDialog(QDialog):
                 self.style_manager.add_style(style)
             except Exception as e:
                 logging.getLogger(__name__).warning(
-                    "Failed to load conditional style (style_id=%r). "
-                    "Typical causes: missing keys, wrong types, invalid color/icon values, or malformed condition data. "
+                    "Failed to load conditional style (style_id=%r). Typical causes: "
+                    "missing keys, wrong types, invalid color/icon values, or malformed condition data. "
                     "Error: %s. Data: %r",
-                    style_data.get('style_id', '<unknown>'), e, style_data
+                    style_data.get("style_id", "<unknown>"),
+                    e,
+                    style_data,
                 )
-        
-        self.setWindowTitle("Button Properties")
-        self.setMinimumWidth(1000)  # Increased width for better layout
-        self.setMaximumHeight(700)  # Increased height
-        self.resize(1000, 700)  # Set initial size
 
-        content_layout = QVBoxLayout(self)
-        
+        main_layout = QVBoxLayout(self)
+
         self.tab_widget = QTabWidget()
-        content_layout.addWidget(self.tab_widget)
+        main_layout.addWidget(self.tab_widget)
 
         self.action_tab = QWidget()
         self.style_tab = QWidget()
 
         self.tab_widget.addTab(self.action_tab, "Action")
         self.tab_widget.addTab(self.style_tab, "Style")
-        
+
         self._populate_action_tab()
         self._populate_style_tab()
-        
-        self.button_box = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
-        self.button_box.accepted.connect(self.accept)
-        self.button_box.rejected.connect(self.reject)
-        content_layout.addWidget(self.button_box)
+
+    # ------------------------------------------------------------------
+    # Public API -------------------------------------------------------
+    def set_properties(self, properties: Dict[str, Any]) -> None:
+        """Replace the current property payload and refresh the UI."""
+        self.properties = copy.deepcopy(properties)
+        if "actions" not in self.properties:
+            self.properties["actions"] = []
+
+        # Update action model backing list
+        self.action_model._actions = self.properties["actions"]
+        self.action_model.refresh()
+
+        # Recreate style manager from dict
+        self.style_manager = ConditionalStyleManager()
+        self.style_manager.default_style = self.properties.get("default_style", {})
+        for style_data in self.properties.get("conditional_styles", []):
+            try:
+                style = ConditionalStyle.from_dict(style_data)
+                self.style_manager.add_style(style)
+            except Exception as e:
+                logging.getLogger(__name__).warning(
+                    "Failed to load conditional style (style_id=%r). Error: %s. Data: %r",
+                    style_data.get("style_id", "<unknown>"),
+                    e,
+                    style_data,
+                )
+
+        self._refresh_style_list()
+        self._on_style_selection_changed()
+
+    def get_data(self) -> Dict[str, Any]:
+        updated_props = self.properties.copy()
+        updated_props["actions"] = self.properties.get("actions", [])
+        # Save label and text color fallback
+        updated_props["label"] = self.properties.get("label", "Button")
+        updated_props["text_color"] = self.properties.get("text_color", "#ffffff")
+        # Serialize conditional styles, preserving any future fields
+        style_data = self.style_manager.to_dict()
+        updated_props["conditional_styles"] = style_data.get("conditional_styles", [])
+        if style_data.get("default_style"):
+            updated_props["default_style"] = style_data["default_style"]
+        return updated_props
+
+    # Internal helpers -------------------------------------------------
+    def _emit_changes(self) -> None:
+        data = self.get_data()
+        self.properties = copy.deepcopy(data)
+        self.properties_changed.emit(data)
 
     def _populate_action_tab(self):
         # Overall layout for the tab
@@ -409,6 +471,7 @@ class ButtonPropertiesDialog(QDialog):
                 self.action_model.insert_action(new_row, action_data)
                 self.action_table.selectRow(new_row)
                 self._on_action_selection_changed()
+                self._emit_changes()
 
     def _edit_action(self):
         selected_rows = self.action_table.selectionModel().selectedRows()
@@ -430,6 +493,7 @@ class ButtonPropertiesDialog(QDialog):
                 self.action_model.update_action(row, new_action_data)
                 self.action_table.selectRow(row)
                 self._on_action_selection_changed()
+                self._emit_changes()
 
     def _remove_action(self):
         selected_rows = self.action_table.selectionModel().selectedRows()
@@ -437,6 +501,7 @@ class ButtonPropertiesDialog(QDialog):
         row = selected_rows[0].row()
         self.action_model.remove_action(row)
         self._on_action_selection_changed()
+        self._emit_changes()
 
     def _move_action_up(self):
         selected_rows = self.action_table.selectionModel().selectedRows()
@@ -446,6 +511,7 @@ class ButtonPropertiesDialog(QDialog):
             self.action_model.move_action(row, row - 1)
             self.action_table.selectRow(row - 1)
             self._on_action_selection_changed()
+            self._emit_changes()
 
     def _move_action_down(self):
         selected_rows = self.action_table.selectionModel().selectedRows()
@@ -455,6 +521,7 @@ class ButtonPropertiesDialog(QDialog):
             self.action_model.move_action(row, row + 1)
             self.action_table.selectRow(row + 1)
             self._on_action_selection_changed()
+            self._emit_changes()
 
     def _duplicate_action(self):
         """Duplicate the selected action"""
@@ -466,12 +533,13 @@ class ButtonPropertiesDialog(QDialog):
             # Create a deep copy of the action
             original_action = self.properties['actions'][row]
             duplicated_action = copy.deepcopy(original_action)
-            
+
             # Insert the duplicated action after the original
             new_row = row + 1
             self.action_model.duplicate_action(row, duplicated_action)
             self.action_table.selectRow(new_row)
             self._on_action_selection_changed()
+            self._emit_changes()
 
     def _populate_style_tab(self):
         # Overall layout for the tab
@@ -725,6 +793,7 @@ class ButtonPropertiesDialog(QDialog):
                 row = len(self.style_manager.conditional_styles) - 1
                 self.style_list.setCurrentRow(row)
                 self._on_style_selection_changed()
+                self._emit_changes()
 
     def _edit_style(self):
         row = self.style_list.currentRow()
@@ -742,6 +811,7 @@ class ButtonPropertiesDialog(QDialog):
                 self._refresh_style_list()
                 self.style_list.setCurrentRow(row)
                 self._on_style_selection_changed()
+                self._emit_changes()
 
     def _remove_style(self):
         row = self.style_list.currentRow()
@@ -751,6 +821,7 @@ class ButtonPropertiesDialog(QDialog):
             self.style_manager.remove_style(row)
             self._refresh_style_list()
             self._on_style_selection_changed()
+            self._emit_changes()
 
     def _duplicate_style(self):
         row = self.style_list.currentRow()
@@ -764,6 +835,7 @@ class ButtonPropertiesDialog(QDialog):
             self._refresh_style_list()
             self.style_list.setCurrentRow(row + 1)
             self._on_style_selection_changed()
+            self._emit_changes()
 
     def _move_style_up(self):
         row = self.style_list.currentRow()
@@ -776,6 +848,7 @@ class ButtonPropertiesDialog(QDialog):
             self._refresh_style_list()
             self.style_list.setCurrentRow(row - 1)
             self._on_style_selection_changed()
+            self._emit_changes()
 
     def _move_style_down(self):
         row = self.style_list.currentRow()
@@ -788,6 +861,7 @@ class ButtonPropertiesDialog(QDialog):
             self._refresh_style_list()
             self.style_list.setCurrentRow(row + 1)
             self._on_style_selection_changed()
+            self._emit_changes()
 
     def _on_style_double_click(self, *_):
         self._edit_style()
@@ -940,15 +1014,29 @@ class ButtonPropertiesDialog(QDialog):
     def _on_style_selected(self, style_id):
         pass
 
+
+class ButtonPropertiesDialog(QDialog):
+    """Wrapper dialog that hosts :class:`ButtonPropertiesWidget`. Existing
+    code that previously instantiated ``ButtonPropertiesDialog`` continues to
+    work without changes."""
+
+    def __init__(self, properties: Dict[str, Any], parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("Button Properties")
+        self.setMinimumWidth(1000)
+        self.setMaximumHeight(700)
+        self.resize(1000, 700)
+
+        layout = QVBoxLayout(self)
+        self.widget = ButtonPropertiesWidget(properties, self)
+        layout.addWidget(self.widget)
+
+        self.button_box = QDialogButtonBox(
+            QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel
+        )
+        self.button_box.accepted.connect(self.accept)
+        self.button_box.rejected.connect(self.reject)
+        layout.addWidget(self.button_box)
+
     def get_data(self) -> Dict[str, Any]:
-        updated_props = self.properties.copy()
-        updated_props["actions"] = self.properties.get('actions', [])
-        # Save label and text color fallback
-        updated_props["label"] = self.properties.get("label", "Button")
-        updated_props["text_color"] = self.properties.get("text_color", "#ffffff")
-        # Serialize conditional styles, preserving any future fields
-        style_data = self.style_manager.to_dict()
-        updated_props["conditional_styles"] = style_data.get("conditional_styles", [])
-        if style_data.get("default_style"):
-            updated_props["default_style"] = style_data["default_style"]
-        return updated_props
+        return self.widget.get_data()
