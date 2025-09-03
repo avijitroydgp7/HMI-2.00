@@ -30,6 +30,7 @@ from PyQt6.QtWidgets import (
 
 from utils.icon_manager import IconManager
 from utils.dpi import dpi_scale
+from utils.percentage import percent_to_value
 
 
 class _ThumbButton(QToolButton):
@@ -141,7 +142,7 @@ class IconPickerDialog(QDialog):
         if font:
             self.preview_btn.set_text_font(
                 font.get("family", ""),
-                font.get("size", 0),
+                percent_to_value(font.get("size", 0), self.preview_btn.height()),
                 font.get("bold", False),
                 font.get("italic", False),
                 font.get("underline", False),
@@ -213,9 +214,10 @@ class IconPickerDialog(QDialog):
 
         # Size selector
         self.size_spin = QSpinBox()
-        self.size_spin.setRange(1, 512)
-        self.size_spin.setValue(48)
-        form.addRow("Size", self.size_spin)
+        self.size_spin.setRange(0, 100)
+        self.size_spin.setSuffix("%")
+        self.size_spin.setValue(50)
+        form.addRow("Size (%)", self.size_spin)
 
         # Color selector (Qt icons only)
         color_layout = QHBoxLayout()
@@ -255,7 +257,7 @@ class IconPickerDialog(QDialog):
             self.qt_radio.setChecked(True)
         elif self._initial_source:
             self.svg_radio.setChecked(True)
-        self.size_spin.setValue(int(self._initial.get("size", 48)))
+        self.size_spin.setValue(int(self._initial.get("size", 50)))
 
         initial_color = str(self._initial.get("color", ""))
         if initial_color:
@@ -357,7 +359,8 @@ class IconPickerDialog(QDialog):
         kind, value = self._selected
         align_btn = self.align_group.checkedButton()
         align = align_btn.property("align") if align_btn else "center"
-        size = int(self.size_spin.value())
+        size_pct = int(self.size_spin.value())
+        size = percent_to_value(size_pct, self.preview_btn.height())
         color = ""
         if kind == "qta":
             col = self.color_shade_combo.currentData()

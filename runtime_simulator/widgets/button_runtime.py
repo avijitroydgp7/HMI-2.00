@@ -17,6 +17,7 @@ from tools.button.conditional_style import ConditionalStyleManager
 from tools.button.runtime_style import RuntimeConditionalStyle
 from tools.button.actions.constants import TriggerMode, ActionType
 from utils.icon_manager import IconManager
+from utils.percentage import percent_to_value
 
 
 @dataclass(slots=True)
@@ -108,20 +109,21 @@ class ButtonRuntimeController(QObject):
 
         # Button geometry for proportional scaling
         h = max(self._button.height(), 1)
-        scale_h = h / 40.0  # reference design height
+        w = max(self._button.width(), 1)
+        min_dim = min(w, h)
 
         # Visual properties
         bg = props.get("background_color", "#5a6270")
         fg = props.get("text_color", "#ffffff")
-        bw = int((props.get("border_width", 0) or 0) * scale_h)
+        bw = percent_to_value(props.get("border_width", 0) or 0, min_dim)
         bc = props.get("border_color", "#000000")
 
         # Border radius (supports per-corner values)
         if any(k in props for k in ("border_radius_tl", "border_radius_tr", "border_radius_br", "border_radius_bl")):
-            br_tl = int((props.get("border_radius_tl", 0) or 0) * scale_h)
-            br_tr = int((props.get("border_radius_tr", 0) or 0) * scale_h)
-            br_br = int((props.get("border_radius_br", 0) or 0) * scale_h)
-            br_bl = int((props.get("border_radius_bl", 0) or 0) * scale_h)
+            br_tl = percent_to_value(props.get("border_radius_tl", 0) or 0, min_dim)
+            br_tr = percent_to_value(props.get("border_radius_tr", 0) or 0, min_dim)
+            br_br = percent_to_value(props.get("border_radius_br", 0) or 0, min_dim)
+            br_bl = percent_to_value(props.get("border_radius_bl", 0) or 0, min_dim)
             radius_css = (
                 f"border-top-left-radius:{br_tl}px;"
                 f"border-top-right-radius:{br_tr}px;"
@@ -129,13 +131,13 @@ class ButtonRuntimeController(QObject):
                 f"border-bottom-left-radius:{br_bl}px;"
             )
         else:
-            br = int((props.get("border_radius", 5) or 0) * scale_h)
+            br = percent_to_value(props.get("border_radius", 0) or 0, min_dim)
             radius_css = f"border-radius:{br}px;"
 
         # Font handling
         text = str(props.get("text_value", props.get("label", "Button")))
         self._button.setText(text)
-        font_size = int((props.get("font_size", 10) or 0) * scale_h)
+        font_size = percent_to_value(props.get("font_size", 0) or 0, h)
         font_family = props.get("font_family")
         bold = props.get("bold")
         italic = props.get("italic")
@@ -164,7 +166,7 @@ class ButtonRuntimeController(QObject):
         # Icon handling
         icon_src = props.get("icon", "")
         if icon_src:
-            size = int((props.get("icon_size", 24) or 0) * scale_h)
+            size = percent_to_value(props.get("icon_size", 0) or 0, h)
             color = props.get("icon_color")
             icon = QIcon()
             if str(icon_src).startswith("qta:"):

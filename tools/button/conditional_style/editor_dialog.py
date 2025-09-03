@@ -51,6 +51,7 @@ from utils.dpi import dpi_scale
 from services.comment_data_service import comment_data_service
 from services.data_context import data_context
 from tools.button.actions.constants import TriggerMode
+from utils.percentage import percent_to_value
 
 from .manager import ConditionalStyleManager
 from .models import (
@@ -319,14 +320,14 @@ class ConditionalStyleEditorDialog(QDialog):
 
         border_layout.addWidget(self.corner_frame, 0, 0, 1, 2)
 
-        border_width_label = QLabel("Border Width (px):")
+        border_width_label = QLabel("Border Width (%):")
         border_width_label.setAlignment(
             Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter
         )
         border_layout.addWidget(border_width_label, 2, 0)
         self.border_width_spin = QSpinBox()
-        # Allow border width up to 20px, final limit is adjusted dynamically
-        self.border_width_spin.setRange(0, 20)
+        self.border_width_spin.setRange(0, 100)
+        self.border_width_spin.setSuffix("%")
         self.border_width_spin.setValue(self.style.properties.get("border_width", 0))
         self.border_width_spin.valueChanged.connect(self.update_preview)
         border_layout.addWidget(self.border_width_spin, 2, 1)
@@ -651,9 +652,10 @@ class ConditionalStyleEditorDialog(QDialog):
             font_combo.setCurrentText(props.get("font_family"))
         layout.addWidget(font_combo, 2, 1)
 
-        layout.addWidget(QLabel("Font Size:"), 2, 2)
+        layout.addWidget(QLabel("Font Size (%):"), 2, 2)
         font_size_spin = QSpinBox()
-        font_size_spin.setRange(1, 1000)
+        font_size_spin.setRange(0, 100)
+        font_size_spin.setSuffix("%")
         font_size_spin.setValue(props.get("font_size", 10))
         layout.addWidget(font_size_spin, 2, 3)
 
@@ -1361,7 +1363,8 @@ class ConditionalStyleEditorDialog(QDialog):
 
     def create_radius_spinbox(self):
         spinbox = QSpinBox()
-        spinbox.setRange(0, 1000)
+        spinbox.setRange(0, 100)
+        spinbox.setSuffix("%")
         spinbox.setValue(0)
         return spinbox
 
@@ -1382,7 +1385,7 @@ class ConditionalStyleEditorDialog(QDialog):
         except Exception:
             icons_root = os.path.join(os.getcwd(), "lib", "icon")
         initial = {
-            "size": self.style.properties.get("icon_size", 48),
+            "size": self.style.properties.get("icon_size", 50),
             "color": self.style.properties.get("icon_color", ""),
             "align": self.style.properties.get("icon_align", "center"),
         }
@@ -1417,7 +1420,7 @@ class ConditionalStyleEditorDialog(QDialog):
             value = dlg.selected_value()
             if value:
                 edit.setText(value.get("source", ""))
-                self.style.properties["icon_size"] = value.get("size", 48)
+                self.style.properties["icon_size"] = value.get("size", 50)
                 self.style.properties["icon_align"] = value.get("align", "center")
                 col = value.get("color")
                 if col:
@@ -1583,20 +1586,15 @@ class ConditionalStyleEditorDialog(QDialog):
         self.preview_group.setFixedSize(width, height)
 
     def update_dynamic_ranges(self):
-        width = dpi_scale(200)
-        height = dpi_scale(100)
-        # Corner radii can be up to half of the smaller dimension.
-        radius_limit = min(width, height) // 2
-        # Border widths are limited to 10% of the smaller dimension, capped at 20px.
-        border_limit = min(dpi_scale(20), max(1, min(width, height) // 10))
+        # In percentage mode radius is limited to 50% and border width to 100%.
         for s in [
             self.tl_radius_spin,
             self.tr_radius_spin,
             self.br_radius_spin,
             self.bl_radius_spin,
         ]:
-            s.setMaximum(radius_limit)
-        self.border_width_spin.setMaximum(border_limit)
+            s.setMaximum(50)
+        self.border_width_spin.setMaximum(100)
 
     def generate_qss(self, component_type, props=None):
         # Determine current horizontal alignment. When ``props`` is provided
@@ -1614,11 +1612,17 @@ class ConditionalStyleEditorDialog(QDialog):
         width = dpi_scale(200)
         height = dpi_scale(100)
         padding = min(width, height) // 10
-        tl_radius = self.tl_radius_spin.value()
-        tr_radius = self.tr_radius_spin.value()
-        br_radius = self.br_radius_spin.value()
-        bl_radius = self.bl_radius_spin.value()
-        border_width = self.border_width_spin.value()
+        min_dim = min(width, height)
+        tl_pct = (self.tl_radius_spin.value() if props is None else props.get("border_radius_tl", 0))
+        tr_pct = (self.tr_radius_spin.value() if props is None else props.get("border_radius_tr", 0))
+        br_pct = (self.br_radius_spin.value() if props is None else props.get("border_radius_br", 0))
+        bl_pct = (self.bl_radius_spin.value() if props is None else props.get("border_radius_bl", 0))
+        border_pct = (self.border_width_spin.value() if props is None else props.get("border_width", 0))
+        tl_radius = percent_to_value(tl_pct, min_dim)
+        tr_radius = percent_to_value(tr_pct, min_dim)
+        br_radius = percent_to_value(br_pct, min_dim)
+        bl_radius = percent_to_value(bl_pct, min_dim)
+        border_width = percent_to_value(border_pct, min_dim)
         border_style = self.border_style_combo.currentData()
         bg_color = self._bg_color
         hover_bg_color = self._hover_bg_color
@@ -1628,7 +1632,8 @@ class ConditionalStyleEditorDialog(QDialog):
             or self.palette().color(QPalette.ColorRole.ButtonText).name()
         )
         hover_text_color = self._hover_text_color or text_color
-        font_size = self.font_size_spin.value()
+        font_pct = self.font_size_spin.value() if props is None else props.get("font_size", 0)
+        font_size = percent_to_value(font_pct, height)
         font_family = self.base_controls["font_family_combo"].currentText()
         font_weight = "bold" if self.base_controls["bold_btn"].isChecked() else "normal"
         font_style = (
@@ -1774,7 +1779,7 @@ class ConditionalStyleEditorDialog(QDialog):
         if hasattr(widget, "set_text_font"):
             widget.set_text_font(
                 self.base_controls["font_family_combo"].currentText(),
-                self.font_size_spin.value(),
+                percent_to_value(self.font_size_spin.value(), widget.height()),
                 self.base_controls["bold_btn"].isChecked(),
                 self.base_controls["italic_btn"].isChecked(),
                 self.base_controls["underline_btn"].isChecked(),
@@ -1813,7 +1818,8 @@ class ConditionalStyleEditorDialog(QDialog):
             self.preview_button.set_hover_icon(
                 self.hover_controls["icon_edit"].text(), color
             )
-            icon_sz = self.style.properties.get("icon_size", 48)
+            icon_sz_pct = self.style.properties.get("icon_size", 0)
+            icon_sz = percent_to_value(icon_sz_pct, self.preview_button.height())
             self.preview_button.set_icon_size(icon_sz)
             self.preview_button.set_icon_alignment(
                 self.style.properties.get("icon_align", "center")
@@ -1926,7 +1932,7 @@ class ConditionalStyleEditorDialog(QDialog):
 
         # Icon related properties from picker
         if "icon_size" in self.style.properties:
-            properties["icon_size"] = self.style.properties.get("icon_size", 48)
+            properties["icon_size"] = self.style.properties.get("icon_size", 50)
         if "icon_color" in self.style.properties:
             properties["icon_color"] = self.style.properties.get("icon_color")
         if "icon_align" in self.style.properties:
@@ -1959,7 +1965,7 @@ class ConditionalStyleEditorDialog(QDialog):
         }
         if "icon_size" in self.style.hover_properties:
             hover_properties["icon_size"] = self.style.hover_properties.get(
-                "icon_size", 48
+                "icon_size", 50
             )
         if "icon_color" in self.style.hover_properties:
             hover_properties["icon_color"] = self.style.hover_properties.get(
