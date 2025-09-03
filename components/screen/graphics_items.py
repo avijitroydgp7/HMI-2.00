@@ -11,6 +11,7 @@ from PyQt6.QtGui import (
     QPixmap,
     QPainterPath,
     QPolygonF,
+    QLinearGradient,
 )
 from PyQt6.QtCore import QRectF, Qt, QPointF, QLineF
 from PyQt6.QtSvg import QSvgRenderer
@@ -199,6 +200,12 @@ class ButtonItem(BaseGraphicsItem):
             props = self.instance_data.get('properties', {})
             self._conditional_style_manager.default_style = {
                 'background_color': props.get('background_color', '#5a6270'),
+                'background_color2': props.get('background_color2', '#5a6270'),
+                'background_type': props.get('background_type', 'Solid'),
+                'gradient_x1': props.get('gradient_x1', 0),
+                'gradient_y1': props.get('gradient_y1', 0),
+                'gradient_x2': props.get('gradient_x2', 0),
+                'gradient_y2': props.get('gradient_y2', 1),
                 'text_color': props.get('text_color', '#ffffff'),
                 'label': props.get('label', 'Button'),
                 'border_radius': props.get('border_radius', 5),
@@ -206,7 +213,9 @@ class ButtonItem(BaseGraphicsItem):
                 'border_color': props.get('border_color', '#000000'),
                 'font_size': props.get('font_size', 10),
                 'font_weight': props.get('font_weight', 'normal'),
-                'opacity': props.get('opacity', 1.0)
+                'opacity': props.get('opacity', 1.0),
+                'component_type': props.get('component_type', 'Standard Button'),
+                'shape_style': props.get('shape_style', 'Flat')
             }
         
         return self._conditional_style_manager
@@ -258,6 +267,10 @@ class ButtonItem(BaseGraphicsItem):
         h = rect.height()
         min_dim = min(w, h)
 
+        component_type = props.get('component_type', 'Standard Button')
+        shape_style = props.get('shape_style', 'Flat')
+        background_type = props.get('background_type', 'Solid')
+
         # Apply style properties converting percentages to absolute values
         bg_color = QColor(props.get('background_color', '#5a6270'))
         text_color = QColor(props.get('text_color', '#ffffff'))
@@ -276,18 +289,59 @@ class ButtonItem(BaseGraphicsItem):
         custom_radii = any(
             k in props for k in ('border_radius_tl','border_radius_tr','border_radius_br','border_radius_bl')
         )
-        
+
+        # Component type adjustments
+        if component_type == 'Circle Button':
+            size = min_dim
+            rect = QRectF((w - size) / 2, (h - size) / 2, size, size)
+            w = h = min_dim = size
+            border_radius = size / 2
+            br_tl = br_tr = br_br = br_bl = border_radius
+            custom_radii = False
+        elif component_type == 'Toggle Switch':
+            border_radius = h / 2
+            br_tl = br_tr = br_br = br_bl = border_radius
+            custom_radii = False
+
         # Apply opacity
         bg_color.setAlphaF(opacity)
         text_color.setAlphaF(opacity)
+        bg_color2 = QColor(props.get('background_color2', bg_color.name()))
+        bg_color2.setAlphaF(opacity)
 
-        # Draw background
-        if border_width > 0:
-            painter.setPen(QPen(border_color, border_width))
+        # Determine brush
+        brush = None
+        if shape_style == 'Outline':
+            brush = Qt.BrushStyle.NoBrush
+        elif background_type != 'Solid':
+            x1 = float(props.get('gradient_x1', 0)) * w
+            y1 = float(props.get('gradient_y1', 0)) * h
+            x2 = float(props.get('gradient_x2', 0)) * w
+            y2 = float(props.get('gradient_y2', 1)) * h
+            grad = QLinearGradient(x1, y1, x2, y2)
+            grad.setColorAt(0, bg_color)
+            grad.setColorAt(1, bg_color2)
+            brush = grad
+        elif shape_style == 'Glass':
+            light = QColor(bg_color).lighter(150)
+            grad = QLinearGradient(0, 0, 0, h)
+            grad.setColorAt(0, light)
+            grad.setColorAt(1, bg_color)
+            brush = grad
         else:
-            painter.setPen(Qt.PenStyle.NoPen)
+            brush = bg_color
 
-        painter.setBrush(bg_color)
+        # Pen/brush setup
+        if shape_style == 'Outline':
+            painter.setPen(QPen(bg_color, max(1, border_width)))
+            painter.setBrush(Qt.BrushStyle.NoBrush)
+        else:
+            if border_width > 0:
+                painter.setPen(QPen(border_color, border_width))
+            else:
+                painter.setPen(Qt.PenStyle.NoPen)
+            painter.setBrush(brush)
+
         shape_path = None
         if custom_radii:
             shape_path = QPainterPath()
@@ -302,7 +356,25 @@ class ButtonItem(BaseGraphicsItem):
             shape_path.quadTo(0, 0, br_tl, 0)
             painter.drawPath(shape_path)
         else:
-            painter.drawRoundedRect(rect, border_radius, border_radius)
+            if component_type == 'Circle Button':
+                painter.drawEllipse(rect)
+            else:
+                painter.drawRoundedRect(rect, border_radius, border_radius)
+
+        if component_type == 'Toggle Switch':
+            knob_d = h - 2 * border_width
+            knob_rect = QRectF(border_width, border_width, knob_d, knob_d)
+            painter.setBrush(text_color)
+            painter.setPen(Qt.PenStyle.NoPen)
+            painter.drawEllipse(knob_rect)
+            # Restore brush/pen for subsequent drawing
+            painter.setBrush(brush if shape_style != 'Outline' else Qt.BrushStyle.NoBrush)
+            if shape_style == 'Outline':
+                painter.setPen(QPen(bg_color, max(1, border_width)))
+            elif border_width > 0:
+                painter.setPen(QPen(border_color, border_width))
+            else:
+                painter.setPen(Qt.PenStyle.NoPen)
 
         # Draw icon if available
         icon_src = props.get('icon', '')
