@@ -84,10 +84,11 @@ class ConditionalStyleEditorDialog(QDialog):
         "offset_spin",
     ]
 
-    def __init__(self, parent=None, style: Optional[ConditionalStyle] = None):
+    def __init__(self, parent=None, style: Optional[ConditionalStyle] = None, default_style: Optional[StyleProperties] = None):
         super().__init__(parent)
         self.setWindowTitle("Conditional Style")
         self.style = copy.deepcopy(style) if style else ConditionalStyle()
+        self.default_style = copy.deepcopy(default_style) if default_style else StyleProperties()
         self._text_color = self.style.properties.get("text_color", "")
         self._hover_text_color = self.style.hover_properties.get("text_color", "")
 
