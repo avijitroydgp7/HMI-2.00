@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import copy
 from typing import Any, Dict, List, Optional
 
 from PyQt6.QtCore import QAbstractTableModel, QModelIndex, Qt
@@ -76,8 +77,8 @@ class ButtonActionsModel(QAbstractTableModel):
             return action.get("details", "")
 
         if role == Qt.ItemDataRole.UserRole:
-            # Expose raw action dict for convenience
-            return action
+            # Return a deep copy so external callers can't mutate internal state
+            return copy.deepcopy(action)
 
         if role == Qt.ItemDataRole.TextAlignmentRole:
             if col == 0:

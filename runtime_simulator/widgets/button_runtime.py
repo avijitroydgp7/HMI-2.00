@@ -291,10 +291,15 @@ class ButtonRuntimeController(QObject):
         if not isinstance(mt, dict):
             return None
         if mt.get("source") == "tag":
-            val = mt.get("value") or {}
-            # Prefer canonical path "[DB]::Tag" when possible for uniqueness
-            db = val.get("db_name")
-            tn = val.get("tag_name")
+            val = mt.get("value")
+            if isinstance(val, dict):
+                # Prefer canonical path "[DB]::Tag" when possible for uniqueness
+                db = val.get("db_name")
+                tn = val.get("tag_name")
+            else:
+                # value may be a plain string from legacy data
+                db = None
+                tn = val
             if db and tn:
                 return f"[{db}]::" + tn
             # Fallback to plain name (legacy)

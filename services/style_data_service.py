@@ -116,13 +116,27 @@ class StyleDataService(QObject):
         self.styles_changed.emit("")
 
     def get_style(self, style_id: str) -> Dict[str, Any] | None:
-        return self._styles.get(style_id)
+        """Return a **copy** of the style definition.
+
+        Returning direct references to the internal ``_styles`` mapping meant
+        that callers could inadvertently mutate the service's state without
+        using :meth:`update_style`.  Such mutations bypassed the usual
+        ``styles_changed`` signal and left existing button instances in an
+        inconsistent state.  Providing a deep copy ensures external code must
+        explicitly update the service if it wants to persist modifications.
+        """
+
+        data = self._styles.get(style_id)
+        return copy.deepcopy(data) if data is not None else None
 
     def get_all_styles(self) -> List[Dict[str, Any]]:
-        return list(self._styles.values())
+        """Return copies of all style definitions."""
+        return [copy.deepcopy(s) for s in self._styles.values()]
 
     def get_default_style(self) -> Dict[str, Any]:
-        return self._styles.get(_QT_DEFAULT_STYLE["id"], copy.deepcopy(_QT_DEFAULT_STYLE))
+        """Return a copy of the default style definition."""
+        data = self._styles.get(_QT_DEFAULT_STYLE["id"])
+        return copy.deepcopy(data) if data is not None else copy.deepcopy(_QT_DEFAULT_STYLE)
 
     def add_style(self, style_data: Dict[str, Any], style_id: str | None = None) -> str:
         sid = style_id or style_data.get("id") or str(uuid.uuid4())
