@@ -4,7 +4,7 @@
         "company": "",
         "description": "",
         "creation_date": "2025-08-26 17:51:48",
-        "modification_date": "2025-09-02 12:32:17",
+        "modification_date": "2025-09-03 15:26:14",
         "save_history": [
             "Project Created on 2025-08-26 17:51:48",
             "Saved on 2025-08-26 17:54:13",
@@ -24,7 +24,8 @@
             "Saved on 2025-09-01 17:28:06",
             "Saved on 2025-09-02 09:40:16",
             "Saved on 2025-09-02 11:54:46",
-            "Saved on 2025-09-02 12:32:17"
+            "Saved on 2025-09-02 12:32:17",
+            "Saved on 2025-09-03 15:26:14"
         ]
     },
     "screens": {
@@ -41,36 +42,7 @@
             },
             "type": "base",
             "id": "2cbe6eaa-2353-45de-b37e-80f549201f40",
-            "children": [
-                {
-                    "instance_id": "f8dd960f-c63e-4e79-8e0d-29fcadaec91c",
-                    "tool_type": "button",
-                    "properties": {
-                        "label": "Button",
-                        "size": {
-                            "width": 100,
-                            "height": 40
-                        },
-                        "style_id": "qt_default",
-                        "shape_style": "Flat",
-                        "background_type": "Solid",
-                        "background_color": "#f0f0f0",
-                        "text_color": "#000000",
-                        "border_radius": 4,
-                        "border_width": 1,
-                        "border_style": "solid",
-                        "border_color": "#b3b3b3",
-                        "hover_properties": {
-                            "background_color": "#e0e0e0",
-                            "text_color": "#000000"
-                        },
-                        "position": {
-                            "x": 388.0,
-                            "y": 327.0
-                        }
-                    }
-                }
-            ]
+            "children": []
         },
         "f9d9ea4f-ed61-4cd4-810b-b04eae7d31b0": {
             "number": 2,
@@ -86,31 +58,7 @@
             },
             "type": "base",
             "id": "f9d9ea4f-ed61-4cd4-810b-b04eae7d31b0",
-            "children": [
-                {
-                    "instance_id": "5dfc69bb-cf0d-47c2-9b72-a13186522a84",
-                    "tool_type": "button",
-                    "properties": {
-                        "label": "Button",
-                        "size": {
-                            "width": 100,
-                            "height": 40
-                        },
-                        "style_id": "default_rounded",
-                        "background_color": "#5a6270",
-                        "text_color": "#ffffff",
-                        "border_radius": 20,
-                        "hover_properties": {
-                            "background_color": "#6b7383",
-                            "text_color": "#ffffff"
-                        },
-                        "position": {
-                            "x": 44.0,
-                            "y": 25.0
-                        }
-                    }
-                }
-            ]
+            "children": []
         }
     },
     "tag_databases": {

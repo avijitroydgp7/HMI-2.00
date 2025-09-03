@@ -68,7 +68,10 @@ class ButtonPropertiesWidget(QWidget):
 
         # Initialize conditional style manager
         self.style_manager = ConditionalStyleManager()
-        self.style_manager.default_style = self.properties.get("default_style", {})
+        default_style = self.properties.get("default_style", {})
+        self.style_manager.default_style = default_style.get(
+            "properties", default_style
+        )
         for style_data in self.properties.get("conditional_styles", []):
             # Typical failure reasons when importing styles from dict:
             # - Missing or misspelled keys like 'properties' or 'hover_properties'
@@ -153,7 +156,10 @@ class ButtonPropertiesWidget(QWidget):
 
         # Recreate style manager from dict
         self.style_manager = ConditionalStyleManager()
-        self.style_manager.default_style = self.properties.get("default_style", {})
+        default_style = self.properties.get("default_style", {})
+        self.style_manager.default_style = default_style.get(
+            "properties", default_style
+        )
         for style_data in self.properties.get("conditional_styles", []):
             try:
                 style = ConditionalStyle.from_dict(style_data)
@@ -206,11 +212,65 @@ class ButtonPropertiesWidget(QWidget):
         # Save label and text color fallback
         updated_props["label"] = self.properties.get("label", "Button")
         updated_props["text_color"] = self.properties.get("text_color", "#ffffff")
-        # Serialize conditional styles, preserving any future fields
+
+        # Serialize conditional styles and construct default style block
         style_data = self.style_manager.to_dict()
-        updated_props["conditional_styles"] = style_data.get("conditional_styles", [])
-        if style_data.get("default_style"):
-            updated_props["default_style"] = style_data["default_style"]
+        updated_props["conditional_styles"] = style_data.get(
+            "conditional_styles", []
+        )
+        first_style = (
+            updated_props["conditional_styles"][0]
+            if updated_props["conditional_styles"]
+            else {}
+        )
+        default_style = {
+            "style_id": first_style.get(
+                "style_id", self.properties.get("default_style", {}).get("style_id", "")
+            ),
+            "tooltip": first_style.get(
+                "tooltip", self.properties.get("default_style", {}).get("tooltip", "")
+            ),
+            "style_sheet": first_style.get(
+                "style_sheet",
+                self.properties.get("default_style", {}).get("style_sheet", ""),
+            ),
+            "tags": first_style.get(
+                "tags", self.properties.get("default_style", {}).get("tags", [])
+            ),
+            "text": first_style.get(
+                "text", self.properties.get("default_style", {}).get("text", "")
+            ),
+            "properties": style_data.get("default_style", {}),
+            "hover_properties": first_style.get(
+                "hover_properties",
+                self.properties.get("default_style", {}).get("hover_properties", {}),
+            ),
+        }
+        updated_props["default_style"] = default_style
+
+        # Flatten default style for canvas/runtime consumption
+        updated_props.update(default_style.get("properties", {}))
+        if default_style.get("hover_properties"):
+            updated_props["hover_properties"] = default_style["hover_properties"]
+        else:
+            updated_props.pop("hover_properties", None)
+        if default_style.get("tags"):
+            updated_props["tags"] = default_style["tags"]
+        else:
+            updated_props.pop("tags", None)
+        if default_style.get("text"):
+            updated_props["text"] = default_style["text"]
+        else:
+            updated_props.pop("text", None)
+        if default_style.get("tooltip"):
+            updated_props["tooltip"] = default_style["tooltip"]
+        else:
+            updated_props.pop("tooltip", None)
+        if default_style.get("style_sheet"):
+            updated_props["style_sheet"] = default_style["style_sheet"]
+        else:
+            updated_props.pop("style_sheet", None)
+
         return updated_props
 
     # Internal helpers -------------------------------------------------
@@ -726,7 +786,7 @@ class ButtonPropertiesWidget(QWidget):
         self._refresh_style_list()
         self._on_style_selection_changed()
 
-    def _build_swatch_widget(self, style: ConditionalStyle) -> QWidget:
+    def _build_swatch_widget(self, index: int, style: ConditionalStyle) -> QWidget:
         """Create a small swatch widget to preview the style in the list."""
         container = QWidget()
         hl = QHBoxLayout(container)
@@ -761,11 +821,10 @@ class ButtonPropertiesWidget(QWidget):
         min_dim = min(base_w, base_h)
         scale = min(swatch_w / dpi_scale(base_w), swatch_h / dpi_scale(base_h))
 
-        # Determine base/hover properties for icons and colours
-        temp_manager = ConditionalStyleManager()
-        temp_manager.add_style(copy.deepcopy(style))
-        base_props = temp_manager.get_active_style()
-        hover_props = temp_manager.get_active_style(state='hover')
+        # Determine base/hover properties for icons and colours using the
+        # manager, bypassing condition evaluation.
+        base_props = self.style_manager.get_style_by_index(index)
+        hover_props = self.style_manager.get_style_by_index(index, state="hover")
 
         # Apply either stored style sheet or basic colours
         if style.style_sheet:
@@ -852,11 +911,11 @@ class ButtonPropertiesWidget(QWidget):
 
     def _refresh_style_list(self):
         self.style_list.clear()
-        for style in self.style_manager.conditional_styles:
+        for idx, style in enumerate(self.style_manager.conditional_styles):
             item = QListWidgetItem()
             item.setSizeHint(QSize(dpi_scale(240), dpi_scale(48)))
             self.style_list.addItem(item)
-            widget = self._build_swatch_widget(style)
+            widget = self._build_swatch_widget(idx, style)
             self.style_list.setItemWidget(item, widget)
 
     def _add_style(self):
@@ -1002,10 +1061,8 @@ class ButtonPropertiesWidget(QWidget):
         self.style_properties_group.setTitle(f"Style Properties - {style.style_id}")
 
         # Apply style to preview button using manager helper
-        temp_manager = ConditionalStyleManager()
-        temp_manager.add_style(copy.deepcopy(style))
-        base_props = temp_manager.get_active_style()
-        hover_props = temp_manager.get_active_style(state='hover')
+        base_props = self.style_manager.get_style_by_index(row)
+        hover_props = self.style_manager.get_style_by_index(row, state="hover")
 
         component_type = style.properties.get("component_type", "Standard Button")
 

@@ -101,6 +101,43 @@ class ConditionalStyleManager(QObject):
                 return props
         return base
 
+    def get_style_by_index(
+        self, index: int, state: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """Return the style at ``index`` merged with the default style.
+
+        This bypasses condition evaluation and is primarily used for style
+        previews in the editor where styles are selected explicitly by their
+        list index.
+        """
+
+        base = (
+            self.default_style.to_dict()
+            if isinstance(self.default_style, StyleProperties)
+            else dict(self.default_style)
+        )
+
+        if not (0 <= index < len(self.conditional_styles)):
+            return base
+
+        style = self.conditional_styles[index]
+        props = base.copy()
+        props.update(style.properties.to_dict())
+
+        if state:
+            hover = getattr(style, f"{state}_properties", StyleProperties())
+            if isinstance(hover, StyleProperties):
+                props.update(hover.to_dict())
+            elif isinstance(hover, dict):
+                props.update(hover)
+
+        if style.tooltip:
+            props["tooltip"] = style.tooltip
+        if style.style_sheet:
+            props["style_sheet"] = style.style_sheet
+
+        return props
+
     def _evaluate_condition(
         self, condition: Any, tag_values: Dict[str, Any]
     ) -> Tuple[bool, Optional[str]]:
