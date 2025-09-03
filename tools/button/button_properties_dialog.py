@@ -53,6 +53,24 @@ def scale_stylesheet(qss: str, scale: float) -> str:
     return re.sub(r"(\d+(?:\.\d+)?)(px|pt)", repl, qss)
 
 
+def percent_to_value(pct: float | int, base: float) -> int:
+    """Convert a percentage ``pct`` to an absolute value based on ``base``."""
+    try:
+        return int(float(pct) * base / 100.0)
+    except Exception:
+        return 0
+
+
+def value_to_percent(value: float | int, base: float) -> float:
+    """Convert an absolute ``value`` to a percentage of ``base``."""
+    if not base:
+        return 0.0
+    try:
+        return float(value) / float(base) * 100.0
+    except Exception:
+        return 0.0
+
+
 class ButtonPropertiesWidget(QWidget):
     """Widget exposing the Action and Style tabs used by the dialog and
     the property editor."""
@@ -690,7 +708,10 @@ class ButtonPropertiesWidget(QWidget):
                 swatch_w = dpi_scale(90)
                 swatch_h = dpi_scale(36)
         preview.setFixedSize(swatch_w, swatch_h)
-        scale = min(swatch_w / dpi_scale(200), swatch_h / dpi_scale(100))
+        base_w = 200
+        base_h = 200 if component_type == "Circle Button" else 100
+        min_dim = min(base_w, base_h)
+        scale = min(swatch_w / dpi_scale(base_w), swatch_h / dpi_scale(base_h))
 
         # Determine base/hover properties for icons and colours
         temp_manager = ConditionalStyleManager()
@@ -702,11 +723,12 @@ class ButtonPropertiesWidget(QWidget):
         if style.style_sheet:
             preview.setStyleSheet(scale_stylesheet(style.style_sheet, scale))
         else:
+            radius_px = percent_to_value(base_props.get('border_radius', 0), min_dim)
             qss = (
                 "QPushButton {\n"
                 f"    background-color: {base_props.get('background_color', 'transparent')};\n"
                 f"    color: {base_props.get('text_color', '#000')};\n"
-                f"    border-radius: {int(base_props.get('border_radius', 4) * scale)}px;\n"
+                f"    border-radius: {int(radius_px * scale)}px;\n"
                 "}\n"
                 "QPushButton:hover {\n"
                 f"    background-color: {hover_props.get('background_color', base_props.get('background_color', 'transparent'))};\n"
@@ -723,14 +745,15 @@ class ButtonPropertiesWidget(QWidget):
             preview.set_hover_icon(
                 hover_props.get("icon", ""), base_props.get("icon_color")
             )
-            icon_sz = dpi_scale(base_props.get("icon_size", 20) * scale)
+            icon_sz = dpi_scale(percent_to_value(base_props.get("icon_size", 20), min_dim) * scale)
             preview.set_icon_size(icon_sz)
             preview.set_icon_alignment(base_props.get("icon_align", "center"))
 
             # Text formatting
+            font_sz = percent_to_value(base_props.get("font_size", 0), base_h)
             preview.set_text_font(
                 base_props.get("font_family", ""),
-                max(1, int(base_props.get("font_size", 0) * scale)),
+                max(1, int(font_sz * scale)),
                 base_props.get("bold", False),
                 base_props.get("italic", False),
                 base_props.get("underline", False),
@@ -930,17 +953,22 @@ class ButtonPropertiesWidget(QWidget):
             self.preview_stack.setCurrentWidget(self.preview_button)
             if component_type == "Circle Button":
                 self.preview_button.setFixedSize(dpi_scale(200), dpi_scale(200))
+                base_w = base_h = 200
             else:
                 self.preview_button.setFixedSize(dpi_scale(200), dpi_scale(100))
+                base_w = 200
+                base_h = 100
+            min_dim = min(base_w, base_h)
 
             if style.style_sheet:
                 self.preview_button.setStyleSheet(style.style_sheet)
             else:
+                radius_px = percent_to_value(base_props.get('border_radius', 0), min_dim)
                 qss = (
                     "QPushButton {\n"
                     f"    background-color: {base_props.get('background_color', 'transparent')};\n"
                     f"    color: {base_props.get('text_color', '#000000')};\n"
-                    f"    border-radius: {base_props.get('border_radius', 0)}px;\n"
+                    f"    border-radius: {radius_px}px;\n"
                     "}\n"
                     "QPushButton:hover {\n"
                     f"    background-color: {hover_props.get('background_color', base_props.get('background_color', 'transparent'))};\n"
@@ -955,7 +983,7 @@ class ButtonPropertiesWidget(QWidget):
             self.preview_button.set_hover_icon(
                 hover_props.get('icon', ''), base_props.get('icon_color')
             )
-            icon_sz = base_props.get('icon_size', 48)
+            icon_sz = percent_to_value(base_props.get('icon_size', 48), min_dim)
             self.preview_button.set_icon_size(icon_sz)
             self.preview_button.set_icon_alignment(base_props.get('icon_align', 'center'))
             text = (
@@ -967,9 +995,10 @@ class ButtonPropertiesWidget(QWidget):
             self.preview_button.setToolTip(style.tooltip)
 
             # Apply text formatting to mirror saved style
+            font_sz = percent_to_value(base_props.get("font_size", 0), base_h)
             self.preview_button.set_text_font(
                 base_props.get("font_family", ""),
-                base_props.get("font_size", 0),
+                font_sz,
                 base_props.get("bold", False),
                 base_props.get("italic", False),
                 base_props.get("underline", False),

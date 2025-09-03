@@ -21,6 +21,13 @@ from services.screen_data_service import screen_service
 from utils.icon_manager import IconManager
 
 
+def _pct_of(value, base):
+    try:
+        return float(value) * base / 100.0
+    except Exception:
+        return 0.0
+
+
 def _apply_pen_style_from_name(pen: QPen, style_name: str):
     """Apply a named pen style to a QPen.
 
@@ -156,12 +163,17 @@ class ButtonItem(BaseGraphicsItem):
         self._tooltip = ''
         # Initialize tooltip based on current style (with empty tag values)
         self._get_active_style_properties(self._state)
+        # Base size used for percentage-based properties
+        self._base_width = 100
+        self._base_height = 40
 
     def boundingRect(self) -> QRectF:
         props = self.instance_data.get('properties', {})
         size = props.get('size', {})
         w = size.get('width', 100)
         h = size.get('height', 40)
+        self._base_width = w
+        self._base_height = h
         return QRectF(0, 0, w, h)
 
     def update_data(self, new_instance_data):
@@ -237,35 +249,61 @@ class ButtonItem(BaseGraphicsItem):
         
         # Get active style properties
         props = self._get_active_style_properties(self._state)
-        
-        # Apply style properties
+        rect = self.boundingRect()
+        w = rect.width()
+        h = rect.height()
+        min_dim = min(w, h)
+
+        # Apply style properties converting percentages to absolute values
         bg_color = QColor(props.get('background_color', '#5a6270'))
         text_color = QColor(props.get('text_color', '#ffffff'))
         label = props.get('label', 'Button')
-        border_radius = props.get('border_radius', 5)
-        border_width = props.get('border_width', 0)
+        border_radius = _pct_of(props.get('border_radius', 0), min_dim)
+        border_width = _pct_of(props.get('border_width', 0), min_dim)
         border_color = QColor(props.get('border_color', '#000000'))
-        font_size = props.get('font_size', 10)
+        font_size = _pct_of(props.get('font_size', 0), h)
         font_weight = props.get('font_weight', 'normal')
         opacity = props.get('opacity', 1.0)
+
+        br_tl = _pct_of(props.get('border_radius_tl', props.get('border_radius', 0)), min_dim)
+        br_tr = _pct_of(props.get('border_radius_tr', props.get('border_radius', 0)), min_dim)
+        br_br = _pct_of(props.get('border_radius_br', props.get('border_radius', 0)), min_dim)
+        br_bl = _pct_of(props.get('border_radius_bl', props.get('border_radius', 0)), min_dim)
+        custom_radii = any(
+            k in props for k in ('border_radius_tl','border_radius_tr','border_radius_br','border_radius_bl')
+        )
         
         # Apply opacity
         bg_color.setAlphaF(opacity)
         text_color.setAlphaF(opacity)
-        
+
         # Draw background
         if border_width > 0:
             painter.setPen(QPen(border_color, border_width))
         else:
             painter.setPen(Qt.PenStyle.NoPen)
-            
+
         painter.setBrush(bg_color)
-        painter.drawRoundedRect(self.boundingRect(), border_radius, border_radius)
+        shape_path = None
+        if custom_radii:
+            shape_path = QPainterPath()
+            shape_path.moveTo(br_tl, 0)
+            shape_path.lineTo(w - br_tr, 0)
+            shape_path.quadTo(w, 0, w, br_tr)
+            shape_path.lineTo(w, h - br_br)
+            shape_path.quadTo(w, h, w - br_br, h)
+            shape_path.lineTo(br_bl, h)
+            shape_path.quadTo(0, h, 0, h - br_bl)
+            shape_path.lineTo(0, br_tl)
+            shape_path.quadTo(0, 0, br_tl, 0)
+            painter.drawPath(shape_path)
+        else:
+            painter.drawRoundedRect(rect, border_radius, border_radius)
 
         # Draw icon if available
         icon_src = props.get('icon', '')
         if icon_src:
-            size = int(props.get('icon_size', 24))
+            size = int(_pct_of(props.get('icon_size', 0), min_dim))
             color = props.get('icon_color')
             align = props.get('icon_align', 'center')
             pix = QPixmap()
@@ -289,7 +327,7 @@ class ButtonItem(BaseGraphicsItem):
                             size, size, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation
                         )
             if not pix.isNull():
-                br = self.boundingRect()
+                br = rect
                 x = br.left() + (br.width() - pix.width()) / 2
                 y = br.top() + (br.height() - pix.height()) / 2
                 if 'left' in align:
@@ -304,7 +342,7 @@ class ButtonItem(BaseGraphicsItem):
 
         # Draw text
         painter.setPen(text_color)
-        font = QFont("Arial", font_size)
+        font = QFont("Arial", max(1, int(font_size)))
         if font_weight == 'bold':
             font.setBold(True)
         elif font_weight == 'light':
@@ -324,7 +362,10 @@ class ButtonItem(BaseGraphicsItem):
                 pulse_factor = 0.8 + 0.2 * intensity
                 bg_color.setAlphaF(opacity * pulse_factor)
                 painter.setBrush(bg_color)
-                painter.drawRoundedRect(self.boundingRect(), border_radius, border_radius)
+                if shape_path:
+                    painter.drawPath(shape_path)
+                else:
+                    painter.drawRoundedRect(rect, border_radius, border_radius)
         
         painter.restore()
     
