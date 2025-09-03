@@ -1302,6 +1302,12 @@ class ConditionalStyleEditorDialog(QDialog):
         self._border_color = color.darker(150)
         self._bg_color2 = color.lighter(130)
 
+        self.set_combo_selection(
+            self.bg_base_color_combo,
+            self.bg_shade_combo,
+            self._bg_color,
+        )
+
         base_text = self.get_contrast_color(self._bg_color)
         hover_text = self.get_contrast_color(self._hover_bg_color)
         self._text_color = base_text.name()
@@ -1330,16 +1336,18 @@ class ConditionalStyleEditorDialog(QDialog):
         self.update_preview()
 
     def set_initial_colors(self):
-        self.bg_base_color_combo.blockSignals(True)
-        self.bg_base_color_combo.setCurrentText("Green")
-        self.bg_base_color_combo.blockSignals(False)
-        scheme = self.color_schemes.get("Green")
-        self._bg_color = scheme["main"] if scheme else QColor("#2ecc71")
+        bg_color = self.style.properties.get("background_color") or "Green"
+        self.set_combo_selection(
+            self.bg_base_color_combo, self.bg_shade_combo, bg_color
+        )
 
         orig_base_text = self._text_color
         orig_hover_text = self._hover_text_color
 
-        self.on_bg_color_changed("Green", self._bg_color)
+        self.on_bg_color_changed(
+            self.bg_base_color_combo.currentText(),
+            self.bg_shade_combo.currentData(),
+        )
 
         if orig_base_text:
             self.set_combo_selection(
