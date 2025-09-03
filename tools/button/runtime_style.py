@@ -17,23 +17,27 @@ class RuntimeConditionalStyle:
     )
     properties: Dict[str, Any] = field(default_factory=dict)
     hover_properties: Dict[str, Any] = field(default_factory=dict)
-    icon: str = ""
-    hover_icon: str = ""
     tooltip: str = ""
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "RuntimeConditionalStyle":
         """Build a RuntimeConditionalStyle from a persisted dictionary."""
 
+        props = data.get("properties", {}) or {}
+        hover = data.get("hover_properties", {}) or {}
+        if "icon" in data and "icon" not in props:
+            props = dict(props)
+            props["icon"] = data.get("icon")
+        if "hover_icon" in data and "icon" not in hover:
+            hover = dict(hover)
+            hover["icon"] = data.get("hover_icon")
         return cls(
             style_id=data.get("style_id", ""),
             condition=data.get("condition"),
             condition_data=data.get(
                 "condition_data", {"mode": TriggerMode.ORDINARY.value}
             ),
-            properties=data.get("properties", {}),
-            hover_properties=data.get("hover_properties", {}),
-            icon=data.get("icon", ""),
-            hover_icon=data.get("hover_icon", ""),
+            properties=props,
+            hover_properties=hover,
             tooltip=data.get("tooltip", ""),
         )

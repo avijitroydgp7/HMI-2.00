@@ -55,6 +55,7 @@ from tools.button.actions.constants import TriggerMode
 from .manager import ConditionalStyleManager
 from .models import (
     ConditionalStyle,
+    StyleProperties,
     AnimationProperties,
     get_styles,
     _GRADIENT_STYLES,
@@ -364,8 +365,12 @@ class ConditionalStyleEditorDialog(QDialog):
             self.style.hover_properties, "hover"
         )
         style_tabs.addTab(self.hover_tab, "Hover")
-        self.base_controls["icon_edit"].setText(self.style.icon)
-        self.hover_controls["icon_edit"].setText(self.style.hover_icon)
+        self.base_controls["icon_edit"].setText(
+            self.style.properties.get("icon", "")
+        )
+        self.hover_controls["icon_edit"].setText(
+            self.style.hover_properties.get("icon", "")
+        )
 
         # Convenience shortcuts for commonly used controls
         self.font_size_spin = self.base_controls["font_size_spin"]
@@ -2001,42 +2006,15 @@ class ConditionalStyleEditorDialog(QDialog):
                     else None
                 )
 
+        properties["icon"] = self.base_controls["icon_edit"].text()
+        hover_properties["icon"] = self.hover_controls["icon_edit"].text()
+
         component_type = properties.get("component_type")
         style = ConditionalStyle(
             style_id=self.style.style_id,
             tooltip=self.tooltip_edit.text(),
-            icon=self.base_controls["icon_edit"].text(),
-            hover_icon=self.hover_controls["icon_edit"].text(),
-            text_type=properties.get("text_type", "Text"),
-            text_value=properties.get("text_value", properties.get("text", "")),
-            comment_ref=properties.get(
-                "comment_ref",
-                (
-                    {
-                        "number": properties.get("comment_number", 0),
-                        "column": properties.get("comment_column", 0),
-                        "row": properties.get("comment_row", 0),
-                    }
-                    if properties.get("text_type") == "Comment"
-                    else {}
-                ),
-            ),
-            font_family=properties.get("font_family", ""),
-            font_size=properties.get("font_size", 0),
-            bold=properties.get("bold", False),
-            italic=properties.get("italic", False),
-            underline=properties.get("underline", False),
-            background_color=properties.get("background_color", ""),
-            text_color=properties.get("text_color", ""),
-            h_align=properties.get(
-                "h_align", properties.get("horizontal_align", "center")
-            ),
-            v_align=properties.get(
-                "v_align", properties.get("vertical_align", "middle")
-            ),
-            offset=properties.get("offset", properties.get("offset_to_frame", 0)),
-            properties=properties,
-            hover_properties=hover_properties,
+            properties=StyleProperties.from_dict(properties),
+            hover_properties=StyleProperties.from_dict(hover_properties),
             condition_data=condition_cfg,
         )
         # Generate the style sheet using the freshly collected properties so

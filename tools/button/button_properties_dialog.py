@@ -678,7 +678,11 @@ class ButtonPropertiesWidget(QWidget):
             swatch_w = dpi_scale(90)
             swatch_h = dpi_scale(36)
         else:
-            preview_text = style.text_value if style.text_type == "Text" else ""
+            preview_text = (
+                style.properties.get("text_value", "")
+                if style.properties.get("text_type", "Text") == "Text"
+                else ""
+            )
             preview = PreviewButton(preview_text or "")
             if component_type == "Circle Button":
                 swatch_w = swatch_h = dpi_scale(36)
@@ -954,7 +958,11 @@ class ButtonPropertiesWidget(QWidget):
             icon_sz = base_props.get('icon_size', 48)
             self.preview_button.set_icon_size(icon_sz)
             self.preview_button.set_icon_alignment(base_props.get('icon_align', 'center'))
-            text = style.text_value if style.text_type == "Text" else ""
+            text = (
+                style.properties.get('text_value', '')
+                if style.properties.get('text_type', 'Text') == 'Text'
+                else ''
+            )
             self.preview_button.setText(text or "")
             self.preview_button.setToolTip(style.tooltip)
 

@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import MISSING, dataclass, field, fields
 import copy
-from typing import Any, Callable, Dict, List, Optional, Union
+from typing import Any, Callable, Dict, Iterable, List, Optional, Union
 
 from tools.button.actions.constants import TriggerMode
 from services.style_data_service import style_data_service
@@ -54,59 +54,87 @@ class AnimationProperties:
 
 
 @dataclass(slots=True)
-class ConditionalStyle:
-    """A style that can be applied to a button."""
+class StyleProperties:
+    """Encapsulates the visual properties for a button state."""
 
-    style_id: str = ""
-    condition: Optional[Union[str, Callable[[Dict[str, Any]], bool]]] = None
-    condition_data: Dict[str, Any] = field(
-        default_factory=lambda: {"mode": TriggerMode.ORDINARY.value}
-    )
-    # core text/style attributes
-    text_type: str = "Text"
-    text_value: str = ""
-    comment_ref: Dict[str, Any] = field(default_factory=dict)
+    component_type: str = "Standard Button"
+    shape_style: str = "Flat"
+    background_type: str = "Solid"
+    background_color: str = ""
+    text_color: str = ""
+    border_radius: int = 0
+    border_width: int = 0
+    border_style: str = "solid"
+    border_color: str = ""
     font_family: str = ""
     font_size: int = 0
     bold: bool = False
     italic: bool = False
     underline: bool = False
-    background_color: str = ""
-    text_color: str = ""
+    text_type: str = "Text"
+    text_value: str = ""
+    comment_ref: Dict[str, Any] = field(default_factory=dict)
     h_align: str = "center"
     v_align: str = "middle"
     offset: int = 0
     icon: str = ""
-    hover_icon: str = ""
-    # miscellaneous properties remain grouped
-    properties: Dict[str, Any] = field(default_factory=dict)
-    tooltip: str = ""
-    hover_properties: Dict[str, Any] = field(default_factory=dict)
-    animation: AnimationProperties = field(default_factory=AnimationProperties)
-    style_sheet: str = ""
+    icon_size: int = 0
+    icon_align: str = "center"
+    icon_color: str = ""
+    extra: Dict[str, Any] = field(default_factory=dict)
 
+    # --- dict-like interface -------------------------------------------------
+    def _field_names(self) -> Iterable[str]:
+        return [f.name for f in fields(self) if f.name != "extra"]
+
+    def _as_dict(self) -> Dict[str, Any]:
+        data = {name: getattr(self, name) for name in self._field_names()}
+        data.update(self.extra)
+        return data
+
+    def to_dict(self) -> Dict[str, Any]:
+        return copy.deepcopy(self._as_dict())
+
+    # Mapping protocol -------------------------------------------------
+    def __getitem__(self, key):
+        if key in self._field_names():
+            return getattr(self, key)
+        return self.extra[key]
+
+    def __setitem__(self, key, value):
+        if key in self._field_names():
+            setattr(self, key, value)
+        else:
+            self.extra[key] = value
+
+    def get(self, key, default=None):
+        if key in self._field_names():
+            return getattr(self, key)
+        return self.extra.get(key, default)
+
+    def update(self, other: Dict[str, Any]):
+        for k, v in other.items():
+            self[k] = v
+
+    def __contains__(self, key):
+        return key in self._field_names() or key in self.extra
+
+    def __iter__(self):
+        return iter(self.to_dict())
+
+    def items(self):
+        return self.to_dict().items()
+
+    def keys(self):
+        return self.to_dict().keys()
+
+    def values(self):
+        return self.to_dict().values()
+
+    # Factory ----------------------------------------------------------
     @staticmethod
-    def _normalize_state(props: Dict[str, Any]) -> Dict[str, Any]:
-        """Return a state dictionary containing the expected keys."""
-        defaults = {
-            "text_type": "Text",
-            "text_value": "",
-            "comment_ref": {},
-            "font_family": "",
-            "font_size": 0,
-            "bold": False,
-            "italic": False,
-            "underline": False,
-            "background_color": "",
-            "text_color": "",
-            "h_align": "center",
-            "v_align": "middle",
-            "offset": 0,
-        }
-        if not props:
-            return defaults.copy()
-
-        data = dict(props)
+    def _normalize(data: Dict[str, Any]) -> Dict[str, Any]:
+        """Normalize legacy keys into the new structure."""
         if "text" in data and "text_value" not in data:
             data["text_value"] = data.get("text", "")
         if data.get("text_type") == "Comment" and "comment_ref" not in data:
@@ -121,11 +149,37 @@ class ConditionalStyle:
             data["v_align"] = data.get("vertical_align")
         if "offset_to_frame" in data and "offset" not in data:
             data["offset"] = data.get("offset_to_frame")
+        return data
 
-        normalized = defaults.copy()
-        for key in normalized.keys():
-            normalized[key] = data.get(key, normalized[key])
-        return normalized
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "StyleProperties":
+        if not data:
+            return cls()
+        data = cls._normalize(dict(data))
+        known = {}
+        for field in fields(cls):
+            if field.name == "extra":
+                continue
+            known[field.name] = data.pop(field.name, field.default if field.default is not MISSING else None)
+        inst = cls(**known)
+        inst.extra = data
+        return inst
+
+
+@dataclass(slots=True)
+class ConditionalStyle:
+    """A style that can be applied to a button."""
+
+    style_id: str = ""
+    condition: Optional[Union[str, Callable[[Dict[str, Any]], bool]]] = None
+    condition_data: Dict[str, Any] = field(
+        default_factory=lambda: {"mode": TriggerMode.ORDINARY.value}
+    )
+    properties: StyleProperties = field(default_factory=StyleProperties)
+    tooltip: str = ""
+    hover_properties: StyleProperties = field(default_factory=StyleProperties)
+    animation: AnimationProperties = field(default_factory=AnimationProperties)
+    style_sheet: str = ""
 
     def to_dict(self) -> Dict[str, Any]:
         cond = copy.deepcopy(self.condition_data)
@@ -134,23 +188,8 @@ class ConditionalStyle:
             "condition": self.condition if isinstance(self.condition, str) else None,
             "condition_data": cond,
             "tooltip": self.tooltip,
-            "text_type": self.text_type,
-            "text_value": self.text_value,
-            "comment_ref": self.comment_ref,
-            "font_family": self.font_family,
-            "font_size": self.font_size,
-            "bold": self.bold,
-            "italic": self.italic,
-            "underline": self.underline,
-            "background_color": self.background_color,
-            "text_color": self.text_color,
-            "h_align": self.h_align,
-            "v_align": self.v_align,
-            "offset": self.offset,
-            "icon": self.icon,
-            "hover_icon": self.hover_icon,
-            "properties": self.properties,
-            "hover_properties": self._normalize_state(self.hover_properties),
+            "properties": self.properties.to_dict(),
+            "hover_properties": self.hover_properties.to_dict(),
             "animation": self.animation.to_dict(),
             "style_sheet": self.style_sheet,
         }
@@ -158,41 +197,20 @@ class ConditionalStyle:
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "ConditionalStyle":
         props = data.get("properties", {})
-        hover = cls._normalize_state(data.get("hover_properties", {}))
+        hover = data.get("hover_properties", {})
+        # Backwards compatibility for legacy icon placement
+        if "icon" in data and "icon" not in props:
+            props = dict(props)
+            props["icon"] = data.get("icon")
+        if "hover_icon" in data and "icon" not in hover:
+            hover = dict(hover)
+            hover["icon"] = data.get("hover_icon")
         style = cls(
             style_id=data.get("style_id", ""),
             condition=data.get("condition"),
             tooltip=data.get("tooltip", ""),
-            icon=data.get("icon", data.get("svg_icon", "")),
-            hover_icon=data.get("hover_icon", ""),
-            text_type=data.get("text_type", props.get("text_type", "Text")),
-            text_value=data.get("text_value", props.get("text", "")),
-            comment_ref=data.get(
-                "comment_ref",
-                (
-                    {
-                        "number": props.get("comment_number", 0),
-                        "column": props.get("comment_column", 0),
-                        "row": props.get("comment_row", 0),
-                    }
-                    if props.get("text_type") == "Comment"
-                    else {}
-                ),
-            ),
-            font_family=data.get("font_family", props.get("font_family", "")),
-            font_size=data.get("font_size", props.get("font_size", 0)),
-            bold=data.get("bold", props.get("bold", False)),
-            italic=data.get("italic", props.get("italic", False)),
-            underline=data.get("underline", props.get("underline", False)),
-            background_color=data.get(
-                "background_color", props.get("background_color", "")
-            ),
-            text_color=data.get("text_color", props.get("text_color", "")),
-            h_align=data.get("h_align", props.get("horizontal_align", "center")),
-            v_align=data.get("v_align", props.get("vertical_align", "middle")),
-            offset=data.get("offset", props.get("offset_to_frame", 0)),
-            properties=props,
-            hover_properties=hover,
+            properties=StyleProperties.from_dict(props),
+            hover_properties=StyleProperties.from_dict(hover),
             style_sheet=data.get("style_sheet", ""),
         )
         cond = data.get("condition_data", {"mode": TriggerMode.ORDINARY.value})

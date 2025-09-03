@@ -2,12 +2,12 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 from PyQt6.QtCore import QObject, pyqtSignal
 
 from tools.button.actions.constants import TriggerMode
-from .models import ConditionalStyle
+from .models import ConditionalStyle, StyleProperties
 from .safe_eval import _safe_eval
 
 logger = logging.getLogger(__name__)
@@ -20,7 +20,7 @@ class ConditionalStyleManager(QObject):
     condition_error = pyqtSignal(str)
     parent: Optional[QObject] = None
     conditional_styles: List[ConditionalStyle] = field(default_factory=list)
-    default_style: Dict[str, Any] = field(default_factory=dict)
+    _default_style: StyleProperties = field(default_factory=StyleProperties)
 
     def __post_init__(self):
         QObject.__init__(self, self.parent)
@@ -30,6 +30,10 @@ class ConditionalStyleManager(QObject):
             style.style_id = str(idx)
 
     def add_style(self, style: ConditionalStyle):
+        if isinstance(style.properties, dict):
+            style.properties = StyleProperties.from_dict(style.properties)
+        if isinstance(style.hover_properties, dict):
+            style.hover_properties = StyleProperties.from_dict(style.hover_properties)
         self.conditional_styles.append(style)
         self.renumber_styles()
 
@@ -40,13 +44,33 @@ class ConditionalStyleManager(QObject):
 
     def update_style(self, index: int, style: ConditionalStyle):
         if 0 <= index < len(self.conditional_styles):
+            if isinstance(style.properties, dict):
+                style.properties = StyleProperties.from_dict(style.properties)
+            if isinstance(style.hover_properties, dict):
+                style.hover_properties = StyleProperties.from_dict(style.hover_properties)
             self.conditional_styles[index] = style
             self.renumber_styles()
+
+    @property
+    def default_style(self) -> StyleProperties:
+        return self._default_style
+
+    @default_style.setter
+    def default_style(self, value: Union[StyleProperties, Dict[str, Any]]):
+        if isinstance(value, StyleProperties):
+            self._default_style = value
+        else:
+            self._default_style = StyleProperties.from_dict(value)
 
     def get_active_style(
         self, tag_values: Optional[Dict[str, Any]] = None, state: Optional[str] = None
     ) -> Dict[str, Any]:
         tag_values = tag_values or {}
+        base = (
+            self.default_style.to_dict()
+            if isinstance(self.default_style, StyleProperties)
+            else dict(self.default_style)
+        )
         for style in self.conditional_styles:
             cond_cfg = getattr(style, "condition_data", {"mode": TriggerMode.ORDINARY.value})
             cond = style.condition
@@ -64,17 +88,18 @@ class ConditionalStyleManager(QObject):
                     pass
                 logger.warning("Condition evaluation error: %s", err)
             if match:
-                props = dict(style.properties)
-                if state == "hover" and style.hover_icon:
-                    props["icon"] = style.hover_icon
-                else:
-                    props["icon"] = style.icon
+                props = base.copy()
+                props.update(style.properties.to_dict())
                 if state:
-                    props.update(getattr(style, f"{state}_properties", {}))
+                    hover = getattr(style, f"{state}_properties", StyleProperties())
+                    if isinstance(hover, StyleProperties):
+                        props.update(hover.to_dict())
+                    elif isinstance(hover, dict):
+                        props.update(hover)
                 if style.tooltip:
                     props["tooltip"] = style.tooltip
                 return props
-        return dict(self.default_style)
+        return base
 
     def _evaluate_condition(
         self, condition: Any, tag_values: Dict[str, Any]
@@ -180,7 +205,7 @@ class ConditionalStyleManager(QObject):
             "conditional_styles": [
                 style.to_dict() for style in self.conditional_styles
             ],
-            "default_style": self.default_style,
+            "default_style": self.default_style.to_dict(),
         }
 
     @classmethod

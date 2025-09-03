@@ -1,5 +1,6 @@
 from .models import (
     ConditionalStyle,
+    StyleProperties,
     AnimationProperties,
     get_styles,
     get_style_by_id,
@@ -11,6 +12,7 @@ from .editor_dialog import ConditionalStyleEditorDialog
 __all__ = [
     "ConditionalStyle",
     "AnimationProperties",
+    "StyleProperties",
     "ConditionalStyleManager",
     "ConditionalStyleEditorDialog",
     "SwitchButton",
