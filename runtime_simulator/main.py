@@ -18,7 +18,6 @@ import argparse
 from typing import Optional
 
 from PyQt6.QtWidgets import QApplication, QFileDialog, QMessageBox
-from PyQt6.QtCore import Qt
 
 # Support both module and script execution
 try:
@@ -55,9 +54,6 @@ def main(argv: list[str] | None = None) -> int:
     raw_argv = list(sys.argv if argv is None else argv)
 
     # Create the Qt application up-front so we can show dialogs if needed
-    if hasattr(Qt.ApplicationAttribute, "AA_UseDesktopOpenGL"):
-        QApplication.setAttribute(Qt.ApplicationAttribute.AA_UseDesktopOpenGL)
-
     app = QApplication(raw_argv)
     app.setStyle("Fusion")
 
