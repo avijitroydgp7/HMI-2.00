@@ -234,6 +234,10 @@ class ButtonItem(BaseGraphicsItem):
 
         active_props = manager.get_active_style(tag_values, state if state == 'hover' else None)
 
+        # Map text_value to label for compatibility with paint method
+        if 'text_value' in active_props:
+            active_props['label'] = active_props['text_value']
+
         final_props = {**default_props, **active_props}
 
         tooltip = final_props.get('tooltip', '')
