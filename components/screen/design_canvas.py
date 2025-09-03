@@ -13,7 +13,6 @@ from PyQt6.QtWidgets import (
     QGraphicsSimpleTextItem,
     QGraphicsItem,
 )
-from PyQt6.QtOpenGLWidgets import QOpenGLWidget
 from PyQt6.QtGui import (
     QPainter,
     QColor,
@@ -117,9 +116,7 @@ class DesignCanvas(QGraphicsView):
         self._update_preview_style()
         self._update_cursor()
 
-        # Use OpenGL-backed viewport for GPU-accelerated rendering
-        self.setViewport(QOpenGLWidget())
-
+        # Use the default QWidget-based viewport for rasterized rendering
         self.scene = QGraphicsScene(self)
         self.scene.setItemIndexMethod(QGraphicsScene.ItemIndexMethod.BspTreeIndex)
         self.setScene(self.scene)

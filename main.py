@@ -3,40 +3,16 @@
 
 import sys
 import os
-import logging
+from PyQt6.QtWidgets import QApplication
+from main_window import MainWindow
 
 def main():
-    """Initializes the application and starts the event loop."""
-    # Defer heavy Qt imports until needed
-    from PyQt6.QtCore import Qt, QThreadPool
-    from PyQt6.QtWidgets import QApplication
-    from PyQt6.QtGui import QPixmapCache
-
-    # Configure rendering and high-DPI behavior before creating the application
-    if hasattr(Qt.ApplicationAttribute, "AA_UseHighDpiPixmaps"):
-        QApplication.setAttribute(Qt.ApplicationAttribute.AA_UseHighDpiPixmaps)
-
-    # Request desktop OpenGL so the GPU is engaged from startup
-    if hasattr(Qt.ApplicationAttribute, "AA_UseDesktopOpenGL"):
-        QApplication.setAttribute(Qt.ApplicationAttribute.AA_UseDesktopOpenGL)
-
-    QApplication.setHighDpiScaleFactorRoundingPolicy(
-        Qt.HighDpiScaleFactorRoundingPolicy.PassThrough
-    )
-
-    QPixmapCache.setCacheLimit(256 * 1024)
-
-    logging.basicConfig(level=logging.INFO)
-
+    """
+    Initializes the QApplication, sets up services, creates the main window,
+    and starts the event loop.
+    """
     app = QApplication(sys.argv)
     app.setStyle("Fusion")
-
-    # Import MainWindow after QApplication has been created
-    from main_window import MainWindow
-
-    # Attach a global thread pool to the application
-    app.thread_pool = QThreadPool.globalInstance()
-    app.thread_pool.setMaxThreadCount(os.cpu_count() or 1)
 
     # Check for a project file passed as a command-line argument
     initial_project = None
