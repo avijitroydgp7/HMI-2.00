@@ -108,6 +108,38 @@ class ButtonPropertiesWidget(QWidget):
                     style_data,
                 )
 
+        # Backwards compatibility: seed a basic style from legacy keys
+        if not self.style_manager.conditional_styles:
+            base_props = {
+                k: v
+                for k, v in self.properties.items()
+                if k
+                not in {
+                    "actions",
+                    "size",
+                    "hover_properties",
+                    "label",
+                    "default_style",
+                    "conditional_styles",
+                }
+            }
+            if self.properties.get("label"):
+                base_props["text_value"] = self.properties.get("label", "")
+                base_props.setdefault("text_type", "Text")
+            hover_props = copy.deepcopy(self.properties.get("hover_properties", {}))
+            if self.properties.get("icon"):
+                base_props.setdefault("icon", self.properties.get("icon"))
+            if self.properties.get("hover_icon"):
+                hover_props.setdefault("icon", self.properties.get("hover_icon"))
+            legacy_style = ConditionalStyle.from_dict(
+                {
+                    "style_id": str(self.properties.get("style_id", "1")),
+                    "properties": base_props,
+                    "hover_properties": hover_props,
+                }
+            )
+            self.style_manager.add_style(legacy_style)
+
         main_layout = QVBoxLayout(self)
 
         self.tab_widget = QTabWidget()
@@ -121,6 +153,8 @@ class ButtonPropertiesWidget(QWidget):
 
         self._populate_action_tab()
         self._populate_style_tab()
+        self._refresh_style_list()
+        self._on_style_selection_changed()
 
     # ------------------------------------------------------------------
     # Public API -------------------------------------------------------
@@ -148,6 +182,37 @@ class ButtonPropertiesWidget(QWidget):
                     e,
                     style_data,
                 )
+
+        if not self.style_manager.conditional_styles:
+            base_props = {
+                k: v
+                for k, v in self.properties.items()
+                if k
+                not in {
+                    "actions",
+                    "size",
+                    "hover_properties",
+                    "label",
+                    "default_style",
+                    "conditional_styles",
+                }
+            }
+            if self.properties.get("label"):
+                base_props["text_value"] = self.properties.get("label", "")
+                base_props.setdefault("text_type", "Text")
+            hover_props = copy.deepcopy(self.properties.get("hover_properties", {}))
+            if self.properties.get("icon"):
+                base_props.setdefault("icon", self.properties.get("icon"))
+            if self.properties.get("hover_icon"):
+                hover_props.setdefault("icon", self.properties.get("hover_icon"))
+            legacy_style = ConditionalStyle.from_dict(
+                {
+                    "style_id": str(self.properties.get("style_id", "1")),
+                    "properties": base_props,
+                    "hover_properties": hover_props,
+                }
+            )
+            self.style_manager.add_style(legacy_style)
 
         self._refresh_style_list()
         self._on_style_selection_changed()
@@ -743,7 +808,8 @@ class ButtonPropertiesWidget(QWidget):
                 base_props.get("icon", ""), base_props.get("icon_color")
             )
             preview.set_hover_icon(
-                hover_props.get("icon", ""), base_props.get("icon_color")
+                hover_props.get("icon", ""),
+                hover_props.get("icon_color", base_props.get("icon_color")),
             )
             icon_sz = dpi_scale(percent_to_value(base_props.get("icon_size", 20), min_dim) * scale)
             preview.set_icon_size(icon_sz)
@@ -844,9 +910,22 @@ class ButtonPropertiesWidget(QWidget):
         row = self.style_list.currentRow()
         if row < 0:
             return
-        if 0 <= row < len(self.style_manager.conditional_styles):
+        styles = self.style_manager.conditional_styles
+        if len(styles) <= 1:
+            if styles:
+                styles[0] = ConditionalStyle()
+                self.style_manager.renumber_styles()
+            self._refresh_style_list()
+            self.style_list.setCurrentRow(0)
+            self._on_style_selection_changed()
+            self._emit_changes()
+            return
+        if 0 <= row < len(styles):
             self.style_manager.remove_style(row)
             self._refresh_style_list()
+            self.style_list.setCurrentRow(
+                min(row, len(self.style_manager.conditional_styles) - 1)
+            )
             self._on_style_selection_changed()
             self._emit_changes()
 
@@ -895,7 +974,8 @@ class ButtonPropertiesWidget(QWidget):
 
     def _on_style_selection_changed(self):
         row = self.style_list.currentRow()
-        if row < 0:
+        styles = self.style_manager.conditional_styles
+        if row < 0 or not styles:
             self.style_edit_btn.setEnabled(False)
             self.style_remove_btn.setEnabled(False)
             self.style_duplicate_btn.setEnabled(False)
@@ -910,18 +990,22 @@ class ButtonPropertiesWidget(QWidget):
             self.preview_button.setFixedSize(dpi_scale(200), dpi_scale(100))
             self.preview_switch.setStyleSheet("")
             self.preview_stack.setCurrentWidget(self.preview_button)
+            self.style_list.blockSignals(True)
+            self._refresh_style_list()
+            self.style_list.blockSignals(False)
             return
 
         self.style_edit_btn.setEnabled(True)
-        self.style_remove_btn.setEnabled(True)
+        self.style_remove_btn.setEnabled(len(styles) > 1)
         self.style_duplicate_btn.setEnabled(True)
         self.style_move_up_btn.setEnabled(row > 0)
-        self.style_move_down_btn.setEnabled(row < len(self.style_manager.conditional_styles) - 1)
-        if row >= len(self.style_manager.conditional_styles):
+        self.style_move_down_btn.setEnabled(row < len(styles) - 1)
+        if row >= len(styles):
             self.style_properties_stack.setCurrentIndex(0)
+            self._refresh_style_list()
             return
 
-        style = self.style_manager.conditional_styles[row]
+        style = styles[row]
 
         # Populate labels
         self.style_id_label.setText(style.style_id)
@@ -981,7 +1065,8 @@ class ButtonPropertiesWidget(QWidget):
                 base_props.get('icon', ''), base_props.get('icon_color')
             )
             self.preview_button.set_hover_icon(
-                hover_props.get('icon', ''), base_props.get('icon_color')
+                hover_props.get('icon', ''),
+                hover_props.get('icon_color', base_props.get('icon_color'))
             )
             icon_sz = percent_to_value(base_props.get('icon_size', 48), min_dim)
             self.preview_button.set_icon_size(icon_sz)
@@ -1031,6 +1116,11 @@ class ButtonPropertiesWidget(QWidget):
             elif v_align == "bottom":
                 alignment |= Qt.AlignmentFlag.AlignBottom
             self.preview_button.setAlignment(alignment)
+
+        self.style_list.blockSignals(True)
+        self._refresh_style_list()
+        self.style_list.setCurrentRow(row)
+        self.style_list.blockSignals(False)
 
     def _populate_extended_style_tab(self):
         pass

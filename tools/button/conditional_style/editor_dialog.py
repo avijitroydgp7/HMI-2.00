@@ -1957,6 +1957,18 @@ class ConditionalStyleEditorDialog(QDialog):
             "offset": self.hover_controls["offset_spin"].value(),
             "text_type": self.hover_controls["text_type_combo"].currentText(),
         }
+        if "icon_size" in self.style.hover_properties:
+            hover_properties["icon_size"] = self.style.hover_properties.get(
+                "icon_size", 48
+            )
+        if "icon_color" in self.style.hover_properties:
+            hover_properties["icon_color"] = self.style.hover_properties.get(
+                "icon_color"
+            )
+        if "icon_align" in self.style.hover_properties:
+            hover_properties["icon_align"] = self.style.hover_properties.get(
+                "icon_align"
+            )
         if hover_properties["text_type"] == "Comment":
             hover_properties["comment_ref"] = {
                 "number": self.hover_controls["comment_number"].get_data(),
