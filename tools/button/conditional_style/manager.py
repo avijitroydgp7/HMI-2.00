@@ -34,6 +34,14 @@ class ConditionalStyleManager(QObject):
             style.properties = StyleProperties.from_dict(style.properties)
         if isinstance(style.hover_properties, dict):
             style.hover_properties = StyleProperties.from_dict(style.hover_properties)
+        if isinstance(style.pressed_properties, dict):
+            style.pressed_properties = StyleProperties.from_dict(
+                style.pressed_properties
+            )
+        if isinstance(style.disabled_properties, dict):
+            style.disabled_properties = StyleProperties.from_dict(
+                style.disabled_properties
+            )
         self.conditional_styles.append(style)
         self.renumber_styles()
         self.create_default_style_properties()
@@ -50,6 +58,14 @@ class ConditionalStyleManager(QObject):
                 style.properties = StyleProperties.from_dict(style.properties)
             if isinstance(style.hover_properties, dict):
                 style.hover_properties = StyleProperties.from_dict(style.hover_properties)
+            if isinstance(style.pressed_properties, dict):
+                style.pressed_properties = StyleProperties.from_dict(
+                    style.pressed_properties
+                )
+            if isinstance(style.disabled_properties, dict):
+                style.disabled_properties = StyleProperties.from_dict(
+                    style.disabled_properties
+                )
             self.conditional_styles[index] = style
             self.renumber_styles()
             self.create_default_style_properties()
@@ -77,6 +93,8 @@ class ConditionalStyleManager(QObject):
         for style in self.conditional_styles:
             keys.update(style.properties.keys())
             keys.update(style.hover_properties.keys())
+            keys.update(style.pressed_properties.keys())
+            keys.update(style.disabled_properties.keys())
         defaults = StyleProperties().to_dict()
         for key in keys:
             if key not in base:

@@ -61,12 +61,13 @@ class ButtonRuntimeController(QObject):
         """Bind the controller to a QPushButton instance."""
         self._button = button
         self._apply_style(state=None)
+        # Provide visual feedback for pressed state regardless of actions
+        button.pressed.connect(lambda: self._apply_style(None))
+        button.released.connect(lambda: self._apply_style(None))
+
         # Hook runtime actions
         actions = self.cfg.properties.get("actions", [])
         if not actions:
-            # Still provide visual pressed/hover state via simple styling
-            button.pressed.connect(lambda: self._apply_style(state="click"))
-            button.released.connect(lambda: self._apply_style(state=None))
             return
 
         # For now, apply first action as the primary.
@@ -119,6 +120,11 @@ class ButtonRuntimeController(QObject):
     def _apply_style(self, state: Optional[str]):
         if not self._button:
             return
+        if state is None:
+            if not self._button.isEnabled():
+                state = "disabled"
+            elif self._button.isDown():
+                state = "pressed"
         props = self._manager.get_active_style(self._tag_values, state)
         if props == self._last_props:
             return

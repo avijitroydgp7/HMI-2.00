@@ -12,10 +12,14 @@ def test_init_emits_styles_changed(qapp):
     assert spy[0][0]["style_id"] == _QT_DEFAULT_STYLE_ID
 
 
-def test_default_hover_properties_copy(qapp):
+def test_default_state_properties_copy(qapp):
     service = StyleDataService(DataContext())
     default_style = service.get_default_style()
     props = default_style["properties"]
     hover = default_style["hover_properties"]
-    assert props == hover
+    pressed = default_style["pressed_properties"]
+    disabled = default_style["disabled_properties"]
+    assert props == hover == pressed == disabled
     assert props is not hover
+    assert props is not pressed
+    assert props is not disabled

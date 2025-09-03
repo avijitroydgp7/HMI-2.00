@@ -178,6 +178,8 @@ class ConditionalStyle:
     properties: StyleProperties = field(default_factory=StyleProperties)
     tooltip: str = ""
     hover_properties: StyleProperties = field(default_factory=StyleProperties)
+    pressed_properties: StyleProperties = field(default_factory=StyleProperties)
+    disabled_properties: StyleProperties = field(default_factory=StyleProperties)
     animation: AnimationProperties = field(default_factory=AnimationProperties)
     style_sheet: str = ""
 
@@ -190,6 +192,8 @@ class ConditionalStyle:
             "tooltip": self.tooltip,
             "properties": self.properties.to_dict(),
             "hover_properties": self.hover_properties.to_dict(),
+            "pressed_properties": self.pressed_properties.to_dict(),
+            "disabled_properties": self.disabled_properties.to_dict(),
             "animation": self.animation.to_dict(),
             "style_sheet": self.style_sheet,
         }
@@ -198,6 +202,8 @@ class ConditionalStyle:
     def from_dict(cls, data: Dict[str, Any]) -> "ConditionalStyle":
         props = data.get("properties", {})
         hover = data.get("hover_properties", {})
+        pressed = data.get("pressed_properties", {})
+        disabled = data.get("disabled_properties", {})
         # Backwards compatibility for legacy icon placement
         if "icon" in data and "icon" not in props:
             props = dict(props)
@@ -205,12 +211,20 @@ class ConditionalStyle:
         if "hover_icon" in data and "icon" not in hover:
             hover = dict(hover)
             hover["icon"] = data.get("hover_icon")
+        if "pressed_icon" in data and "icon" not in pressed:
+            pressed = dict(pressed)
+            pressed["icon"] = data.get("pressed_icon")
+        if "disabled_icon" in data and "icon" not in disabled:
+            disabled = dict(disabled)
+            disabled["icon"] = data.get("disabled_icon")
         style = cls(
             style_id=data.get("style_id", ""),
             condition=data.get("condition"),
             tooltip=data.get("tooltip", ""),
             properties=StyleProperties.from_dict(props),
             hover_properties=StyleProperties.from_dict(hover),
+            pressed_properties=StyleProperties.from_dict(pressed),
+            disabled_properties=StyleProperties.from_dict(disabled),
             style_sheet=data.get("style_sheet", ""),
         )
         cond = data.get("condition_data", {"mode": TriggerMode.ORDINARY.value})

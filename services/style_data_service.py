@@ -78,12 +78,16 @@ def _qt_default_style() -> Dict[str, Any]:
 
     properties = base_props.to_dict()
     hover_properties = copy.deepcopy(properties)
+    pressed_properties = copy.deepcopy(properties)
+    disabled_properties = copy.deepcopy(properties)
 
     return {
         "id": _QT_DEFAULT_STYLE_ID,
         "name": "Qt Default",
         "properties": properties,
         "hover_properties": hover_properties,
+        "pressed_properties": pressed_properties,
+        "disabled_properties": disabled_properties,
     }
 
 
@@ -207,6 +211,18 @@ class StyleDataService(QObject):
                     props["hover_properties"] = copy.deepcopy(style_def["hover_properties"])
                 else:
                     props.pop("hover_properties", None)
+                if "pressed_properties" in style_def:
+                    props["pressed_properties"] = copy.deepcopy(
+                        style_def["pressed_properties"]
+                    )
+                else:
+                    props.pop("pressed_properties", None)
+                if "disabled_properties" in style_def:
+                    props["disabled_properties"] = copy.deepcopy(
+                        style_def["disabled_properties"]
+                    )
+                else:
+                    props.pop("disabled_properties", None)
                 if style_def.get("icon"):
                     props["icon"] = style_def["icon"]
                 else:

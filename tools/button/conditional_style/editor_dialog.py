@@ -92,6 +92,12 @@ class ConditionalStyleEditorDialog(QDialog):
         self.default_style = copy.deepcopy(default_style) if default_style else StyleProperties()
         self._text_color = self.style.properties.get("text_color", "")
         self._hover_text_color = self.style.hover_properties.get("text_color", "")
+        self._pressed_text_color = self.style.pressed_properties.get(
+            "text_color", ""
+        )
+        self._disabled_text_color = self.style.disabled_properties.get(
+            "text_color", ""
+        )
 
         # Initialize background-related colors so early update/preview calls
         # have default values to work with.  These will be overwritten once
@@ -100,6 +106,8 @@ class ConditionalStyleEditorDialog(QDialog):
         self._hover_bg_color = QColor()
         self._bg_color2 = QColor()
         self._border_color = QColor()
+        self._pressed_bg_color = QColor()
+        self._disabled_bg_color = QColor()
 
         main_layout = QGridLayout(self)
         # Provide consistent padding around the dialog and space between cells
@@ -367,11 +375,25 @@ class ConditionalStyleEditorDialog(QDialog):
             self.style.hover_properties, "hover"
         )
         style_tabs.addTab(self.hover_tab, "Hover")
+        self.pressed_tab, self.pressed_controls = self._build_state_tab(
+            self.style.pressed_properties, "pressed"
+        )
+        style_tabs.addTab(self.pressed_tab, "Pressed")
+        self.disabled_tab, self.disabled_controls = self._build_state_tab(
+            self.style.disabled_properties, "disabled"
+        )
+        style_tabs.addTab(self.disabled_tab, "Disabled")
         self.base_controls["icon_edit"].setText(
             self.style.properties.get("icon", "")
         )
         self.hover_controls["icon_edit"].setText(
             self.style.hover_properties.get("icon", "")
+        )
+        self.pressed_controls["icon_edit"].setText(
+            self.style.pressed_properties.get("icon", "")
+        )
+        self.disabled_controls["icon_edit"].setText(
+            self.style.disabled_properties.get("icon", "")
         )
 
         # Convenience shortcuts for commonly used controls
@@ -1091,6 +1113,24 @@ class ConditionalStyleEditorDialog(QDialog):
                 self.hover_controls["text_shade_combo"],
                 txt,
             )
+        elif state == "pressed":
+            self._pressed_bg_color = color
+            txt = self.get_contrast_color(self._pressed_bg_color)
+            self._pressed_text_color = txt.name()
+            self.set_combo_selection(
+                self.pressed_controls["text_base_combo"],
+                self.pressed_controls["text_shade_combo"],
+                txt,
+            )
+        elif state == "disabled":
+            self._disabled_bg_color = color
+            txt = self.get_contrast_color(self._disabled_bg_color)
+            self._disabled_text_color = txt.name()
+            self.set_combo_selection(
+                self.disabled_controls["text_base_combo"],
+                self.disabled_controls["text_shade_combo"],
+                txt,
+            )
         self.update_preview()
 
     def on_state_text_color_changed(self, state, color):
@@ -1099,6 +1139,10 @@ class ConditionalStyleEditorDialog(QDialog):
             self._text_color = name
         elif state == "hover":
             self._hover_text_color = name
+        elif state == "pressed":
+            self._pressed_text_color = name
+        elif state == "disabled":
+            self._disabled_text_color = name
         self.update_preview()
 
     def init_colors(self):
@@ -1289,10 +1333,18 @@ class ConditionalStyleEditorDialog(QDialog):
             self.on_state_bg_color_changed("base", final_color)
         elif base_combo is self.hover_controls.get("bg_base_combo"):
             self.on_state_bg_color_changed("hover", final_color)
+        elif base_combo is self.pressed_controls.get("bg_base_combo"):
+            self.on_state_bg_color_changed("pressed", final_color)
+        elif base_combo is self.disabled_controls.get("bg_base_combo"):
+            self.on_state_bg_color_changed("disabled", final_color)
         elif base_combo is self.base_controls.get("text_base_combo"):
             self.on_state_text_color_changed("base", final_color)
         elif base_combo is self.hover_controls.get("text_base_combo"):
             self.on_state_text_color_changed("hover", final_color)
+        elif base_combo is self.pressed_controls.get("text_base_combo"):
+            self.on_state_text_color_changed("pressed", final_color)
+        elif base_combo is self.disabled_controls.get("text_base_combo"):
+            self.on_state_text_color_changed("disabled", final_color)
 
     def on_bg_color_changed(self, color_name, color):
         if not color:
@@ -1301,6 +1353,8 @@ class ConditionalStyleEditorDialog(QDialog):
         self._hover_bg_color = color.lighter(120)
         self._border_color = color.darker(150)
         self._bg_color2 = color.lighter(130)
+        self._pressed_bg_color = QColor(color)
+        self._disabled_bg_color = QColor(color)
 
         self.set_combo_selection(
             self.bg_base_color_combo,
@@ -1312,6 +1366,8 @@ class ConditionalStyleEditorDialog(QDialog):
         hover_text = self.get_contrast_color(self._hover_bg_color)
         self._text_color = base_text.name()
         self._hover_text_color = hover_text.name()
+        self._pressed_text_color = base_text.name()
+        self._disabled_text_color = base_text.name()
 
         self.set_combo_selection(
             self.base_controls["bg_base_combo"],
@@ -1324,6 +1380,16 @@ class ConditionalStyleEditorDialog(QDialog):
             self._hover_bg_color,
         )
         self.set_combo_selection(
+            self.pressed_controls["bg_base_combo"],
+            self.pressed_controls["bg_shade_combo"],
+            self._pressed_bg_color,
+        )
+        self.set_combo_selection(
+            self.disabled_controls["bg_base_combo"],
+            self.disabled_controls["bg_shade_combo"],
+            self._disabled_bg_color,
+        )
+        self.set_combo_selection(
             self.base_controls["text_base_combo"],
             self.base_controls["text_shade_combo"],
             base_text,
@@ -1332,6 +1398,16 @@ class ConditionalStyleEditorDialog(QDialog):
             self.hover_controls["text_base_combo"],
             self.hover_controls["text_shade_combo"],
             hover_text,
+        )
+        self.set_combo_selection(
+            self.pressed_controls["text_base_combo"],
+            self.pressed_controls["text_shade_combo"],
+            base_text,
+        )
+        self.set_combo_selection(
+            self.disabled_controls["text_base_combo"],
+            self.disabled_controls["text_shade_combo"],
+            base_text,
         )
         self.update_preview()
 
@@ -1343,6 +1419,10 @@ class ConditionalStyleEditorDialog(QDialog):
 
         orig_base_text = self._text_color
         orig_hover_text = self._hover_text_color
+        orig_pressed_text = self._pressed_text_color
+        orig_disabled_text = self._disabled_text_color
+        orig_pressed_bg = self._pressed_bg_color
+        orig_disabled_bg = self._disabled_bg_color
 
         self.on_bg_color_changed(
             self.bg_base_color_combo.currentText(),
@@ -1360,6 +1440,30 @@ class ConditionalStyleEditorDialog(QDialog):
                 self.hover_controls["text_base_combo"],
                 self.hover_controls["text_shade_combo"],
                 QColor(orig_hover_text),
+            )
+        if orig_pressed_text:
+            self.set_combo_selection(
+                self.pressed_controls["text_base_combo"],
+                self.pressed_controls["text_shade_combo"],
+                QColor(orig_pressed_text),
+            )
+        if orig_disabled_text:
+            self.set_combo_selection(
+                self.disabled_controls["text_base_combo"],
+                self.disabled_controls["text_shade_combo"],
+                QColor(orig_disabled_text),
+            )
+        if orig_pressed_bg and isinstance(orig_pressed_bg, QColor):
+            self.set_combo_selection(
+                self.pressed_controls["bg_base_combo"],
+                self.pressed_controls["bg_shade_combo"],
+                orig_pressed_bg,
+            )
+        if orig_disabled_bg and isinstance(orig_disabled_bg, QColor):
+            self.set_combo_selection(
+                self.disabled_controls["bg_base_combo"],
+                self.disabled_controls["bg_shade_combo"],
+                orig_disabled_bg,
             )
 
     def create_coord_spinbox(self, value=0):
@@ -1994,6 +2098,102 @@ class ConditionalStyleEditorDialog(QDialog):
                 "text_edit"
             ].toPlainText()
 
+        pressed_properties = {
+            "background_color": self._pressed_bg_color.name(),
+            "text_color": self._pressed_text_color,
+            "font_size": self.pressed_controls["font_size_spin"].value(),
+            "font_family": self.pressed_controls["font_family_combo"].currentText(),
+            "bold": self.pressed_controls["bold_btn"].isChecked(),
+            "italic": self.pressed_controls["italic_btn"].isChecked(),
+            "underline": self.pressed_controls["underline_btn"].isChecked(),
+            "v_align": (
+                self.pressed_controls["v_align_group"]
+                .checkedButton()
+                .property("align_value")
+                if self.pressed_controls["v_align_group"].checkedButton()
+                else "middle",
+            ),
+            "h_align": (
+                self.pressed_controls["h_align_group"]
+                .checkedButton()
+                .property("align_value")
+                if self.pressed_controls["h_align_group"].checkedButton()
+                else "center",
+            ),
+            "offset": self.pressed_controls["offset_spin"].value(),
+            "text_type": self.pressed_controls["text_type_combo"].currentText(),
+        }
+        if "icon_size" in self.style.pressed_properties:
+            pressed_properties["icon_size"] = self.style.pressed_properties.get(
+                "icon_size", 50
+            )
+        if "icon_color" in self.style.pressed_properties:
+            pressed_properties["icon_color"] = self.style.pressed_properties.get(
+                "icon_color"
+            )
+        if "icon_align" in self.style.pressed_properties:
+            pressed_properties["icon_align"] = self.style.pressed_properties.get(
+                "icon_align"
+            )
+        if pressed_properties["text_type"] == "Comment":
+            pressed_properties["comment_ref"] = {
+                "number": self.pressed_controls["comment_number"].get_data(),
+                "column": self.pressed_controls["comment_column"].get_data(),
+                "row": self.pressed_controls["comment_row"].get_data(),
+            }
+        else:
+            pressed_properties["text_value"] = self.pressed_controls[
+                "text_edit"
+            ].toPlainText()
+
+        disabled_properties = {
+            "background_color": self._disabled_bg_color.name(),
+            "text_color": self._disabled_text_color,
+            "font_size": self.disabled_controls["font_size_spin"].value(),
+            "font_family": self.disabled_controls["font_family_combo"].currentText(),
+            "bold": self.disabled_controls["bold_btn"].isChecked(),
+            "italic": self.disabled_controls["italic_btn"].isChecked(),
+            "underline": self.disabled_controls["underline_btn"].isChecked(),
+            "v_align": (
+                self.disabled_controls["v_align_group"]
+                .checkedButton()
+                .property("align_value")
+                if self.disabled_controls["v_align_group"].checkedButton()
+                else "middle",
+            ),
+            "h_align": (
+                self.disabled_controls["h_align_group"]
+                .checkedButton()
+                .property("align_value")
+                if self.disabled_controls["h_align_group"].checkedButton()
+                else "center",
+            ),
+            "offset": self.disabled_controls["offset_spin"].value(),
+            "text_type": self.disabled_controls["text_type_combo"].currentText(),
+        }
+        if "icon_size" in self.style.disabled_properties:
+            disabled_properties["icon_size"] = self.style.disabled_properties.get(
+                "icon_size", 50
+            )
+        if "icon_color" in self.style.disabled_properties:
+            disabled_properties["icon_color"] = self.style.disabled_properties.get(
+                "icon_color"
+            )
+        if "icon_align" in self.style.disabled_properties:
+            disabled_properties["icon_align"] = self.style.disabled_properties.get(
+                "icon_align"
+            )
+        if disabled_properties["text_type"] == "Comment":
+            disabled_properties["comment_ref"] = {
+                "number": self.disabled_controls["comment_number"].get_data(),
+                "column": self.disabled_controls["comment_column"].get_data(),
+                "row": self.disabled_controls["comment_row"].get_data(),
+            }
+        else:
+            disabled_properties["text_value"] = self.disabled_controls[
+                "text_edit"
+            ].toPlainText()
+
         condition_cfg = {"mode": self.condition_mode_combo.currentText()}
         if condition_cfg["mode"] in (TriggerMode.ON.value, TriggerMode.OFF.value):
             data = (
@@ -2035,6 +2235,8 @@ class ConditionalStyleEditorDialog(QDialog):
 
         properties["icon"] = self.base_controls["icon_edit"].text()
         hover_properties["icon"] = self.hover_controls["icon_edit"].text()
+        pressed_properties["icon"] = self.pressed_controls["icon_edit"].text()
+        disabled_properties["icon"] = self.disabled_controls["icon_edit"].text()
 
         component_type = properties.get("component_type")
         style = ConditionalStyle(
@@ -2042,6 +2244,8 @@ class ConditionalStyleEditorDialog(QDialog):
             tooltip=self.tooltip_edit.text(),
             properties=StyleProperties.from_dict(properties),
             hover_properties=StyleProperties.from_dict(hover_properties),
+            pressed_properties=StyleProperties.from_dict(pressed_properties),
+            disabled_properties=StyleProperties.from_dict(disabled_properties),
             condition_data=condition_cfg,
         )
         # Generate the style sheet using the freshly collected properties so

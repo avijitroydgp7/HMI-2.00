@@ -104,6 +104,8 @@ class ButtonPropertiesWidget(QWidget):
                     "actions",
                     "size",
                     "hover_properties",
+                    "pressed_properties",
+                    "disabled_properties",
                     "label",
                     "default_style",
                     "conditional_styles",
@@ -113,6 +115,8 @@ class ButtonPropertiesWidget(QWidget):
                 base_props["text_value"] = self.properties.get("label", "")
                 base_props.setdefault("text_type", "Text")
             hover_props = copy.deepcopy(self.properties.get("hover_properties", {}))
+            pressed_props = copy.deepcopy(self.properties.get("pressed_properties", {}))
+            disabled_props = copy.deepcopy(self.properties.get("disabled_properties", {}))
             if self.properties.get("icon"):
                 base_props.setdefault("icon", self.properties.get("icon"))
             if self.properties.get("hover_icon"):
@@ -122,6 +126,8 @@ class ButtonPropertiesWidget(QWidget):
                     "style_id": str(self.properties.get("style_id", "1")),
                     "properties": base_props,
                     "hover_properties": hover_props,
+                    "pressed_properties": pressed_props,
+                    "disabled_properties": disabled_props,
                 }
             )
             self.style_manager.add_style(legacy_style)
@@ -181,6 +187,8 @@ class ButtonPropertiesWidget(QWidget):
                     "actions",
                     "size",
                     "hover_properties",
+                    "pressed_properties",
+                    "disabled_properties",
                     "label",
                     "default_style",
                     "conditional_styles",
@@ -190,6 +198,8 @@ class ButtonPropertiesWidget(QWidget):
                 base_props["text_value"] = self.properties.get("label", "")
                 base_props.setdefault("text_type", "Text")
             hover_props = copy.deepcopy(self.properties.get("hover_properties", {}))
+            pressed_props = copy.deepcopy(self.properties.get("pressed_properties", {}))
+            disabled_props = copy.deepcopy(self.properties.get("disabled_properties", {}))
             if self.properties.get("icon"):
                 base_props.setdefault("icon", self.properties.get("icon"))
             if self.properties.get("hover_icon"):
@@ -199,6 +209,8 @@ class ButtonPropertiesWidget(QWidget):
                     "style_id": str(self.properties.get("style_id", "1")),
                     "properties": base_props,
                     "hover_properties": hover_props,
+                    "pressed_properties": pressed_props,
+                    "disabled_properties": disabled_props,
                 }
             )
             self.style_manager.add_style(legacy_style)
@@ -245,6 +257,14 @@ class ButtonPropertiesWidget(QWidget):
                 "hover_properties",
                 self.properties.get("default_style", {}).get("hover_properties", {}),
             ),
+            "pressed_properties": first_style.get(
+                "pressed_properties",
+                self.properties.get("default_style", {}).get("pressed_properties", {}),
+            ),
+            "disabled_properties": first_style.get(
+                "disabled_properties",
+                self.properties.get("default_style", {}).get("disabled_properties", {}),
+            ),
         }
         updated_props["default_style"] = default_style
 
@@ -254,6 +274,14 @@ class ButtonPropertiesWidget(QWidget):
             updated_props["hover_properties"] = default_style["hover_properties"]
         else:
             updated_props.pop("hover_properties", None)
+        if default_style.get("pressed_properties"):
+            updated_props["pressed_properties"] = default_style["pressed_properties"]
+        else:
+            updated_props.pop("pressed_properties", None)
+        if default_style.get("disabled_properties"):
+            updated_props["disabled_properties"] = default_style["disabled_properties"]
+        else:
+            updated_props.pop("disabled_properties", None)
         if default_style.get("tags"):
             updated_props["tags"] = default_style["tags"]
         else:
