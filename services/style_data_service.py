@@ -17,6 +17,7 @@ from __future__ import annotations
 from typing import Dict, Any, List
 import copy
 import uuid
+from dataclasses import dataclass, field, asdict
 
 from PyQt6.QtCore import QObject, pyqtSignal
 
@@ -28,62 +29,62 @@ from .data_context import DataContext, data_context
 # The application always provides at least one style – the Qt default
 # QPushButton appearance.  Keeping the definition here avoids circular
 # imports with modules that expose convenience wrappers around the service.
-_QT_DEFAULT_STYLE: Dict[str, Any] = {
-    "id": "qt_default",
-    "name": "Qt Default",
-    "properties": {
-        "component_type": "Standard Button",
-        "shape_style": "Flat",
-        "background_type": "Solid",
-        "background_color": "#f0f0f0",
-        "text_color": "#000000",
-        "border_radius": 4,
-        "border_width": 1,
-        "border_style": "solid",
-        "border_color": "#b3b3b3",
-        "font_family": "",
-        "font_size": 18,
-        "bold": False,
-        "italic": False,
-        "underline": False,
-        "text_type": "Text",
-        "text_value": "",
-        "comment_ref": {},
-        "h_align": "center",
-        "v_align": "middle",
-        "offset": 0,
-        "icon": "",
-        "icon_size": 50,
-        "icon_align": "center",
-        "icon_color": "",
-    },
-    "hover_properties": {
-       "component_type": "Standard Button",
-        "shape_style": "Flat",
-        "background_type": "Solid",
-        "background_color": "#f0f0f0",
-        "text_color": "#000000",
-        "border_radius": 4,
-        "border_width": 1,
-        "border_style": "solid",
-        "border_color": "#b3b3b3",
-        "font_family": "",
-        "font_size": 18,
-        "bold": False,
-        "italic": False,
-        "underline": False,
-        "text_type": "Text",
-        "text_value": "",
-        "comment_ref": {},
-        "h_align": "center",
-        "v_align": "middle",
-        "offset": 0,
-        "icon": "",
-        "icon_size": 50,
-        "icon_align": "center",
-        "icon_color": "",
-    },
-}
+_QT_DEFAULT_STYLE_ID = "qt_default"
+
+
+@dataclass
+class StyleProperties:
+    component_type: str = "Standard Button"
+    shape_style: str = "Flat"
+    background_type: str = "Solid"
+    background_color: str = ""
+    text_color: str = ""
+    border_radius: int = 0
+    border_width: int = 0
+    border_style: str = "solid"
+    border_color: str = ""
+    font_family: str = ""
+    font_size: int = 0
+    bold: bool = False
+    italic: bool = False
+    underline: bool = False
+    text_type: str = "Text"
+    text_value: str = ""
+    comment_ref: Dict[str, Any] = field(default_factory=dict)
+    h_align: str = "center"
+    v_align: str = "middle"
+    offset: int = 0
+    icon: str = ""
+    icon_size: int = 0
+    icon_align: str = "center"
+    icon_color: str = ""
+
+    def to_dict(self) -> Dict[str, Any]:
+        return copy.deepcopy(asdict(self))
+
+
+def _qt_default_style() -> Dict[str, Any]:
+    """Factory for the built-in Qt button style."""
+
+    base_props = StyleProperties(
+        background_color="#f0f0f0",
+        text_color="#000000",
+        border_radius=4,
+        border_width=1,
+        border_color="#b3b3b3",
+        font_size=18,
+        icon_size=50,
+    )
+
+    properties = base_props.to_dict()
+    hover_properties = copy.deepcopy(properties)
+
+    return {
+        "id": _QT_DEFAULT_STYLE_ID,
+        "name": "Qt Default",
+        "properties": properties,
+        "hover_properties": hover_properties,
+    }
 
 
 class StyleDataService(QObject):
@@ -104,7 +105,7 @@ class StyleDataService(QObject):
         )
 
         # Ensure the default style exists
-        self.add_style(copy.deepcopy(_QT_DEFAULT_STYLE))
+        self.add_style(_qt_default_style())
 
     # ------------------------------------------------------------------
     # Basic CRUD helpers
@@ -112,7 +113,7 @@ class StyleDataService(QObject):
     def clear_all(self) -> None:
         """Remove all styles and restore the built-in default."""
         self._styles.clear()
-        self.add_style(copy.deepcopy(_QT_DEFAULT_STYLE))
+        self.add_style(_qt_default_style())
         self.styles_changed.emit("")
 
     def get_style(self, style_id: str) -> Dict[str, Any] | None:
@@ -135,8 +136,8 @@ class StyleDataService(QObject):
 
     def get_default_style(self) -> Dict[str, Any]:
         """Return a copy of the default style definition."""
-        data = self._styles.get(_QT_DEFAULT_STYLE["id"])
-        return copy.deepcopy(data) if data is not None else copy.deepcopy(_QT_DEFAULT_STYLE)
+        data = self._styles.get(_QT_DEFAULT_STYLE_ID)
+        return copy.deepcopy(data) if data is not None else _qt_default_style()
 
     def add_style(self, style_data: Dict[str, Any], style_id: str | None = None) -> str:
         sid = style_id or style_data.get("id") or str(uuid.uuid4())
@@ -159,7 +160,7 @@ class StyleDataService(QObject):
 
     def remove_style(self, style_id: str) -> bool:
         """Remove a style and reset buttons to the default style."""
-        if style_id == _QT_DEFAULT_STYLE["id"]:
+        if style_id == _QT_DEFAULT_STYLE_ID:
             return False
         if style_id in self._styles:
             del self._styles[style_id]
@@ -179,8 +180,8 @@ class StyleDataService(QObject):
         styles = project_data.get("styles", {})
         self._styles = {sid: copy.deepcopy(s) for sid, s in styles.items()}
         # Guarantee the default style exists
-        if _QT_DEFAULT_STYLE["id"] not in self._styles:
-            self._styles[_QT_DEFAULT_STYLE["id"]] = copy.deepcopy(_QT_DEFAULT_STYLE)
+        if _QT_DEFAULT_STYLE_ID not in self._styles:
+            self._styles[_QT_DEFAULT_STYLE_ID] = _qt_default_style()
         self.styles_changed.emit("")
 
     # ------------------------------------------------------------------

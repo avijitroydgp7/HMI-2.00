@@ -4,6 +4,8 @@ from typing import Any, Dict, Optional, Tuple, Callable, Set
 from dataclasses import dataclass
 
 import os
+import json
+import hashlib
 
 from PyQt6.QtCore import QObject, QSize, Qt
 from PyQt6.QtWidgets import QPushButton
@@ -43,6 +45,9 @@ class ButtonRuntimeController(QObject):
         self._tag_values: Dict[str, Any] = {}
         self._tags_of_interest: Set[str] = self._collect_referenced_tags(self.cfg.properties)
         self._button: Optional[QPushButton] = None
+        self._last_props: Optional[Dict[str, Any]] = None
+        self._last_css: str = ""
+        self._style_cache: Dict[Tuple[str, Optional[str]], Tuple[str, QIcon]] = {}
 
         # Prime local cache
         for t in self._tags_of_interest:
@@ -82,6 +87,7 @@ class ButtonRuntimeController(QObject):
     def _on_tag_changed(self, name: str, value: Any):
         if name in self._tags_of_interest:
             self._tag_values[name] = value
+            self._invalidate_cache()
             self._apply_style(state=None)
 
     def _build_style_manager(self, props: Dict[str, Any]) -> ConditionalStyleManager:
@@ -102,92 +108,118 @@ class ButtonRuntimeController(QObject):
                 pass
         return m
 
+    def _invalidate_cache(self) -> None:
+        self._style_cache.clear()
+
+    def _compute_style_key(self, props: Dict[str, Any], state: Optional[str]) -> Tuple[str, Optional[str]]:
+        data = json.dumps(props, sort_keys=True)
+        digest = hashlib.sha1(data.encode("utf-8")).hexdigest()
+        return digest, state
+
     def _apply_style(self, state: Optional[str]):
         if not self._button:
             return
         props = self._manager.get_active_style(self._tag_values, state)
+        if props == self._last_props:
+            return
 
         # Button geometry for proportional scaling
         h = max(self._button.height(), 1)
         w = max(self._button.width(), 1)
         min_dim = min(w, h)
 
-        # Visual properties
-        bg = props.get("background_color", "#5a6270")
-        fg = props.get("text_color", "#ffffff")
-        bw = percent_to_value(props.get("border_width", 0) or 0, min_dim)
-        bc = props.get("border_color", "#000000")
-
-        # Border radius (supports per-corner values)
-        if any(k in props for k in ("border_radius_tl", "border_radius_tr", "border_radius_br", "border_radius_bl")):
-            br_tl = percent_to_value(props.get("border_radius_tl", 0) or 0, min_dim)
-            br_tr = percent_to_value(props.get("border_radius_tr", 0) or 0, min_dim)
-            br_br = percent_to_value(props.get("border_radius_br", 0) or 0, min_dim)
-            br_bl = percent_to_value(props.get("border_radius_bl", 0) or 0, min_dim)
-            radius_css = (
-                f"border-top-left-radius:{br_tl}px;"
-                f"border-top-right-radius:{br_tr}px;"
-                f"border-bottom-right-radius:{br_br}px;"
-                f"border-bottom-left-radius:{br_bl}px;"
-            )
-        else:
-            br = percent_to_value(props.get("border_radius", 0) or 0, min_dim)
-            radius_css = f"border-radius:{br}px;"
-
-        # Font handling
+        # Update text and tooltip regardless of cache use
         text = str(props.get("text_value", props.get("label", "Button")))
         self._button.setText(text)
-        font_size = percent_to_value(props.get("font_size", 0) or 0, h)
-        font_family = props.get("font_family")
-        bold = props.get("bold")
-        italic = props.get("italic")
-        underline = props.get("underline")
-        font_css = f"font-size:{font_size}px;"
-        if font_family:
-            font_css += f"font-family:'{font_family}';"
-        if bold:
-            font_css += "font-weight:bold;"
-        if italic:
-            font_css += "font-style:italic;"
-        if underline:
-            font_css += "text-decoration:underline;"
-
-        css = (
-            "QPushButton{"
-            f"background-color:{bg};color:{fg};"
-            f"border:{bw}px solid {bc};"
-            f"{radius_css}{font_css}"
-            "}"
-        )
-        self._button.setStyleSheet(css)
-        # ToolTip
         self._button.setToolTip(str(props.get("tooltip", "") or ""))
 
-        # Icon handling
-        icon_src = props.get("icon", "")
-        if icon_src:
-            size = percent_to_value(props.get("icon_size", 0) or 0, h)
-            color = props.get("icon_color")
-            icon = QIcon()
-            if str(icon_src).startswith("qta:"):
-                name = icon_src.split(":", 1)[1]
-                icon = IconManager.create_icon(name, color=color)
+        key = self._compute_style_key(props, state)
+        cached = self._style_cache.get(key)
+        if cached is None:
+            bg = props.get("background_color", "#5a6270")
+            fg = props.get("text_color", "#ffffff")
+            bw = percent_to_value(props.get("border_width", 0) or 0, min_dim)
+            bc = props.get("border_color", "#000000")
+
+            if any(
+                k in props
+                for k in (
+                    "border_radius_tl",
+                    "border_radius_tr",
+                    "border_radius_br",
+                    "border_radius_bl",
+                )
+            ):
+                br_tl = percent_to_value(props.get("border_radius_tl", 0) or 0, min_dim)
+                br_tr = percent_to_value(props.get("border_radius_tr", 0) or 0, min_dim)
+                br_br = percent_to_value(props.get("border_radius_br", 0) or 0, min_dim)
+                br_bl = percent_to_value(props.get("border_radius_bl", 0) or 0, min_dim)
+                radius_css = (
+                    f"border-top-left-radius:{br_tl}px;"
+                    f"border-top-right-radius:{br_tr}px;"
+                    f"border-bottom-right-radius:{br_br}px;"
+                    f"border-bottom-left-radius:{br_bl}px;"
+                )
             else:
-                ext = os.path.splitext(icon_src)[1].lower()
-                if ext == ".svg":
-                    renderer = QSvgRenderer(icon_src)
-                    if renderer.isValid():
-                        pix = QPixmap(size, size)
-                        pix.fill(Qt.GlobalColor.transparent)
-                        p = QPainter(pix)
-                        renderer.render(p)
-                        p.end()
-                        icon = QIcon(pix)
+                br = percent_to_value(props.get("border_radius", 0) or 0, min_dim)
+                radius_css = f"border-radius:{br}px;"
+
+            font_size = percent_to_value(props.get("font_size", 0) or 0, h)
+            font_family = props.get("font_family")
+            bold = props.get("bold")
+            italic = props.get("italic")
+            underline = props.get("underline")
+            font_css = f"font-size:{font_size}px;"
+            if font_family:
+                font_css += f"font-family:'{font_family}';"
+            if bold:
+                font_css += "font-weight:bold;"
+            if italic:
+                font_css += "font-style:italic;"
+            if underline:
+                font_css += "text-decoration:underline;"
+
+            css = (
+                "QPushButton{"
+                f"background-color:{bg};color:{fg};"
+                f"border:{bw}px solid {bc};"
+                f"{radius_css}{font_css}"
+                "}"
+            )
+
+            icon_src = props.get("icon", "")
+            icon = QIcon()
+            if icon_src:
+                size = percent_to_value(props.get("icon_size", 0) or 0, h)
+                color = props.get("icon_color")
+                if str(icon_src).startswith("qta:"):
+                    name = icon_src.split(":", 1)[1]
+                    icon = IconManager.create_icon(name, color=color)
                 else:
-                    pix = QPixmap(icon_src)
-                    if not pix.isNull():
-                        icon = QIcon(pix)
-            self._button.setIcon(icon)
+                    ext = os.path.splitext(icon_src)[1].lower()
+                    if ext == ".svg":
+                        renderer = QSvgRenderer(icon_src)
+                        if renderer.isValid():
+                            pix = QPixmap(size, size)
+                            pix.fill(Qt.GlobalColor.transparent)
+                            p = QPainter(pix)
+                            renderer.render(p)
+                            p.end()
+                            icon = QIcon(pix)
+                    else:
+                        pix = QPixmap(icon_src)
+                        if not pix.isNull():
+                            icon = QIcon(pix)
+            cached = (css, icon)
+            self._style_cache[key] = cached
+
+        css, icon = cached
+        self._button.setStyleSheet(css)
+        self._last_props = dict(props)
+        self._last_css = css
+        self._button.setIcon(icon)
+        if not icon.isNull():
+            size = percent_to_value(props.get("icon_size", 0) or 0, h)
             self._button.setIconSize(QSize(size, size))
 
     # --- Action execution -----------------------------------------------
