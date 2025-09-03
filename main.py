@@ -3,7 +3,7 @@
 
 import sys
 import os
-from PyQt6.QtWidgets import QApplication
+from utils.exception_safe_application import ExceptionSafeApplication
 from main_window import MainWindow
 
 def main():
@@ -11,7 +11,7 @@ def main():
     Initializes the QApplication, sets up services, creates the main window,
     and starts the event loop.
     """
-    app = QApplication(sys.argv)
+    app = ExceptionSafeApplication(sys.argv)
     app.setStyle("Fusion")
 
     # Check for a project file passed as a command-line argument

@@ -1,6 +1,7 @@
 # components/screen/graphics_items.py
 # MODIFIED: All mouse event logic has been removed and moved to the DesignCanvas.
 
+from typing import Optional
 from PyQt6.QtWidgets import QGraphicsObject, QGraphicsItem
 from PyQt6.QtGui import (
     QPainter,
@@ -9,6 +10,7 @@ from PyQt6.QtGui import (
     QFont,
     QFontMetrics,
     QPixmap,
+    QIcon,
     QPainterPath,
     QPolygonF,
     QLinearGradient,
@@ -382,10 +384,11 @@ class ButtonItem(BaseGraphicsItem):
             size = int(_pct_of(props.get('icon_size', 0), min_dim))
             color = props.get('icon_color')
             align = props.get('icon_align', 'center')
+            icon: Optional[QIcon] = None
             pix = QPixmap()
             if str(icon_src).startswith('qta:'):
                 name = icon_src.split(':', 1)[1]
-                pix = IconManager.create_pixmap(name, size, color=color)
+                icon = IconManager.create_icon(name, color=color)
             else:
                 ext = os.path.splitext(icon_src)[1].lower()
                 if ext == '.svg':
@@ -402,8 +405,21 @@ class ButtonItem(BaseGraphicsItem):
                         pix = pix.scaled(
                             size, size, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation
                         )
-            if not pix.isNull():
-                br = rect
+            br = rect
+            if icon is not None and not icon.isNull():
+                x = br.left() + (br.width() - size) / 2
+                y = br.top() + (br.height() - size) / 2
+                if 'left' in align:
+                    x = br.left()
+                elif 'right' in align:
+                    x = br.right() - size
+                if 'top' in align:
+                    y = br.top()
+                elif 'bottom' in align:
+                    y = br.bottom() - size
+                target = QRectF(int(x), int(y), size, size)
+                icon.paint(painter, target.toRect())
+            elif not pix.isNull():
                 x = br.left() + (br.width() - pix.width()) / 2
                 y = br.top() + (br.height() - pix.height()) / 2
                 if 'left' in align:
