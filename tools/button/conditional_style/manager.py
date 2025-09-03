@@ -36,11 +36,13 @@ class ConditionalStyleManager(QObject):
             style.hover_properties = StyleProperties.from_dict(style.hover_properties)
         self.conditional_styles.append(style)
         self.renumber_styles()
+        self.create_default_style_properties()
 
     def remove_style(self, index: int):
         if 0 <= index < len(self.conditional_styles):
             del self.conditional_styles[index]
             self.renumber_styles()
+            self.create_default_style_properties()
 
     def update_style(self, index: int, style: ConditionalStyle):
         if 0 <= index < len(self.conditional_styles):
@@ -50,6 +52,7 @@ class ConditionalStyleManager(QObject):
                 style.hover_properties = StyleProperties.from_dict(style.hover_properties)
             self.conditional_styles[index] = style
             self.renumber_styles()
+            self.create_default_style_properties()
 
     @property
     def default_style(self) -> StyleProperties:
@@ -61,6 +64,24 @@ class ConditionalStyleManager(QObject):
             self._default_style = value
         else:
             self._default_style = StyleProperties.from_dict(value)
+        self.create_default_style_properties()
+
+    def create_default_style_properties(self) -> None:
+        """Ensure the default style defines all keys seen in conditional styles."""
+        base = (
+            self._default_style.to_dict()
+            if isinstance(self._default_style, StyleProperties)
+            else dict(self._default_style)
+        )
+        keys = set(base.keys())
+        for style in self.conditional_styles:
+            keys.update(style.properties.keys())
+            keys.update(style.hover_properties.keys())
+        defaults = StyleProperties().to_dict()
+        for key in keys:
+            if key not in base:
+                base[key] = defaults.get(key, "")
+        self._default_style = StyleProperties.from_dict(base)
 
     def get_active_style(
         self, tag_values: Optional[Dict[str, Any]] = None, state: Optional[str] = None
