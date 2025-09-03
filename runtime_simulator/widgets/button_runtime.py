@@ -171,7 +171,7 @@ class ButtonRuntimeController(QObject):
             icon = QIcon()
             if str(icon_src).startswith("qta:"):
                 name = icon_src.split(":", 1)[1]
-                icon = IconManager.create_icon(name, size=size, color=color)
+                icon = IconManager.create_icon(name, color=color)
             else:
                 ext = os.path.splitext(icon_src)[1].lower()
                 if ext == ".svg":

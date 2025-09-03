@@ -4,7 +4,7 @@ from PyQt6.QtGui import QIcon, QPixmap, QMovie
 import qtawesome as qta
 
 
-_ICON_CACHE: Dict[Tuple[str, Optional[int], Optional[str], Optional[str]], QIcon] = {}
+_ICON_CACHE: Dict[Tuple[str, Optional[str], Optional[str]], QIcon] = {}
 """Cache for generated :class:`QIcon` objects.
 
 The cache is unbounded and will grow until cleared via
@@ -21,8 +21,9 @@ This cache has no eviction policy.
 class IconManager:
     """Centralized manager for creating and converting icons.
 
-    Icons and pixmaps are cached by ``(icon_name, size, color, active_color)``.
-    Call :meth:`clear_cache` to release memory.
+    Icons are cached by ``(icon_name, color, active_color)`` and pixmaps by
+    ``(icon_name, size, color, active_color)``. Call :meth:`clear_cache` to
+    release memory.
     """
 
     @staticmethod
@@ -34,18 +35,22 @@ class IconManager:
     ):
         """Create a PyQt6 ``QIcon`` from a qtawesome icon name.
 
-        Results are cached by ``(icon_name, size, color, active_color)``.
+        Results are cached by ``(icon_name, color, active_color)``. The
+        ``size`` argument is retained for backward compatibility but is not
+        used; Qt will render scalable icons at the requested dimensions via
+        ``QWidget.setIconSize``.
 
         Args:
             icon_name (str): The qtawesome icon name (e.g., 'fa5s.file').
             color (str, optional): The color of the icon. Defaults to the standard icon color.
             active_color (str, optional): The color of the icon when active. Defaults to the standard active color.
-            size (int, optional): The size of the icon in pixels. If ``None`` a scalable icon is returned.
+            size (int, optional): Deprecated. Provided for compatibility but
+                ignored; the returned icon is scalable.
 
         Returns:
             QIcon: A PyQt6-compatible ``QIcon``.
         """
-        key = (icon_name, size, color, active_color)
+        key = (icon_name, color, active_color)
         if key in _ICON_CACHE:
             return _ICON_CACHE[key]
 
@@ -63,10 +68,10 @@ class IconManager:
 
             if qta_icon is None:
                 result = QIcon()
-            elif size is None:
-                result = qta_icon
             else:
-                result = QIcon(qta_icon.pixmap(size, size))
+                # Wrap the qtawesome icon to ensure a distinct QIcon instance
+                # while preserving the scalable rendering capabilities.
+                result = QIcon(qta_icon)
 
         except Exception as e:
             print(f"Error creating icon {icon_name}: {str(e)}")
