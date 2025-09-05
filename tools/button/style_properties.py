@@ -87,20 +87,32 @@ class StyleProperties:
     @staticmethod
     def _normalize(data: Dict[str, Any]) -> Dict[str, Any]:
         """Normalize legacy keys into the new structure."""
-        if "text" in data and "text_value" not in data:
-            data["text_value"] = data.get("text", "")
+        if "text" in data:
+            if "text_value" not in data:
+                data["text_value"] = data["text"]
+            data.pop("text", None)
         if data.get("text_type") == "Comment" and "comment_ref" not in data:
             data["comment_ref"] = {
-                "number": data.get("comment_number", 0),
-                "column": data.get("comment_column", 0),
-                "row": data.get("comment_row", 0),
+                "number": data.pop("comment_number", 0),
+                "column": data.pop("comment_column", 0),
+                "row": data.pop("comment_row", 0),
             }
-        if "horizontal_align" in data and "h_align" not in data:
-            data["h_align"] = data.get("horizontal_align")
-        if "vertical_align" in data and "v_align" not in data:
-            data["v_align"] = data.get("vertical_align")
-        if "offset_to_frame" in data and "offset" not in data:
-            data["offset"] = data.get("offset_to_frame")
+        else:
+            data.pop("comment_number", None)
+            data.pop("comment_column", None)
+            data.pop("comment_row", None)
+        if "horizontal_align" in data:
+            if "h_align" not in data:
+                data["h_align"] = data["horizontal_align"]
+            data.pop("horizontal_align", None)
+        if "vertical_align" in data:
+            if "v_align" not in data:
+                data["v_align"] = data["vertical_align"]
+            data.pop("vertical_align", None)
+        if "offset_to_frame" in data:
+            if "offset" not in data:
+                data["offset"] = data["offset_to_frame"]
+            data.pop("offset_to_frame", None)
         return data
 
     @classmethod
