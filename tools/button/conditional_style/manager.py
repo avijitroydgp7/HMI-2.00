@@ -135,6 +135,8 @@ class ConditionalStyleManager(QObject):
                         props.update(hover)
                 if style.tooltip:
                     props["tooltip"] = style.tooltip
+                if style.style_sheet:
+                    props["style_sheet"] = style.style_sheet
                 return props
         return base
 
