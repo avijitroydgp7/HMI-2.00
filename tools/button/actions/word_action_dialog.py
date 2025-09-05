@@ -22,6 +22,17 @@ class WordActionDialog(QDialog):
     """
     def __init__(self, parent=None, action_data: Optional[Dict] = None):
         super().__init__(parent)
+        # Optional selectors are defined upfront so that signal handlers can
+        # safely reference them before the Trigger UI is built.
+        self.on_off_tag_selector = None
+        self.range_operand1_selector = None
+        self.range_operand2_selector = None
+        self.range_lower_bound_selector = None
+        self.range_upper_bound_selector = None
+        self.range_operator_combo = None
+        self.range_rhs_stack = None
+        self._trigger_helper = None
+
         self.setWindowTitle("Word Action Configuration")
         self.setMinimumWidth(800)
         # Provide a sensible initial size without fixing the height
@@ -76,16 +87,6 @@ class WordActionDialog(QDialog):
 
         # --- Initialize dialog state ---
         self._initialize_dialog(action_data)
-        
-        # Ensure dynamic trigger widgets exist as attributes
-        # so signal handlers can safely reference them before creation.
-        if not hasattr(self, 'on_off_tag_selector'): self.on_off_tag_selector = None
-        if not hasattr(self, 'range_operand1_selector'): self.range_operand1_selector = None
-        if not hasattr(self, 'range_operand2_selector'): self.range_operand2_selector = None
-        if not hasattr(self, 'range_lower_bound_selector'): self.range_lower_bound_selector = None
-        if not hasattr(self, 'range_upper_bound_selector'): self.range_upper_bound_selector = None
-        if not hasattr(self, 'range_operator_combo'): self.range_operator_combo = None
-        if not hasattr(self, 'range_rhs_stack'): self.range_rhs_stack = None
 
     # -------------------------------------------------------------------------
     # UI Building Methods
@@ -239,7 +240,7 @@ class WordActionDialog(QDialog):
         self.trigger_mode_combo.currentTextChanged.connect(self._on_trigger_mode_changed)
         self.operator_combo.currentTextChanged.connect(self._on_conditional_operator_changed)
         # Ensure trigger range operator toggles RHS page and re-validates
-        if getattr(self, 'range_operator_combo', None) is not None:
+        if self.range_operator_combo is not None:
             self.range_operator_combo.currentTextChanged.connect(self._on_range_operator_changed)
         self.conditional_reset_group.toggled.connect(self._validate_form)
         self.else_checkbox.toggled.connect(self.else_group.setVisible)
@@ -249,7 +250,7 @@ class WordActionDialog(QDialog):
 
     def _on_trigger_mode_changed(self, mode: str):
         # Switch pre-built pages without destroying widgets
-        if hasattr(self, '_trigger_helper') and self._trigger_helper:
+        if self._trigger_helper:
             self._trigger_helper.on_mode_changed(mode)
         self._validate_form()
 
@@ -265,7 +266,7 @@ class WordActionDialog(QDialog):
         self._validate_form()
 
     def _on_range_operator_changed(self, operator: str):
-        if hasattr(self, '_trigger_helper') and self._trigger_helper:
+        if self._trigger_helper:
             self._trigger_helper.on_range_operator_changed(operator)
         self._validate_form()
 
@@ -277,7 +278,7 @@ class WordActionDialog(QDialog):
         sender = self.sender()
         if sender == self.target_tag_selector:
             self._on_target_tag_selected(tag_data)
-        elif getattr(self, 'range_operand1_selector', None) is not None and sender == self.range_operand1_selector:
+        elif self.range_operand1_selector is not None and sender == self.range_operand1_selector:
             self._on_range_operand1_selected(tag_data)
         self._validate_form()
 
