@@ -1557,9 +1557,21 @@ class ConditionalStyleEditorDialog(QDialog):
         else:
             self.preview_stack.setCurrentWidget(self.preview_button)
 
-        self.shape_style_label.setEnabled(not is_switch)
-        self.shape_style_combo.setEnabled(not is_switch)
+        # Shape style should be configurable even for toggle switches
+        self.shape_style_label.setEnabled(True)
+        self.shape_style_combo.setEnabled(True)
         self.border_group.setEnabled(not is_switch)
+
+        # Toggle switches do not use text parameters, so disable related controls
+        self._set_state_controls_enabled(self.base_controls, not is_switch)
+        self._set_state_controls_enabled(self.hover_controls, not is_switch)
+        if is_switch:
+            # Re-enable background color controls which are still applicable
+            for controls in (self.base_controls, self.hover_controls):
+                for key in ("bg_base_combo", "bg_shade_combo"):
+                    w = controls.get(key)
+                    if w:
+                        w.setEnabled(True)
 
         is_circle = component_type == "Circle Button"
         self.corner_frame.setEnabled(not is_circle and not is_switch)
