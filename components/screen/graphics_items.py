@@ -450,25 +450,40 @@ class ButtonItem(BaseGraphicsItem):
             align = props.get('icon_align', 'center')
             icon: Optional[QIcon] = None
             pix = QPixmap()
+            logger = logging.getLogger(__name__)
             if str(icon_src).startswith('qta:'):
                 name = icon_src.split(':', 1)[1]
                 icon = IconManager.create_icon(name, color=color)
+                if icon.isNull():
+                    logger.warning("Failed to load icon '%s'", icon_src)
             else:
                 ext = os.path.splitext(icon_src)[1].lower()
                 if ext == '.svg':
-                    renderer = QSvgRenderer(icon_src)
-                    if renderer.isValid():
-                        pix = QPixmap(size, size)
-                        pix.fill(Qt.GlobalColor.transparent)
-                        p = QPainter(pix)
-                        renderer.render(p)
-                        p.end()
+                    if os.path.exists(icon_src):
+                        renderer = QSvgRenderer(icon_src)
+                        if renderer.isValid():
+                            pix = QPixmap(size, size)
+                            pix.fill(Qt.GlobalColor.transparent)
+                            p = QPainter(pix)
+                            renderer.render(p)
+                            p.end()
+                            if pix.isNull():
+                                logger.warning("Failed to render SVG icon '%s'", icon_src)
+                        else:
+                            logger.warning("Invalid SVG icon '%s'", icon_src)
+                    else:
+                        logger.warning("Icon file not found: %s", icon_src)
                 else:
-                    pix = QPixmap(icon_src)
-                    if not pix.isNull():
-                        pix = pix.scaled(
-                            size, size, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation
-                        )
+                    if os.path.exists(icon_src):
+                        pix = QPixmap(icon_src)
+                        if pix.isNull():
+                            logger.warning("Failed to load icon '%s'", icon_src)
+                        else:
+                            pix = pix.scaled(
+                                size, size, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation
+                            )
+                    else:
+                        logger.warning("Icon file not found: %s", icon_src)
             br = rect
             if icon is not None and not icon.isNull():
                 x = br.left() + (br.width() - size) / 2
@@ -495,6 +510,23 @@ class ButtonItem(BaseGraphicsItem):
                 elif 'bottom' in align:
                     y = br.bottom() - pix.height()
                 painter.drawPixmap(int(x), int(y), pix)
+            else:
+                x = br.left() + (br.width() - size) / 2
+                y = br.top() + (br.height() - size) / 2
+                if 'left' in align:
+                    x = br.left()
+                elif 'right' in align:
+                    x = br.right() - size
+                if 'top' in align:
+                    y = br.top()
+                elif 'bottom' in align:
+                    y = br.bottom() - size
+                placeholder = QRectF(int(x), int(y), size, size)
+                painter.setBrush(QColor("#cccccc"))
+                painter.setPen(QPen(Qt.GlobalColor.darkGray, 1, Qt.PenStyle.SolidLine))
+                painter.drawRect(placeholder)
+                painter.drawLine(placeholder.topLeft(), placeholder.bottomRight())
+                painter.drawLine(placeholder.topRight(), placeholder.bottomLeft())
 
         # Draw text
         painter.setPen(text_color)
@@ -1024,8 +1056,16 @@ class ImageItem(BaseGraphicsItem):
     def _load_pixmap(self):
         props = self.instance_data.get("properties", {})
         path = props.get("path")
+        self._pixmap = QPixmap()
         if path:
-            self._pixmap = QPixmap(path)
+            if os.path.exists(path):
+                pixmap = QPixmap(path)
+                if pixmap.isNull():
+                    logging.getLogger(__name__).warning("Failed to load image '%s'", path)
+                else:
+                    self._pixmap = pixmap
+            else:
+                logging.getLogger(__name__).warning("Image file not found: %s", path)
 
     def update_data(self, new_instance_data):
         super().update_data(new_instance_data)
