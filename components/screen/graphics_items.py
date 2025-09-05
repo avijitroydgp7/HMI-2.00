@@ -297,13 +297,13 @@ class ButtonItem(BaseGraphicsItem):
         background_type = props.get('background_type', 'Solid')
 
         # Apply style properties converting percentages to absolute values
-        bg_color = QColor(props.get('background_color', '#5a6270'))
-        text_color = QColor(props.get('text_color', '#ffffff'))
+        bg_color = QColor(props.get('background_color') or '#5a6270')
+        text_color = QColor(props.get('text_color') or '#ffffff')
         # Prefer Conditional Style "text_value"; fallback to legacy "label"
         label = props.get('text_value', props.get('label', 'Button'))
         border_radius = _pct_of(props.get('border_radius', 0), min_dim)
         border_width = _pct_of(props.get('border_width', 0), min_dim)
-        border_color = QColor(props.get('border_color', '#000000'))
+        border_color = QColor(props.get('border_color') or '#000000')
         font_size = _pct_of(props.get('font_size', 0), h)
         # Text formatting from Conditional Style
         font_family = props.get('font_family', 'Arial') or 'Arial'
