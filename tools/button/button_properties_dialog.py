@@ -822,7 +822,6 @@ class ButtonPropertiesWidget(QWidget):
             dpi_scale(6), dpi_scale(4), dpi_scale(6), dpi_scale(4)
         )
         hl.setSpacing(dpi_scale(8))
-        hl.setSpacing(8)
 
         component_type = style.properties.get("component_type", "Standard Button")
 
