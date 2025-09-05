@@ -22,6 +22,7 @@ _hover_props.setdefault("font_size", 18)
 DEFAULT_PROPERTIES = {
     "label": "Button",
     "size": {"width": 100, "height": 40},
+    "actions": [],
     "default_style": copy.deepcopy(_base_props),
     "conditional_styles": [
         {

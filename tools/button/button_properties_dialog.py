@@ -63,8 +63,6 @@ class ButtonPropertiesWidget(QWidget):
     def __init__(self, properties: Dict[str, Any], parent=None):
         super().__init__(parent)
         self.properties = copy.deepcopy(properties)
-        if "actions" not in self.properties:
-            self.properties["actions"] = []
 
         # Initialize conditional style manager
         self._load_styles(self.properties)
@@ -90,8 +88,6 @@ class ButtonPropertiesWidget(QWidget):
     def set_properties(self, properties: Dict[str, Any]) -> None:
         """Replace the current property payload and refresh the UI."""
         self.properties = copy.deepcopy(properties)
-        if "actions" not in self.properties:
-            self.properties["actions"] = []
 
         # Update action model backing list
         self.action_model._actions = self.properties["actions"]
