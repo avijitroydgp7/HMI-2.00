@@ -228,10 +228,10 @@ class ButtonItem(BaseGraphicsItem):
                 'comment_ref': props.get('comment_ref', {}),
                 # Border
                 'border_radius': props.get('border_radius', 5),
-                'border_radius_tl': props.get('border_radius_tl', props.get('border_radius', 5)),
-                'border_radius_tr': props.get('border_radius_tr', props.get('border_radius', 5)),
-                'border_radius_br': props.get('border_radius_br', props.get('border_radius', 5)),
-                'border_radius_bl': props.get('border_radius_bl', props.get('border_radius', 5)),
+                'border_radius_tl': props.get('border_radius_tl') or props.get('border_radius', 5),
+                'border_radius_tr': props.get('border_radius_tr') or props.get('border_radius', 5),
+                'border_radius_br': props.get('border_radius_br') or props.get('border_radius', 5),
+                'border_radius_bl': props.get('border_radius_bl') or props.get('border_radius', 5),
                 'border_width': props.get('border_width', 0),
                 'border_style': props.get('border_style', 'solid'),
                 'border_color': props.get('border_color', '#000000'),
@@ -311,12 +311,12 @@ class ButtonItem(BaseGraphicsItem):
         font_italic = bool(props.get('italic', False))
         font_underline = bool(props.get('underline', False))
 
-        br_tl = _pct_of(props.get('border_radius_tl', props.get('border_radius', 0)), min_dim)
-        br_tr = _pct_of(props.get('border_radius_tr', props.get('border_radius', 0)), min_dim)
-        br_br = _pct_of(props.get('border_radius_br', props.get('border_radius', 0)), min_dim)
-        br_bl = _pct_of(props.get('border_radius_bl', props.get('border_radius', 0)), min_dim)
+        br_tl = _pct_of(props.get('border_radius_tl') or props.get('border_radius', 0), min_dim)
+        br_tr = _pct_of(props.get('border_radius_tr') or props.get('border_radius', 0), min_dim)
+        br_br = _pct_of(props.get('border_radius_br') or props.get('border_radius', 0), min_dim)
+        br_bl = _pct_of(props.get('border_radius_bl') or props.get('border_radius', 0), min_dim)
         custom_radii = any(
-            k in props for k in ('border_radius_tl','border_radius_tr','border_radius_br','border_radius_bl')
+            props.get(k, 0) for k in ('border_radius_tl','border_radius_tr','border_radius_br','border_radius_bl')
         )
 
         # Component type adjustments

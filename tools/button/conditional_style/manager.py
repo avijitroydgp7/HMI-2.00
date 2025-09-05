@@ -122,10 +122,7 @@ class ConditionalStyleManager(QObject):
             )
             match, err = self._evaluate_condition(condition, tag_values)
             if err:
-                try:
-                    type(self).condition_error.emit(err)
-                except Exception:
-                    pass
+                self.condition_error.emit(err)
                 logger.warning("Condition evaluation error: %s", err)
             if match:
                 props = base.copy()

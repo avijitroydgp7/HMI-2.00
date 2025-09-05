@@ -15,6 +15,10 @@ class StyleProperties:
     background_color: str = ""
     text_color: str = ""
     border_radius: int = 0
+    border_radius_tl: int = 0
+    border_radius_tr: int = 0
+    border_radius_br: int = 0
+    border_radius_bl: int = 0
     border_width: int = 0
     border_style: str = "solid"
     border_color: str = ""

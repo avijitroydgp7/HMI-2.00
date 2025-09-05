@@ -148,7 +148,7 @@ class ButtonRuntimeController(QObject):
             bc = props.get("border_color", "#000000")
 
             if any(
-                k in props
+                props.get(k, 0)
                 for k in (
                     "border_radius_tl",
                     "border_radius_tr",

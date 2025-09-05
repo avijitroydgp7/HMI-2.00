@@ -281,16 +281,16 @@ class ConditionalStyleEditorDialog(QDialog):
         corner_layout.addWidget(bottom_label, 3, 0)
 
         self.tl_radius_spin = self.create_radius_spinbox()
-        self.tl_radius_spin.setValue(self.style.properties.get("border_radius_tl", 0))
+        self.tl_radius_spin.setValue(self.style.properties.border_radius_tl)
         corner_layout.addWidget(self.tl_radius_spin, 2, 1)
         self.tr_radius_spin = self.create_radius_spinbox()
-        self.tr_radius_spin.setValue(self.style.properties.get("border_radius_tr", 0))
+        self.tr_radius_spin.setValue(self.style.properties.border_radius_tr)
         corner_layout.addWidget(self.tr_radius_spin, 2, 2)
         self.bl_radius_spin = self.create_radius_spinbox()
-        self.bl_radius_spin.setValue(self.style.properties.get("border_radius_bl", 0))
+        self.bl_radius_spin.setValue(self.style.properties.border_radius_bl)
         corner_layout.addWidget(self.bl_radius_spin, 3, 1)
         self.br_radius_spin = self.create_radius_spinbox()
-        self.br_radius_spin.setValue(self.style.properties.get("border_radius_br", 0))
+        self.br_radius_spin.setValue(self.style.properties.border_radius_br)
         corner_layout.addWidget(self.br_radius_spin, 3, 2)
 
         for w in [
@@ -1633,11 +1633,25 @@ class ConditionalStyleEditorDialog(QDialog):
         height = dpi_scale(100)
         padding = min(width, height) // 10
         min_dim = min(width, height)
-        tl_pct = (self.tl_radius_spin.value() if props is None else props.get("border_radius_tl", 0))
-        tr_pct = (self.tr_radius_spin.value() if props is None else props.get("border_radius_tr", 0))
-        br_pct = (self.br_radius_spin.value() if props is None else props.get("border_radius_br", 0))
-        bl_pct = (self.bl_radius_spin.value() if props is None else props.get("border_radius_bl", 0))
-        border_pct = (self.border_width_spin.value() if props is None else props.get("border_width", 0))
+        if props is None:
+            tl_pct = self.tl_radius_spin.value()
+            tr_pct = self.tr_radius_spin.value()
+            br_pct = self.br_radius_spin.value()
+            bl_pct = self.bl_radius_spin.value()
+            border_pct = self.border_width_spin.value()
+        else:
+            if isinstance(props, StyleProperties):
+                tl_pct = props.border_radius_tl
+                tr_pct = props.border_radius_tr
+                br_pct = props.border_radius_br
+                bl_pct = props.border_radius_bl
+                border_pct = props.border_width
+            else:
+                tl_pct = props.get("border_radius_tl", 0)
+                tr_pct = props.get("border_radius_tr", 0)
+                br_pct = props.get("border_radius_br", 0)
+                bl_pct = props.get("border_radius_bl", 0)
+                border_pct = props.get("border_width", 0)
         tl_radius = percent_to_value(tl_pct, min_dim)
         tr_radius = percent_to_value(tr_pct, min_dim)
         br_radius = percent_to_value(br_pct, min_dim)
