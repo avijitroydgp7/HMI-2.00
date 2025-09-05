@@ -67,70 +67,7 @@ class ButtonPropertiesWidget(QWidget):
             self.properties["actions"] = []
 
         # Initialize conditional style manager
-        self.style_manager = ConditionalStyleManager()
-        default_style = self.properties.get("default_style", {})
-        self.style_manager.default_style = default_style.get(
-            "properties", default_style
-        )
-        for style_data in self.properties.get("conditional_styles", []):
-            # Typical failure reasons when importing styles from dict:
-            # - Missing or misspelled keys like 'properties' or 'hover_properties'
-            # - Wrong data types (e.g., strings where dicts are expected)
-            # - Invalid color formats or icon paths in the properties
-            # - Malformed 'condition' or 'condition_data' structures
-            # - Legacy schema fields not compatible with current loader
-            try:
-                # ConditionalStyle.from_dict already understands the separated
-                # base/hover property dictionaries and tooltip field.
-                style = ConditionalStyle.from_dict(style_data)
-                self.style_manager.add_style(style)
-            except Exception as e:
-                logging.getLogger(__name__).warning(
-                    "Failed to load conditional style (style_id=%r). Typical causes: "
-                    "missing keys, wrong types, invalid color/icon values, or malformed condition data. "
-                    "Error: %s. Data: %r",
-                    style_data.get("style_id", "<unknown>"),
-                    e,
-                    style_data,
-                )
-
-        # Backwards compatibility: seed a basic style from legacy keys
-        if not self.style_manager.conditional_styles:
-            base_props = {
-                k: v
-                for k, v in self.properties.items()
-                if k
-                not in {
-                    "actions",
-                    "size",
-                    "hover_properties",
-                    "pressed_properties",
-                    "disabled_properties",
-                    "label",
-                    "default_style",
-                    "conditional_styles",
-                }
-            }
-            if self.properties.get("label"):
-                base_props["text_value"] = self.properties.get("label", "")
-                base_props.setdefault("text_type", "Text")
-            hover_props = copy.deepcopy(self.properties.get("hover_properties", {}))
-            pressed_props = copy.deepcopy(self.properties.get("pressed_properties", {}))
-            disabled_props = copy.deepcopy(self.properties.get("disabled_properties", {}))
-            if self.properties.get("icon"):
-                base_props.setdefault("icon", self.properties.get("icon"))
-            if self.properties.get("hover_icon"):
-                hover_props.setdefault("icon", self.properties.get("hover_icon"))
-            legacy_style = ConditionalStyle.from_dict(
-                {
-                    "style_id": str(self.properties.get("style_id", "1")),
-                    "properties": base_props,
-                    "hover_properties": hover_props,
-                    "pressed_properties": pressed_props,
-                    "disabled_properties": disabled_props,
-                }
-            )
-            self.style_manager.add_style(legacy_style)
+        self._load_styles(self.properties)
 
         main_layout = QVBoxLayout(self)
 
@@ -161,59 +98,7 @@ class ButtonPropertiesWidget(QWidget):
         self.action_model.refresh()
 
         # Recreate style manager from dict
-        self.style_manager = ConditionalStyleManager()
-        default_style = self.properties.get("default_style", {})
-        self.style_manager.default_style = default_style.get(
-            "properties", default_style
-        )
-        for style_data in self.properties.get("conditional_styles", []):
-            try:
-                style = ConditionalStyle.from_dict(style_data)
-                self.style_manager.add_style(style)
-            except Exception as e:
-                logging.getLogger(__name__).warning(
-                    "Failed to load conditional style (style_id=%r). Error: %s. Data: %r",
-                    style_data.get("style_id", "<unknown>"),
-                    e,
-                    style_data,
-                )
-
-        if not self.style_manager.conditional_styles:
-            base_props = {
-                k: v
-                for k, v in self.properties.items()
-                if k
-                not in {
-                    "actions",
-                    "size",
-                    "hover_properties",
-                    "pressed_properties",
-                    "disabled_properties",
-                    "label",
-                    "default_style",
-                    "conditional_styles",
-                }
-            }
-            if self.properties.get("label"):
-                base_props["text_value"] = self.properties.get("label", "")
-                base_props.setdefault("text_type", "Text")
-            hover_props = copy.deepcopy(self.properties.get("hover_properties", {}))
-            pressed_props = copy.deepcopy(self.properties.get("pressed_properties", {}))
-            disabled_props = copy.deepcopy(self.properties.get("disabled_properties", {}))
-            if self.properties.get("icon"):
-                base_props.setdefault("icon", self.properties.get("icon"))
-            if self.properties.get("hover_icon"):
-                hover_props.setdefault("icon", self.properties.get("hover_icon"))
-            legacy_style = ConditionalStyle.from_dict(
-                {
-                    "style_id": str(self.properties.get("style_id", "1")),
-                    "properties": base_props,
-                    "hover_properties": hover_props,
-                    "pressed_properties": pressed_props,
-                    "disabled_properties": disabled_props,
-                }
-            )
-            self.style_manager.add_style(legacy_style)
+        self._load_styles(self.properties)
 
         self._refresh_style_list()
         self._on_style_selection_changed()
@@ -302,6 +187,65 @@ class ButtonPropertiesWidget(QWidget):
         return updated_props
 
     # Internal helpers -------------------------------------------------
+    def _load_styles(self, properties: Dict[str, Any]) -> None:
+        """Create and populate ``ConditionalStyleManager`` from ``properties``."""
+        self.style_manager = ConditionalStyleManager()
+        default_style = properties.get("default_style", {})
+        self.style_manager.default_style = default_style.get(
+            "properties", default_style
+        )
+        for style_data in properties.get("conditional_styles", []):
+            try:
+                style = ConditionalStyle.from_dict(style_data)
+                self.style_manager.add_style(style)
+            except Exception as e:
+                logging.getLogger(__name__).warning(
+                    "Failed to load conditional style (style_id=%r). Typical causes: "
+                    "missing keys, wrong types, invalid color/icon values, or malformed condition data. "
+                    "Error: %s. Data: %r",
+                    style_data.get("style_id", "<unknown>"),
+                    e,
+                    style_data,
+                )
+
+        # Backwards compatibility: seed a basic style from legacy keys
+        if not self.style_manager.conditional_styles:
+            base_props = {
+                k: v
+                for k, v in properties.items()
+                if k
+                not in {
+                    "actions",
+                    "size",
+                    "hover_properties",
+                    "pressed_properties",
+                    "disabled_properties",
+                    "label",
+                    "default_style",
+                    "conditional_styles",
+                }
+            }
+            if properties.get("label"):
+                base_props["text_value"] = properties.get("label", "")
+                base_props.setdefault("text_type", "Text")
+            hover_props = copy.deepcopy(properties.get("hover_properties", {}))
+            pressed_props = copy.deepcopy(properties.get("pressed_properties", {}))
+            disabled_props = copy.deepcopy(properties.get("disabled_properties", {}))
+            if properties.get("icon"):
+                base_props.setdefault("icon", properties.get("icon"))
+            if properties.get("hover_icon"):
+                hover_props.setdefault("icon", properties.get("hover_icon"))
+            legacy_style = ConditionalStyle.from_dict(
+                {
+                    "style_id": str(properties.get("style_id", "1")),
+                    "properties": base_props,
+                    "hover_properties": hover_props,
+                    "pressed_properties": pressed_props,
+                    "disabled_properties": disabled_props,
+                }
+            )
+            self.style_manager.add_style(legacy_style)
+
     def _emit_changes(self) -> None:
         data = self.get_data()
         self.properties = copy.deepcopy(data)
