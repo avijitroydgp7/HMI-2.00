@@ -200,25 +200,48 @@ class ButtonItem(BaseGraphicsItem):
             
             # Set default style
             props = self.instance_data.get('properties', {})
-            self._conditional_style_manager.default_style = {
-                'background_color': props.get('background_color', '#5a6270'),
-                'background_color2': props.get('background_color2', '#5a6270'),
+            # Align default style keys with Conditional Style window (StyleProperties)
+            default_style = {
+                # Core component styling
+                'component_type': props.get('component_type', 'Standard Button'),
+                'shape_style': props.get('shape_style', 'Flat'),
                 'background_type': props.get('background_type', 'Solid'),
+                'background_color': props.get('background_color', '#5a6270'),
+                # Extras supported by the editor (stored via StyleProperties.extra)
+                'background_color2': props.get('background_color2', '#5a6270'),
                 'gradient_x1': props.get('gradient_x1', 0),
                 'gradient_y1': props.get('gradient_y1', 0),
                 'gradient_x2': props.get('gradient_x2', 0),
                 'gradient_y2': props.get('gradient_y2', 1),
+                # Text
+                'text_type': props.get('text_type', 'Text'),
+                'text_value': props.get('text_value', props.get('label', 'Button')),
                 'text_color': props.get('text_color', '#ffffff'),
-                'label': props.get('label', 'Button'),
+                'font_family': props.get('font_family', ''),
+                'font_size': props.get('font_size', 18),
+                'bold': props.get('bold', False),
+                'italic': props.get('italic', False),
+                'underline': props.get('underline', False),
+                'h_align': props.get('h_align', props.get('horizontal_align', 'center')),
+                'v_align': props.get('v_align', props.get('vertical_align', 'middle')),
+                'offset': props.get('offset', props.get('offset_to_frame', 0)),
+                'comment_ref': props.get('comment_ref', {}),
+                # Border
                 'border_radius': props.get('border_radius', 5),
+                'border_radius_tl': props.get('border_radius_tl', props.get('border_radius', 5)),
+                'border_radius_tr': props.get('border_radius_tr', props.get('border_radius', 5)),
+                'border_radius_br': props.get('border_radius_br', props.get('border_radius', 5)),
+                'border_radius_bl': props.get('border_radius_bl', props.get('border_radius', 5)),
                 'border_width': props.get('border_width', 0),
+                'border_style': props.get('border_style', 'solid'),
                 'border_color': props.get('border_color', '#000000'),
-                'font_size': props.get('font_size', 10),
-                'font_weight': props.get('font_weight', 'normal'),
-                'opacity': props.get('opacity', 1.0),
-                'component_type': props.get('component_type', 'Standard Button'),
-                'shape_style': props.get('shape_style', 'Flat')
+                # Icon
+                'icon': props.get('icon', ''),
+                'icon_size': props.get('icon_size', 50),
+                'icon_align': props.get('icon_align', 'center'),
+                'icon_color': props.get('icon_color', ''),
             }
+            self._conditional_style_manager.default_style = default_style
         
         return self._conditional_style_manager
 
@@ -276,13 +299,17 @@ class ButtonItem(BaseGraphicsItem):
         # Apply style properties converting percentages to absolute values
         bg_color = QColor(props.get('background_color', '#5a6270'))
         text_color = QColor(props.get('text_color', '#ffffff'))
-        label = props.get('label', 'Button')
+        # Prefer Conditional Style "text_value"; fallback to legacy "label"
+        label = props.get('text_value', props.get('label', 'Button'))
         border_radius = _pct_of(props.get('border_radius', 0), min_dim)
         border_width = _pct_of(props.get('border_width', 0), min_dim)
         border_color = QColor(props.get('border_color', '#000000'))
         font_size = _pct_of(props.get('font_size', 0), h)
-        font_weight = props.get('font_weight', 'normal')
-        opacity = props.get('opacity', 1.0)
+        # Text formatting from Conditional Style
+        font_family = props.get('font_family', 'Arial') or 'Arial'
+        font_bold = bool(props.get('bold', False))
+        font_italic = bool(props.get('italic', False))
+        font_underline = bool(props.get('underline', False))
 
         br_tl = _pct_of(props.get('border_radius_tl', props.get('border_radius', 0)), min_dim)
         br_tr = _pct_of(props.get('border_radius_tr', props.get('border_radius', 0)), min_dim)
@@ -305,11 +332,8 @@ class ButtonItem(BaseGraphicsItem):
             br_tl = br_tr = br_br = br_bl = border_radius
             custom_radii = False
 
-        # Apply opacity
-        bg_color.setAlphaF(opacity)
-        text_color.setAlphaF(opacity)
+        # Secondary background colour (for gradients)
         bg_color2 = QColor(props.get('background_color2', bg_color.name()))
-        bg_color2.setAlphaF(opacity)
 
         # Determine brush
         brush = None
@@ -339,7 +363,9 @@ class ButtonItem(BaseGraphicsItem):
             painter.setBrush(Qt.BrushStyle.NoBrush)
         else:
             if border_width > 0:
-                painter.setPen(QPen(border_color, border_width))
+                pen = QPen(border_color, border_width)
+                _apply_pen_style_from_name(pen, props.get('border_style', 'solid'))
+                painter.setPen(pen)
             else:
                 painter.setPen(Qt.PenStyle.NoPen)
             painter.setBrush(brush)
@@ -372,9 +398,13 @@ class ButtonItem(BaseGraphicsItem):
             # Restore brush/pen for subsequent drawing
             painter.setBrush(brush if shape_style != 'Outline' else Qt.BrushStyle.NoBrush)
             if shape_style == 'Outline':
-                painter.setPen(QPen(bg_color, max(1, border_width)))
+                pen = QPen(bg_color, max(1, border_width))
+                _apply_pen_style_from_name(pen, props.get('border_style', 'solid'))
+                painter.setPen(pen)
             elif border_width > 0:
-                painter.setPen(QPen(border_color, border_width))
+                pen = QPen(border_color, border_width)
+                _apply_pen_style_from_name(pen, props.get('border_style', 'solid'))
+                painter.setPen(pen)
             else:
                 painter.setPen(Qt.PenStyle.NoPen)
 
@@ -434,13 +464,31 @@ class ButtonItem(BaseGraphicsItem):
 
         # Draw text
         painter.setPen(text_color)
-        font = QFont("Arial", max(1, int(font_size)))
-        if font_weight == 'bold':
-            font.setBold(True)
-        elif font_weight == 'light':
-            font.setWeight(QFont.Weight.Light)
+        font = QFont(font_family, max(1, int(font_size)))
+        font.setBold(font_bold)
+        font.setItalic(font_italic)
+        font.setUnderline(font_underline)
         painter.setFont(font)
-        painter.drawText(self.boundingRect(), Qt.AlignmentFlag.AlignCenter, label)
+
+        # Alignment and offset
+        h_align = props.get('h_align', props.get('horizontal_align', 'center'))
+        v_align = props.get('v_align', props.get('vertical_align', 'middle'))
+        alignment = Qt.AlignmentFlag.AlignAbsolute
+        if h_align == 'left':
+            alignment |= Qt.AlignmentFlag.AlignLeft
+        elif h_align == 'center':
+            alignment |= Qt.AlignmentFlag.AlignHCenter
+        elif h_align == 'right':
+            alignment |= Qt.AlignmentFlag.AlignRight
+        if v_align == 'top':
+            alignment |= Qt.AlignmentFlag.AlignTop
+        elif v_align == 'middle':
+            alignment |= Qt.AlignmentFlag.AlignVCenter
+        elif v_align == 'bottom':
+            alignment |= Qt.AlignmentFlag.AlignBottom
+        offset_px = int(props.get('offset', props.get('offset_to_frame', 0)) or 0)
+        text_rect = self.boundingRect().adjusted(offset_px, offset_px, -offset_px, -offset_px)
+        painter.drawText(text_rect, alignment, label)
         
         # Handle animations (simplified for now)
         animation = props.get('animation', {})
@@ -452,7 +500,7 @@ class ButtonItem(BaseGraphicsItem):
             if anim_type == 'pulse':
                 # Simple pulse effect by adjusting opacity
                 pulse_factor = 0.8 + 0.2 * intensity
-                bg_color.setAlphaF(opacity * pulse_factor)
+                bg_color.setAlphaF(min(1.0, pulse_factor))
                 painter.setBrush(bg_color)
                 if shape_path:
                     painter.drawPath(shape_path)
