@@ -19,16 +19,26 @@ from PyQt6.QtCore import QRectF, Qt, QPointF, QLineF
 from PyQt6.QtSvg import QSvgRenderer
 import os
 import copy
+import logging
 
 from services.screen_data_service import screen_service
 from utils.icon_manager import IconManager
 
 
 def _pct_of(value, base):
+    """Return ``value`` percent of ``base``.
+
+    Only ``TypeError`` and ``ValueError`` are handled; other exceptions will
+    propagate to the caller. If an error occurs the exception is logged and
+    re-raised so that callers can decide how to recover.
+    """
     try:
         return float(value) * base / 100.0
-    except Exception:
-        return 0.0
+    except (TypeError, ValueError) as exc:
+        logging.getLogger(__name__).warning(
+            "Failed to compute percentage: value=%r base=%r", value, base, exc_info=exc
+        )
+        raise
 
 
 def _apply_pen_style_from_name(pen: QPen, style_name: str):
@@ -301,20 +311,41 @@ class ButtonItem(BaseGraphicsItem):
         text_color = QColor(props.get('text_color') or '#ffffff')
         # Prefer Conditional Style "text_value"; fallback to legacy "label"
         label = props.get('text_value', props.get('label', 'Button'))
-        border_radius = _pct_of(props.get('border_radius', 0), min_dim)
-        border_width = _pct_of(props.get('border_width', 0), min_dim)
+        try:
+            border_radius = _pct_of(props.get('border_radius', 0), min_dim)
+        except (TypeError, ValueError):
+            border_radius = 0.0
+        try:
+            border_width = _pct_of(props.get('border_width', 0), min_dim)
+        except (TypeError, ValueError):
+            border_width = 0.0
         border_color = QColor(props.get('border_color') or '#000000')
-        font_size = _pct_of(props.get('font_size', 0), h)
+        try:
+            font_size = _pct_of(props.get('font_size', 0), h)
+        except (TypeError, ValueError):
+            font_size = 0.0
         # Text formatting from Conditional Style
         font_family = props.get('font_family', 'Arial') or 'Arial'
         font_bold = bool(props.get('bold', False))
         font_italic = bool(props.get('italic', False))
         font_underline = bool(props.get('underline', False))
 
-        br_tl = _pct_of(props.get('border_radius_tl') or props.get('border_radius', 0), min_dim)
-        br_tr = _pct_of(props.get('border_radius_tr') or props.get('border_radius', 0), min_dim)
-        br_br = _pct_of(props.get('border_radius_br') or props.get('border_radius', 0), min_dim)
-        br_bl = _pct_of(props.get('border_radius_bl') or props.get('border_radius', 0), min_dim)
+        try:
+            br_tl = _pct_of(props.get('border_radius_tl') or props.get('border_radius', 0), min_dim)
+        except (TypeError, ValueError):
+            br_tl = 0.0
+        try:
+            br_tr = _pct_of(props.get('border_radius_tr') or props.get('border_radius', 0), min_dim)
+        except (TypeError, ValueError):
+            br_tr = 0.0
+        try:
+            br_br = _pct_of(props.get('border_radius_br') or props.get('border_radius', 0), min_dim)
+        except (TypeError, ValueError):
+            br_br = 0.0
+        try:
+            br_bl = _pct_of(props.get('border_radius_bl') or props.get('border_radius', 0), min_dim)
+        except (TypeError, ValueError):
+            br_bl = 0.0
         custom_radii = any(
             props.get(k, 0) for k in ('border_radius_tl','border_radius_tr','border_radius_br','border_radius_bl')
         )
@@ -411,7 +442,10 @@ class ButtonItem(BaseGraphicsItem):
         # Draw icon if available
         icon_src = props.get('icon', '')
         if icon_src:
-            size = int(_pct_of(props.get('icon_size', 0), min_dim))
+            try:
+                size = int(_pct_of(props.get('icon_size', 0), min_dim))
+            except (TypeError, ValueError):
+                size = 0
             color = props.get('icon_color')
             align = props.get('icon_align', 'center')
             icon: Optional[QIcon] = None
