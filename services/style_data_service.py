@@ -17,11 +17,11 @@ from __future__ import annotations
 from typing import Dict, Any, List
 import copy
 import uuid
-from dataclasses import dataclass, field, asdict
 
 from PyQt6.QtCore import QObject, pyqtSignal
 
 from .data_context import DataContext, data_context
+from tools.button.style_properties import StyleProperties
 
 # ---------------------------------------------------------------------------
 # Default style definition
@@ -32,35 +32,6 @@ from .data_context import DataContext, data_context
 _QT_DEFAULT_STYLE_ID = "qt_default"
 
 
-@dataclass
-class StyleProperties:
-    component_type: str = "Standard Button"
-    shape_style: str = "Flat"
-    background_type: str = "Solid"
-    background_color: str = ""
-    text_color: str = ""
-    border_radius: int = 0
-    border_width: int = 0
-    border_style: str = "solid"
-    border_color: str = ""
-    font_family: str = ""
-    font_size: int = 0
-    bold: bool = False
-    italic: bool = False
-    underline: bool = False
-    text_type: str = "Text"
-    text_value: str = ""
-    comment_ref: Dict[str, Any] = field(default_factory=dict)
-    h_align: str = "center"
-    v_align: str = "middle"
-    offset: int = 0
-    icon: str = ""
-    icon_size: int = 0
-    icon_align: str = "center"
-    icon_color: str = ""
-
-    def to_dict(self) -> Dict[str, Any]:
-        return copy.deepcopy(asdict(self))
 
 
 def _qt_default_style() -> Dict[str, Any]:

@@ -7,7 +7,8 @@ from typing import Any, Dict, List, Optional, Tuple, Union
 from PyQt6.QtCore import QObject, pyqtSignal
 
 from tools.button.actions.constants import TriggerMode
-from .models import ConditionalStyle, StyleProperties
+from .models import ConditionalStyle
+from ..style_properties import StyleProperties
 from .safe_eval import _safe_eval
 
 logger = logging.getLogger(__name__)

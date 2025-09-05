@@ -56,11 +56,11 @@ from utils.percentage import percent_to_value
 from .manager import ConditionalStyleManager
 from .models import (
     ConditionalStyle,
-    StyleProperties,
     AnimationProperties,
     get_styles,
     _GRADIENT_STYLES,
 )
+from ..style_properties import StyleProperties
 from .widgets import PreviewButton, SwitchButton, IconButton
 
 logger = logging.getLogger(__name__)

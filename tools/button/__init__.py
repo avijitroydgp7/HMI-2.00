@@ -9,11 +9,26 @@ This package consolidates all button-related code:
 Re-export key helpers so existing imports `from tools import button` keep working.
 """
 
-from .button import (
-    DEFAULT_PROPERTIES,
-    get_default_properties,
-    set_default_properties,
-)
+
+def __getattr__(name):
+    if name in {
+        "DEFAULT_PROPERTIES",
+        "get_default_properties",
+        "set_default_properties",
+    }:
+        from .button import (
+            DEFAULT_PROPERTIES,
+            get_default_properties,
+            set_default_properties,
+        )
+
+        return {
+            "DEFAULT_PROPERTIES": DEFAULT_PROPERTIES,
+            "get_default_properties": get_default_properties,
+            "set_default_properties": set_default_properties,
+        }[name]
+    raise AttributeError(name)
+
 
 __all__ = [
     "DEFAULT_PROPERTIES",
