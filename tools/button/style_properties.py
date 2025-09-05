@@ -124,10 +124,14 @@ class StyleProperties:
         for field in fields(cls):
             if field.name == "extra":
                 continue
-            known[field.name] = data.pop(
-                field.name,
-                field.default if field.default is not MISSING else None,
+            default_value = (
+                field.default
+                if field.default is not MISSING
+                else field.default_factory()
+                if field.default_factory is not MISSING
+                else None
             )
+            known[field.name] = data.pop(field.name, default_value)
         inst = cls(**known)
         inst.extra = data
         return inst

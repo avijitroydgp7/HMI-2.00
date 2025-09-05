@@ -15,7 +15,7 @@ if _default_style.get("hover_icon"):
 
 # Set default non-zero values for icon_size and font_size
 _base_props.setdefault("icon_size", 50)  # 50% of button size
-_base_props.setdefault("font_size", 18)  # 12px font size
+_base_props.setdefault("font_size", 18)  # 18% font size
 _hover_props.setdefault("icon_size", 50)
 _hover_props.setdefault("font_size", 18)
 
