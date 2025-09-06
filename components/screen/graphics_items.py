@@ -1004,62 +1004,92 @@ class ScaleItem(BaseGraphicsItem):
         font = QFont("Arial", 8)
         painter.setFont(font)
         metrics = QFontMetrics(font)
+        self._draw_ticks(
+            painter,
+            orient,
+            length,
+            thickness,
+            major,
+            minor,
+            tick_spacing,
+            units,
+            metrics,
+        )
+        painter.restore()
 
+    @staticmethod
+    def _draw_axis_line(painter: QPainter, orient: str, length: float, thickness: float):
         if orient == "vertical":
             painter.drawLine(QPointF(thickness / 2, 0), QPointF(thickness / 2, length))
-            for i in range(major + 1):
-                y = i * (length / major)
-                painter.drawLine(QPointF(0, y), QPointF(thickness, y))
-
-                label = f"{i * tick_spacing:g}{units}"
-                text_rect = QRectF(
-                    thickness,
-                    y - metrics.height() / 2,
-                    metrics.horizontalAdvance(label) + 4,
-                    metrics.height(),
-                )
-                painter.drawText(
-                    text_rect,
-                    Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter,
-                    label,
-                )
-
-                if minor > 1 and i < major:
-                    step = length / major / minor
-                    for j in range(1, minor):
-                        yy = y + j * step
-                        painter.drawLine(
-                            QPointF(thickness / 4, yy),
-                            QPointF(3 * thickness / 4, yy),
-                        )
         else:
             painter.drawLine(QPointF(0, thickness / 2), QPointF(length, thickness / 2))
-            for i in range(major + 1):
-                x = i * (length / major)
-                painter.drawLine(QPointF(x, 0), QPointF(x, thickness))
 
-                label = f"{i * tick_spacing:g}{units}"
-                text_rect = QRectF(
-                    x - metrics.horizontalAdvance(label) / 2,
-                    thickness,
-                    metrics.horizontalAdvance(label) + 4,
-                    metrics.height(),
-                )
-                painter.drawText(
-                    text_rect,
-                    Qt.AlignmentFlag.AlignCenter | Qt.AlignmentFlag.AlignTop,
-                    label,
-                )
+    @staticmethod
+    def _draw_major_tick(painter: QPainter, orient: str, pos: float, thickness: float):
+        if orient == "vertical":
+            painter.drawLine(QPointF(0, pos), QPointF(thickness, pos))
+        else:
+            painter.drawLine(QPointF(pos, 0), QPointF(pos, thickness))
 
-                if minor > 1 and i < major:
-                    step = length / major / minor
-                    for j in range(1, minor):
-                        xx = x + j * step
-                        painter.drawLine(
-                            QPointF(xx, thickness / 4),
-                            QPointF(xx, 3 * thickness / 4),
-                        )
-        painter.restore()
+    @staticmethod
+    def _draw_minor_tick(painter: QPainter, orient: str, pos: float, thickness: float):
+        if orient == "vertical":
+            painter.drawLine(QPointF(thickness / 4, pos), QPointF(3 * thickness / 4, pos))
+        else:
+            painter.drawLine(QPointF(pos, thickness / 4), QPointF(pos, 3 * thickness / 4))
+
+    @staticmethod
+    def _draw_label(
+        painter: QPainter,
+        orient: str,
+        pos: float,
+        thickness: float,
+        label: str,
+        metrics: QFontMetrics,
+    ):
+        if orient == "vertical":
+            text_rect = QRectF(
+                thickness,
+                pos - metrics.height() / 2,
+                metrics.horizontalAdvance(label) + 4,
+                metrics.height(),
+            )
+            alignment = Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter
+        else:
+            text_rect = QRectF(
+                pos - metrics.horizontalAdvance(label) / 2,
+                thickness,
+                metrics.horizontalAdvance(label) + 4,
+                metrics.height(),
+            )
+            alignment = Qt.AlignmentFlag.AlignCenter | Qt.AlignmentFlag.AlignTop
+        painter.drawText(text_rect, alignment, label)
+
+    def _draw_ticks(
+        self,
+        painter: QPainter,
+        orient: str,
+        length: float,
+        thickness: float,
+        major: int,
+        minor: int,
+        tick_spacing: float,
+        units: str,
+        metrics: QFontMetrics,
+    ):
+        self._draw_axis_line(painter, orient, length, thickness)
+        for i in range(major + 1):
+            pos = i * (length / major)
+            self._draw_major_tick(painter, orient, pos, thickness)
+
+            label = f"{i * tick_spacing:g}{units}"
+            self._draw_label(painter, orient, pos, thickness, label, metrics)
+
+            if minor > 1 and i < major:
+                step = length / major / minor
+                for j in range(1, minor):
+                    pos_minor = pos + j * step
+                    self._draw_minor_tick(painter, orient, pos_minor, thickness)
 
 
 class ImageItem(BaseGraphicsItem):
