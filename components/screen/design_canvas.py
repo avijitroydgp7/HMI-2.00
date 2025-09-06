@@ -122,6 +122,7 @@ class DesignCanvas(QGraphicsView):
         self.scene.setItemIndexMethod(QGraphicsScene.ItemIndexMethod.BspTreeIndex)
         self.setScene(self.scene)
         self.page_item = QGraphicsRectItem()
+        self._initial_centered = False
 
         # Track items currently visible/hidden on the scene
         self._visible_items = set()
@@ -156,6 +157,9 @@ class DesignCanvas(QGraphicsView):
         self.setBackgroundBrush(QColor("#1f1f1f"))
         # Prefer minimal viewport updates for dynamic scenes
         self.setViewportUpdateMode(QGraphicsView.ViewportUpdateMode.MinimalViewportUpdate)
+        # Center the canvas within the viewport when it is smaller than
+        # the view, like Photoshop's pasteboard behavior.
+        self.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.viewport().installEventFilter(self)
 
         self.scene.selectionChanged.connect(self._on_selection_changed)
@@ -1323,10 +1327,16 @@ class DesignCanvas(QGraphicsView):
             return
 
         size = self.screen_data.get('size', {'width': 1920, 'height': 1080})
-        self.scene.setSceneRect(0, 0, size['width'], size['height'])
+        w = int(size.get('width', 1920))
+        h = int(size.get('height', 1080))
+        # Expand scene rect to include margins so outside area is visible
+        # and pannable around the page (Photoshop-like pasteboard).
+        pad = 1000
+        self.scene.setSceneRect(-pad, -pad, w + 2 * pad, h + 2 * pad)
 
         style = self.screen_data.get('style', {})
-        self.page_item.setRect(self.scene.sceneRect())
+        # The page fills only the actual page size at (0,0,w,h)
+        self.page_item.setRect(QRectF(0, 0, w, h))
         self.page_item.setPen(QPen(Qt.PenStyle.NoPen))
 
         if style.get('transparent', False):
@@ -1350,6 +1360,11 @@ class DesignCanvas(QGraphicsView):
         self.scene.blockSignals(False)
         if new_selection_ids != old_selection_ids:
             self._on_selection_changed()
+        # Center the view on the page center once on first load so the
+        # page appears centered within the padded scene.
+        if not self._initial_centered:
+            self.centerOn(QPointF(w / 2, h / 2))
+            self._initial_centered = True
         self.update()
         self.update_visible_items()
 
