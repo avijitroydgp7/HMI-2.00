@@ -1,6 +1,6 @@
 # main_window/ui_setup.py
 from PyQt6.QtWidgets import QStatusBar, QLabel, QWidget, QHBoxLayout, QFrame, QPushButton, QCheckBox
-from PyQt6.QtCore import QByteArray
+from PyQt6.QtCore import QByteArray, Qt
 from utils.icon_manager import IconManager
 
 from services.settings_service import settings_service
@@ -42,6 +42,7 @@ def setup_status_bar(win):
     win.zoom_out_icon.add_target(win.zoom_out_btn)
     win.zoom_out_btn.setFixedSize(24, 24)
     win.zoom_out_btn.setObjectName("StatusBarButton")
+    win.zoom_out_btn.setFocusPolicy(Qt.FocusPolicy.NoFocus)
     layout.addWidget(win.zoom_out_btn)
     
     win.zoom_level_label = QLabel("---%")
@@ -52,6 +53,7 @@ def setup_status_bar(win):
     win.zoom_in_icon.add_target(win.zoom_in_btn)
     win.zoom_in_btn.setFixedSize(24, 24)
     win.zoom_in_btn.setObjectName("StatusBarButton")
+    win.zoom_in_btn.setFocusPolicy(Qt.FocusPolicy.NoFocus)
     layout.addWidget(win.zoom_in_btn)
     
     layout.addWidget(_create_separator())

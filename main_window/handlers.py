@@ -117,8 +117,14 @@ def clear_mouse_position(win):
 
 def zoom_in_current_tab(win):
     widget = win.tab_widget.currentWidget()
-    if hasattr(widget, 'zoom_in'): widget.zoom_in()
+    if hasattr(widget, 'zoom_in'):
+        widget.zoom_in()
+    if hasattr(widget, 'design_canvas'):
+        widget.design_canvas.setFocus()
 
 def zoom_out_current_tab(win):
     widget = win.tab_widget.currentWidget()
-    if hasattr(widget, 'zoom_out'): widget.zoom_out()
+    if hasattr(widget, 'zoom_out'):
+        widget.zoom_out()
+    if hasattr(widget, 'design_canvas'):
+        widget.design_canvas.setFocus()
