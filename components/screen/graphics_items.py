@@ -576,10 +576,29 @@ class ButtonItem(BaseGraphicsItem):
         painter.restore()
     
     def update_tag_values(self, tag_values):
-        """Update tag values and re-evaluate conditional styles"""
-        # In designer mode we do not consume tag updates nor animate states
-        # Leave visuals static; interactive runtime lives in simulator
-        return
+        """Update tag-driven properties and schedule a repaint.
+
+        Parameters
+        ----------
+        tag_values: dict
+            Mapping of tag names to their current values.
+
+        Notes
+        -----
+        This method is shared by both the designer preview and the runtime
+        simulator.  When tag values change we store the new mapping, refresh
+        the active style (which may alter colours, text, tooltips, etc.) and
+        trigger a repaint so the visual representation stays in sync.
+        """
+
+        # Persist the latest tag values for style evaluation
+        self._current_tag_values = dict(tag_values or {})
+
+        # Recalculate any conditional style properties that depend on tags
+        self._get_active_style_properties(self._state)
+
+        # Schedule a repaint to reflect the updated style
+        self.update()
 
 
 class TextItem(BaseGraphicsItem):
