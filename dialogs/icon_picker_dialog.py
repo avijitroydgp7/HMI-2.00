@@ -5,7 +5,11 @@ import os
 import json
 
 from PyQt6.QtCore import Qt, QSize, QEvent, QObject
-from PyQt6.QtGui import QIcon, QPixmap, QColor
+from PyQt6.QtGui import QIcon, QPixmap, QColor, QPainter
+try:
+    from PyQt6.QtSvg import QSvgRenderer  # type: ignore
+except Exception:  # pragma: no cover - optional at runtime
+    QSvgRenderer = None  # type: ignore
 from PyQt6.QtWidgets import (
     QDialog,
     QVBoxLayout,
@@ -84,6 +88,7 @@ class IconPickerDialog(QDialog):
         self._initial = initial or {}
         self._initial_source = source or ""
         self._preview_style = preview_style or {}
+        # No per-color editing for SVGs; render as-is
 
         root = QVBoxLayout(self)
 
@@ -219,7 +224,7 @@ class IconPickerDialog(QDialog):
         self.size_spin.setValue(50)
         form.addRow("Size (%)", self.size_spin)
 
-        # Color selector (Qt icons only)
+        # Color selector (Qt icons and single-fill SVG)
         color_layout = QHBoxLayout()
         color_layout.setContentsMargins(0, 0, 0, 0)
         self.color_base_combo = QComboBox()
@@ -234,6 +239,9 @@ class IconPickerDialog(QDialog):
         form.addRow("Color", color_widget)
 
         style_box.addLayout(form)
+        
+        # Note: SVG color picking disabled by design
+
         params.addLayout(style_box)
         params.addStretch()
 
@@ -246,6 +254,7 @@ class IconPickerDialog(QDialog):
         self.align_group.buttonClicked.connect(lambda _: self._update_preview())
 
         def _update_color_enabled():
+            # Enable color controls only for QtAwesome icons
             en = self.qt_radio.isChecked()
             self.color_base_combo.setEnabled(en)
             self.color_shade_combo.setEnabled(en)
@@ -367,6 +376,7 @@ class IconPickerDialog(QDialog):
             if isinstance(col, QColor):
                 color = col.name()
         source = f"qta:{value}" if kind == "qta" else value
+        # For SVG, render as-is without color overrides
         self.preview_btn.set_icon(source, color if color else None)
         self.preview_btn.set_icon_size(size)
         self.preview_btn.set_icon_alignment(align)
@@ -588,7 +598,7 @@ class IconPickerDialog(QDialog):
         cols = self._compute_grid_cols(self.svg_grid)
         r = c = 0
         for p in files:
-            icon = QIcon(p)
+            icon = self._svg_icon_from_path(p)
             text = os.path.splitext(os.path.basename(p))[0]
             btn = _ThumbButton(text, icon)
             btn.clicked.connect(lambda _=False, b=btn, v=p: self._on_select("svg", v, b))
@@ -666,4 +676,26 @@ class IconPickerDialog(QDialog):
         btn.setChecked(True)
         self._selected = (kind, value)
         self.button_box.button(QDialogButtonBox.StandardButton.Ok).setEnabled(True)
+        # No special handling for SVG colors
         self._update_preview()
+
+    # ------------------- SVG helpers -----------------------
+    def _svg_icon_from_path(self, path: str) -> QIcon:
+        # Render SVG to pixmap to ensure visibility even if QIcon lacks SVG plugin
+        try:
+            if QSvgRenderer is not None:
+                renderer = QSvgRenderer(path)
+                if renderer.isValid():
+                    size = QSize(32, 32)
+                    pix = QPixmap(size)
+                    pix.fill(Qt.GlobalColor.transparent)
+                    painter = QPainter(pix)
+                    renderer.render(painter)
+                    painter.end()
+                    return QIcon(pix)
+        except Exception:
+            pass
+        # Fallback: let QIcon try
+        return QIcon(path)
+
+    # No SVG color override UI or parsing helpers

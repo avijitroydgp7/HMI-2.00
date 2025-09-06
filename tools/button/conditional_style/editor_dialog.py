@@ -1471,9 +1471,12 @@ class ConditionalStyleEditorDialog(QDialog):
         # Restrict SVG selection to lib/icon directory, and allow QtAwesome icons.
         try:
             base_dir = os.path.abspath(
-                os.path.join(os.path.dirname(__file__), "..", "..")
+                os.path.join(os.path.dirname(__file__), "..", "..", "..")
             )
             icons_root = os.path.join(base_dir, "lib", "icon")
+            if not os.path.isdir(icons_root):
+                # Fallback to CWD/lib/icon if project structure differs
+                icons_root = os.path.join(os.getcwd(), "lib", "icon")
         except Exception:
             icons_root = os.path.join(os.getcwd(), "lib", "icon")
         initial = {
@@ -1989,12 +1992,10 @@ class ConditionalStyleEditorDialog(QDialog):
 
         if component_type != "Toggle Switch":
             color = self.style.properties.get("icon_color")
-            self.preview_button.set_icon(
-                self.base_controls["icon_edit"].text(), color
-            )
-            self.preview_button.set_hover_icon(
-                self.hover_controls["icon_edit"].text(), color
-            )
+            base_src = self.base_controls["icon_edit"].text()
+            hover_src = self.hover_controls["icon_edit"].text()
+            self.preview_button.set_icon(base_src, color)
+            self.preview_button.set_hover_icon(hover_src, color)
             icon_sz_pct = self.style.properties.get("icon_size", 0)
             icon_sz = percent_to_value(icon_sz_pct, self.preview_button.height())
             self.preview_button.set_icon_size(icon_sz)
