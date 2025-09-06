@@ -12,6 +12,7 @@ from PyQt6.QtWidgets import (
     QGraphicsPathItem,
     QGraphicsSimpleTextItem,
     QGraphicsItem,
+    QApplication,
 )
 from PyQt6.QtGui import (
     QPainter,
@@ -1285,7 +1286,9 @@ class DesignCanvas(QGraphicsView):
         # Determine anchor in scene coordinates if not provided
         if anchor_pos is None:
             mouse_view = self.mapFromGlobal(QCursor.pos())
-            if self.viewport().rect().contains(mouse_view):
+            if QApplication.widgetAt(QCursor.pos()) is None:
+                anchor_pos = self.mapToScene(self.viewport().rect().center())
+            elif self.viewport().rect().contains(mouse_view):
                 anchor_pos = self.mapToScene(mouse_view)
             else:
                 anchor_pos = self._last_mouse_scene_pos
