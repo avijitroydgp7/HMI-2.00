@@ -3,6 +3,7 @@
 
 from PyQt6.QtWidgets import QWidget, QLabel, QVBoxLayout
 from PyQt6.QtCore import pyqtSignal, pyqtSlot, QPointF
+from PyQt6.QtGui import QCursor
 from services.screen_data_service import screen_service
 from services.data_context import data_context
 from .design_canvas import DesignCanvas
@@ -95,13 +96,19 @@ class ScreenWidget(QWidget):
         self.design_canvas.clear_selection()
 
     def zoom_in(self):
-        center = self.design_canvas.mapToScene(
-            self.design_canvas.viewport().rect().center()
-        )
-        self.design_canvas.apply_zoom_factor(ZOOM_FACTOR, anchor_pos=center)
+        viewport = self.design_canvas.viewport()
+        cursor_view = self.design_canvas.mapFromGlobal(QCursor.pos())
+        if viewport.rect().contains(cursor_view):
+            anchor = self.design_canvas.mapToScene(cursor_view)
+        else:
+            anchor = self.design_canvas.mapToScene(viewport.rect().center())
+        self.design_canvas.apply_zoom_factor(ZOOM_FACTOR, anchor_pos=anchor)
 
     def zoom_out(self):
-        center = self.design_canvas.mapToScene(
-            self.design_canvas.viewport().rect().center()
-        )
-        self.design_canvas.apply_zoom_factor(1 / ZOOM_FACTOR, anchor_pos=center)
+        viewport = self.design_canvas.viewport()
+        cursor_view = self.design_canvas.mapFromGlobal(QCursor.pos())
+        if viewport.rect().contains(cursor_view):
+            anchor = self.design_canvas.mapToScene(cursor_view)
+        else:
+            anchor = self.design_canvas.mapToScene(viewport.rect().center())
+        self.design_canvas.apply_zoom_factor(1 / ZOOM_FACTOR, anchor_pos=anchor)
