@@ -228,10 +228,8 @@ class MainWindow(QMainWindow):
             (project_dock.screens_tab_requested, self.docks['screens'].raise_),
         ])
 
-        # Zoom and snapping controls
+        # Snapping controls (zoom controls removed)
         bulk_connect([
-            (self.zoom_in_btn.clicked, partial(handlers.zoom_in_current_tab, self)),
-            (self.zoom_out_btn.clicked, partial(handlers.zoom_out_current_tab, self)),
             (self.snap_objects_cb.toggled, self._on_snap_objects_changed),
             (self.snap_lines_cb.toggled, self._on_snap_lines_visibility_changed),
         ])

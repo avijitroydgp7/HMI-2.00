@@ -6,7 +6,6 @@ from PyQt6.QtWidgets import (
     QGraphicsScene,
     QMenu,
     QGraphicsRectItem,
-    QGraphicsDropShadowEffect,
     QGraphicsLineItem,
     QGraphicsEllipseItem,
     QGraphicsPathItem,
@@ -19,6 +18,7 @@ from PyQt6.QtGui import (
     QColor,
     QMouseEvent,
     QKeyEvent,
+    QWheelEvent,
     QDragEnterEvent,
     QDropEvent,
     QPen,
@@ -69,7 +69,7 @@ from .graphics_items import (
 from ..selection_overlay import SelectionOverlay
 from utils import constants
 
-ZOOM_FACTOR = 1.05
+# View scaling via zoom is not supported in this application
 
 class DesignCanvas(QGraphicsView):
     """
@@ -81,7 +81,7 @@ class DesignCanvas(QGraphicsView):
     mouse_moved_on_scene = pyqtSignal(QPointF)
     mouse_left_scene = pyqtSignal()
     selection_dragged = pyqtSignal(dict)
-    zoom_changed = pyqtSignal(str)
+    zoom_changed = pyqtSignal(float)
     
     def __init__(self, screen_id, parent=None):
         super().__init__(parent)
@@ -92,9 +92,7 @@ class DesignCanvas(QGraphicsView):
         self.selection_overlay = SelectionOverlay()
         self.path_edit_tool = path_edit.PathEditTool(self)
 
-        self.current_zoom = 1.0
-        self.min_zoom = 0.25
-        self.max_zoom = 4.0
+        # Zoom is disabled; keep view scale fixed at 1.0
         self._rubber_band_origin = None
         self._rubber_band_rect = QRect()
 
@@ -134,17 +132,7 @@ class DesignCanvas(QGraphicsView):
         self._visible_update_timer.setSingleShot(True)
         self._visible_update_timer.timeout.connect(self.update_visible_items)
 
-        # Cache a lighter drop shadow effect for better performance
-        self._shadow_effect = QGraphicsDropShadowEffect()
-        self._shadow_effect.setBlurRadius(10)
-        self._shadow_effect.setColor(QColor(0, 0, 0, 80))
-        self._shadow_effect.setOffset(0, 0)
-
-        # Allow turning shadows off and auto-disabling at high zoom levels
-        self._shadow_enabled = True
-        self._shadow_disable_threshold = 1.25
-        if self._shadow_enabled:
-            self.page_item.setGraphicsEffect(self._shadow_effect)
+        # Visual drop effect removed per request
 
         self.page_item.setZValue(-1)
         self.scene.addItem(self.page_item)
@@ -157,7 +145,9 @@ class DesignCanvas(QGraphicsView):
         # Disable global antialiasing; enable per-item where needed
         self.setRenderHint(QPainter.RenderHint.Antialiasing, False)
         self.setDragMode(QGraphicsView.DragMode.NoDrag)
-        self.setTransformationAnchor(QGraphicsView.ViewportAnchor.AnchorUnderMouse)
+        # Use no automatic anchor; we'll manually keep the cursor's scene
+        # point fixed during zoom for precise Photoshop-like behavior.
+        self.setTransformationAnchor(QGraphicsView.ViewportAnchor.NoAnchor)
         self.setResizeAnchor(QGraphicsView.ViewportAnchor.AnchorViewCenter)
         self.setMouseTracking(True)
         self.viewport().setMouseTracking(True)
@@ -232,27 +222,6 @@ class DesignCanvas(QGraphicsView):
                     self.viewport().setCursor(QCursor(Qt.CursorShape.ArrowCursor))
         return False
 
-    def set_shadow_enabled(self, enabled: bool):
-        """Enable or disable page shadows dynamically."""
-        self._shadow_enabled = enabled
-        self._update_shadow_for_zoom()
-
-    def _update_shadow_for_zoom(self):
-        """Toggle shadow based on zoom level, drag state, and preferences."""
-        disable_shadow = self._drag_mode in ('move', 'resize')
-        use_shadow = (
-            self._shadow_enabled
-            and self.transform().m11() <= self._shadow_disable_threshold
-            and not disable_shadow
-        )
-
-        if use_shadow:
-            if self.page_item.graphicsEffect() is not self._shadow_effect:
-                self.page_item.setGraphicsEffect(self._shadow_effect)
-            self._shadow_effect.setEnabled(True)
-        else:
-            if self.page_item.graphicsEffect() is self._shadow_effect:
-                self._shadow_effect.setEnabled(False)
 
     def _update_preview_style(self):
         """Set preview pen and colors to a fixed value."""
@@ -550,7 +519,6 @@ class DesignCanvas(QGraphicsView):
                             'rect': item.sceneBoundingRect(),
                             'properties': copy.deepcopy(item.instance_data.get('properties', {}))
                         }
-                self._update_shadow_for_zoom()
                 event.accept()
                 return
 
@@ -579,7 +547,6 @@ class DesignCanvas(QGraphicsView):
                     for item in self.scene.selectedItems():
                         if isinstance(item, BaseGraphicsItem):
                             self._start_selection_states[item.get_instance_id()] = item.pos()
-                    self._update_shadow_for_zoom()
                     event.accept()
                     return
             else:
@@ -592,7 +559,6 @@ class DesignCanvas(QGraphicsView):
                 self._rubber_band_origin = event.pos()
                 self._rubber_band_rect = QRect(self._rubber_band_origin, self._rubber_band_origin)
                 self.viewport().update()
-                self._update_shadow_for_zoom()
                 event.accept()
                 return
         else:
@@ -805,7 +771,7 @@ class DesignCanvas(QGraphicsView):
         else:
             return
 
-        offset = QPointF(10 / self.current_zoom, -20 / self.current_zoom)
+        offset = QPointF(10, -20)
         self._dimension_item.setText(text)
         self._dimension_item.setPos(pos + offset)
 
@@ -1269,56 +1235,67 @@ class DesignCanvas(QGraphicsView):
             self._resize_handle = None
             self._rubber_band_origin = None
             self._rubber_band_rect = QRect()
-            self._update_shadow_for_zoom()
             self._snap_lines.clear()
             self.viewport().update()
             self.viewport().setCursor(QCursor(Qt.CursorShape.ArrowCursor))
 
         super().mouseReleaseEvent(event)
 
-    def apply_zoom_factor(self, factor: float, anchor_pos: QPointF | None = None):
-        """Apply a zoom factor around ``anchor_pos`` and update view state."""
-        # Clamp to allowed zoom range and determine effective factor
-        current = self.current_zoom
-        new_zoom = max(self.min_zoom, min(self.max_zoom, current * factor))
-        effective = new_zoom / current if current else 1.0
+    # Zooming: mouse wheel and trackpad two-finger scroll
+    def wheelEvent(self, event: QWheelEvent):
+        from PyQt6.QtWidgets import QApplication
+        modifiers = QApplication.keyboardModifiers()
 
-        # Determine anchor in scene coordinates if not provided
-        if anchor_pos is None:
-            mouse_view = self.mapFromGlobal(QCursor.pos())
-            if QApplication.widgetAt(QCursor.pos()) is None:
-                anchor_pos = self.mapToScene(self.viewport().rect().center())
-            elif self.viewport().rect().contains(mouse_view):
-                anchor_pos = self.mapToScene(mouse_view)
-            else:
-                anchor_pos = self._last_mouse_scene_pos
-                if not self.viewport().rect().contains(self.mapFromScene(anchor_pos)):
-                    anchor_pos = self.mapToScene(self.viewport().rect().center())
+        # If Ctrl/Cmd is pressed, perform zoom; otherwise let it scroll.
+        if modifiers & (Qt.KeyboardModifier.ControlModifier | Qt.KeyboardModifier.MetaModifier):
+            # Determine scroll delta; prefer angleDelta for classic wheels,
+            # fall back to pixelDelta for high-resolution touchpads.
+            delta = event.angleDelta().y()
+            if delta == 0:
+                delta = event.pixelDelta().y()
 
-        view_pt = self.mapFromScene(anchor_pos)
+            if delta == 0:
+                super().wheelEvent(event)
+                return
 
-        if effective != 1.0:
-            self.scale(effective, effective)
-            new_scene_pos = self.mapToScene(view_pt)
-            delta = anchor_pos - new_scene_pos
-            self.translate(delta.x(), delta.y())
+            # Photoshop-like: zoom towards the cursor, keeping the cursor's
+            # scene position fixed in the viewport.
+            # Use the actual cursor position mapped to the viewport to avoid any
+            # discrepancies in event coordinates across platforms.
+            mouse_view_pos = self.viewport().mapFromGlobal(QCursor.pos())
+            scene_pos_before = self.mapToScene(mouse_view_pos)
 
-        self.current_zoom = new_zoom
-        self._last_mouse_scene_pos = anchor_pos
-        self.zoom_changed.emit(f"{int(self.current_zoom * 100)}%")
-        self._update_shadow_for_zoom()
-        self._schedule_visible_items_update()
-        if self._dimension_item:
-            self._update_dimension_label(self._snap_position(self._last_mouse_scene_pos))
+            # Smooth exponential zoom factor; 120 units ~= one notch.
+            zoom_factor = pow(1.0015, delta)
 
-    def wheelEvent(self, event):
-        if event.modifiers() == Qt.KeyboardModifier.ControlModifier:
-            anchor = self.mapToScene(event.position().toPoint())
-            factor = ZOOM_FACTOR if event.angleDelta().y() > 0 else 1 / ZOOM_FACTOR
-            self.apply_zoom_factor(factor, anchor)
+            # Clamp overall view scale to reasonable bounds
+            current_scale = self.transform().m11()
+            min_scale, max_scale = 0.1, 10.0
+            target_scale = current_scale * zoom_factor
+            if target_scale < min_scale:
+                zoom_factor = min_scale / current_scale
+            elif target_scale > max_scale:
+                zoom_factor = max_scale / current_scale
+
+            # Apply zoom uniformly
+            self.scale(zoom_factor, zoom_factor)
+
+            # Re-center so the scene point under the cursor stays under the cursor
+            # Compute where the viewport center is in scene coords after scaling
+            view_center_scene = self.mapToScene(self.viewport().rect().center())
+            # Compute the offset required to move the center so that the mouse
+            # position maps back to the original scene_pos_before
+            delta_scene = scene_pos_before - self.mapToScene(mouse_view_pos)
+            self.centerOn(view_center_scene + delta_scene)
+
+            self._schedule_visible_items_update()
+            # Notify listeners of the new zoom level
+            self.zoom_changed.emit(self.transform().m11())
             event.accept()
         else:
+            # Default scroll behavior for two-finger trackpad and mouse wheel
             super().wheelEvent(event)
+        
 
     def update_screen_data(self):
         selected_ids = [
@@ -1374,7 +1351,6 @@ class DesignCanvas(QGraphicsView):
         if new_selection_ids != old_selection_ids:
             self._on_selection_changed()
         self.update()
-        self._update_shadow_for_zoom()
         self.update_visible_items()
 
     def _on_styles_changed(self, style_id: str):

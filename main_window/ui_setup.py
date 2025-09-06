@@ -37,25 +37,8 @@ def setup_status_bar(win):
     win.cursor_pos_label = add_status_widget('fa5s.mouse-pointer', "X ----, Y ----")
     layout.addWidget(_create_separator())
     
-    win.zoom_out_icon = IconManager.create_animated_icon('fa5s.search-minus', size=16)
-    win.zoom_out_btn = QPushButton(win.zoom_out_icon.icon, "")
-    win.zoom_out_icon.add_target(win.zoom_out_btn)
-    win.zoom_out_btn.setFixedSize(24, 24)
-    win.zoom_out_btn.setObjectName("StatusBarButton")
-    win.zoom_out_btn.setFocusPolicy(Qt.FocusPolicy.NoFocus)
-    layout.addWidget(win.zoom_out_btn)
-    
-    win.zoom_level_label = QLabel("---%")
-    layout.addWidget(win.zoom_level_label)
-    
-    win.zoom_in_icon = IconManager.create_animated_icon('fa5s.search-plus', size=16)
-    win.zoom_in_btn = QPushButton(win.zoom_in_icon.icon, "")
-    win.zoom_in_icon.add_target(win.zoom_in_btn)
-    win.zoom_in_btn.setFixedSize(24, 24)
-    win.zoom_in_btn.setObjectName("StatusBarButton")
-    win.zoom_in_btn.setFocusPolicy(Qt.FocusPolicy.NoFocus)
-    layout.addWidget(win.zoom_in_btn)
-    
+    # Zoom percentage (bottom-right)
+    win.zoom_label = add_status_widget('fa5s.search-plus', "100%")
     layout.addWidget(_create_separator())
     win.status_bar.addPermanentWidget(container)
 
@@ -108,7 +91,6 @@ def setup_view_actions(win):
 def _create_separator():
     separator = QFrame()
     separator.setFrameShape(QFrame.Shape.VLine)
-    separator.setFrameShadow(QFrame.Shadow.Sunken)
     return separator
 
 def save_window_state(win):

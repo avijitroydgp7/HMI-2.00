@@ -113,8 +113,8 @@ def open_screen_in_tab(win, screen_id):
     screen_widget.selection_dragged.connect(lambda pos: handlers.update_drag_position_status(win, pos))
     screen_widget.mouse_moved_on_scene.connect(lambda pos: handlers.update_mouse_position(win, pos))
     screen_widget.mouse_left_scene.connect(lambda: handlers.clear_mouse_position(win))
+    screen_widget.zoom_changed.connect(lambda s: handlers.update_zoom_status(win, s))
     
-    screen_widget.zoom_changed.connect(win.zoom_level_label.setText)
     screen_widget.open_screen_requested.connect(lambda sid: open_screen_in_tab(win, sid))
     
     tab_title = _format_tab_title(screen_data)
@@ -166,7 +166,7 @@ def _update_focus_for_widget(win, widget):
     if isinstance(widget, ScreenWidget):
         widget.setFocus()
         widget.set_active_tool(win.active_tool)
-        win.zoom_level_label.setText(widget.get_zoom_percentage())
+        # Zoom label removed per request
         screen_manager.update_active_screen_highlight(widget.screen_id)
         if widget.design_canvas and widget.design_canvas.screen_data:
             size = widget.design_canvas.screen_data.get('size', {})
@@ -176,18 +176,26 @@ def _update_focus_for_widget(win, widget):
         else:
             win.screen_dim_label.setText("W ----, H ----")
         widget.refresh_selection_status()
+        # Update zoom label to reflect current view scale
+        try:
+            from . import handlers as _handlers
+            _handlers.update_zoom_status(win, widget.design_canvas.transform().m11())
+        except Exception:
+            pass
     elif isinstance(widget, TagEditorWidget):
         widget.tag_table.setFocus()
         win.screen_dim_label.setText("W ----, H ----")
+        win.zoom_label.setText("--%")
     elif isinstance(widget, CommentTableWidget):
         widget.setFocus()
         win.screen_dim_label.setText("W ----, H ----")
         win.object_size_label.setText("W ----, H ----")
         win.object_pos_label.setText("X ----, Y ----")
         handlers.clear_mouse_position(win)
-        win.zoom_level_label.setText("---%")
+        # Zoom label removed per request
         screen_manager.update_active_screen_highlight(None)
         win.docks['properties'].widget().set_current_object(None, None)
+        win.zoom_label.setText("--%")
     else:
         if project_service.is_project_open():
             screen_manager.tree.setFocus()
@@ -195,9 +203,10 @@ def _update_focus_for_widget(win, widget):
         win.object_size_label.setText("W ----, H ----")
         win.object_pos_label.setText("X ----, Y ----")
         handlers.clear_mouse_position(win)
-        win.zoom_level_label.setText("---%")
+        # Zoom label removed per request
         screen_manager.update_active_screen_highlight(None)
         win.docks['properties'].widget().set_current_object(None, None)
+        win.zoom_label.setText("--%")
         
     actions.update_edit_actions(win)
 

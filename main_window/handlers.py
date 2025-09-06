@@ -115,14 +115,9 @@ def update_mouse_position(win, pos: QPointF):
 def clear_mouse_position(win):
     win.cursor_pos_label.setText("X ----, Y ----")
 
-def zoom_in_current_tab(win):
-    widget = win.tab_widget.currentWidget()
-    if hasattr(widget, 'zoom_in'):
-        widget.zoom_in()
-        widget.setFocus()
-
-def zoom_out_current_tab(win):
-    widget = win.tab_widget.currentWidget()
-    if hasattr(widget, 'zoom_out'):
-        widget.zoom_out()
-        widget.setFocus()
+def update_zoom_status(win, scale: float):
+    try:
+        percent = max(1, int(round(scale * 100)))
+    except Exception:
+        percent = 100
+    win.zoom_label.setText(f"{percent}%")

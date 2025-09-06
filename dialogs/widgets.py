@@ -51,7 +51,7 @@ class CollapsibleBox(QWidget):
 
         self.header_line = QFrame(self)
         self.header_line.setFrameShape(QFrame.Shape.HLine)
-        self.header_line.setFrameShadow(QFrame.Shadow.Sunken)
+        
 
         self.content_area = QWidget(self)
         self.content_area.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)

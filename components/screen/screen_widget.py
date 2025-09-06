@@ -1,14 +1,11 @@
 # components/screen/screen_widget.py
-# MODIFIED: Connected to the design canvas zoom_changed signal.
+# MODIFIED: Removed zoom-related signals and helpers.
 
 from PyQt6.QtWidgets import QWidget, QLabel, QVBoxLayout
 from PyQt6.QtCore import pyqtSignal, pyqtSlot, QPointF
-from PyQt6.QtGui import QCursor
 from services.screen_data_service import screen_service
 from services.data_context import data_context
 from .design_canvas import DesignCanvas
-
-ZOOM_FACTOR = 1.05
 
 class ScreenWidget(QWidget):
     """
@@ -16,11 +13,11 @@ class ScreenWidget(QWidget):
     """
     selection_changed = pyqtSignal(str, object)
     open_screen_requested = pyqtSignal(str)
-    zoom_changed = pyqtSignal(str)
     
     mouse_moved_on_scene = pyqtSignal(QPointF)
     mouse_left_scene = pyqtSignal()
     selection_dragged = pyqtSignal(dict)
+    zoom_changed = pyqtSignal(float)
 
     def __init__(self, screen_id, parent=None):
         super().__init__(parent)
@@ -37,7 +34,6 @@ class ScreenWidget(QWidget):
         self.design_canvas.mouse_moved_on_scene.connect(self.mouse_moved_on_scene.emit)
         self.design_canvas.mouse_left_scene.connect(self.mouse_left_scene.emit)
         self.design_canvas.selection_dragged.connect(self.selection_dragged.emit)
-        # Forward canvas zoom changes so toolbar labels stay in sync
         self.design_canvas.zoom_changed.connect(self.zoom_changed.emit)
 
         data_context.screens_changed.connect(
@@ -74,8 +70,7 @@ class ScreenWidget(QWidget):
             self.design_canvas.deleteLater()
             self.layout().addWidget(QLabel("Screen has been deleted."))
 
-    def get_zoom_percentage(self):
-        return f"{int(self.design_canvas.current_zoom * 100)}%"
+    # Zoom helpers removed per request
 
     def has_selection(self):
         return self.design_canvas.has_selection()
@@ -95,20 +90,4 @@ class ScreenWidget(QWidget):
     def clear_selection(self):
         self.design_canvas.clear_selection()
 
-    def zoom_in(self):
-        viewport = self.design_canvas.viewport()
-        cursor_view = self.design_canvas.mapFromGlobal(QCursor.pos())
-        if viewport.rect().contains(cursor_view):
-            anchor = self.design_canvas.mapToScene(cursor_view)
-        else:
-            anchor = self.design_canvas.mapToScene(viewport.rect().center())
-        self.design_canvas.apply_zoom_factor(ZOOM_FACTOR, anchor_pos=anchor)
-
-    def zoom_out(self):
-        viewport = self.design_canvas.viewport()
-        cursor_view = self.design_canvas.mapFromGlobal(QCursor.pos())
-        if viewport.rect().contains(cursor_view):
-            anchor = self.design_canvas.mapToScene(cursor_view)
-        else:
-            anchor = self.design_canvas.mapToScene(viewport.rect().center())
-        self.design_canvas.apply_zoom_factor(1 / ZOOM_FACTOR, anchor_pos=anchor)
+    # Zoom controls removed per request
