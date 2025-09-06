@@ -8,6 +8,8 @@ from services.screen_data_service import screen_service
 from services.data_context import data_context
 from .design_canvas import DesignCanvas
 
+ZOOM_FACTOR = 1.05
+
 class ScreenWidget(QWidget):
     """
     Container widget for a DesignCanvas.
@@ -96,8 +98,10 @@ class ScreenWidget(QWidget):
     def _apply_zoom(self, factor: float):
         """Apply a zoom factor while clamping to min/max and keeping focus position.
 
-        The factor is relative (e.g., 1.25 to zoom in by 25%, 0.8 to zoom out by 20%).
-        Shared logic between zoom_in and zoom_out, including shadow/visibility updates.
+        The factor is relative (e.g., ``ZOOM_FACTOR`` to zoom in by 05%,
+        ``1 / ZOOM_FACTOR`` to zoom out by the same amount). Shared logic
+        between ``zoom_in`` and ``zoom_out``, including shadow/visibility
+        updates.
         """
         # Clamp the new zoom within allowed bounds
         current = self.design_canvas.current_zoom
@@ -134,7 +138,7 @@ class ScreenWidget(QWidget):
         self.zoom_changed.emit(self.get_zoom_percentage())
 
     def zoom_in(self):
-        self._apply_zoom(1.25)
+        self._apply_zoom(ZOOM_FACTOR)
 
     def zoom_out(self):
-        self._apply_zoom(0.8)
+        self._apply_zoom(1 / ZOOM_FACTOR)

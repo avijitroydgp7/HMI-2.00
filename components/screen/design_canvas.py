@@ -68,6 +68,8 @@ from .graphics_items import (
 from ..selection_overlay import SelectionOverlay
 from utils import constants
 
+ZOOM_FACTOR = 1.05
+
 class DesignCanvas(QGraphicsView):
     """
     The main design surface, implemented using Qt's Graphics View Framework
@@ -1276,7 +1278,7 @@ class DesignCanvas(QGraphicsView):
     def wheelEvent(self, event):
         if event.modifiers() == Qt.KeyboardModifier.ControlModifier:
             old_pos = self.mapToScene(event.position().toPoint())
-            factor = 1.1 if event.angleDelta().y() > 0 else 1 / 1.1
+            factor = ZOOM_FACTOR if event.angleDelta().y() > 0 else 1 / ZOOM_FACTOR
             new_zoom = max(self.min_zoom, min(self.max_zoom, self.current_zoom * factor))
             scale_factor = new_zoom / self.current_zoom
             if scale_factor != 1.0:
