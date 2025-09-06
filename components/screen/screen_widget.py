@@ -1,9 +1,8 @@
 # components/screen/screen_widget.py
-# MODIFIED: Connected to the new view_zoomed signal.
+# MODIFIED: Connected to the design canvas zoom_changed signal.
 
 from PyQt6.QtWidgets import QWidget, QLabel, QVBoxLayout
 from PyQt6.QtCore import pyqtSignal, pyqtSlot, QPointF
-from PyQt6.QtGui import QCursor
 from services.screen_data_service import screen_service
 from services.data_context import data_context
 from .design_canvas import DesignCanvas
@@ -37,8 +36,8 @@ class ScreenWidget(QWidget):
         self.design_canvas.mouse_moved_on_scene.connect(self.mouse_moved_on_scene.emit)
         self.design_canvas.mouse_left_scene.connect(self.mouse_left_scene.emit)
         self.design_canvas.selection_dragged.connect(self.selection_dragged.emit)
-        # MODIFIED: Connect the new signal to the existing one.
-        self.design_canvas.view_zoomed.connect(self.zoom_changed.emit)
+        # Forward canvas zoom changes so toolbar labels stay in sync
+        self.design_canvas.zoom_changed.connect(self.zoom_changed.emit)
 
         data_context.screens_changed.connect(
             lambda evt: self.on_screen_modified(evt.get("screen_id", ""))
@@ -95,50 +94,8 @@ class ScreenWidget(QWidget):
     def clear_selection(self):
         self.design_canvas.clear_selection()
 
-    def _apply_zoom(self, factor: float):
-        """Apply a zoom factor while clamping to min/max and keeping focus position.
-
-        The factor is relative (e.g., ``ZOOM_FACTOR`` to zoom in by 05%,
-        ``1 / ZOOM_FACTOR`` to zoom out by the same amount). Shared logic
-        between ``zoom_in`` and ``zoom_out``, including shadow/visibility
-        updates.
-        """
-        # Clamp the new zoom within allowed bounds
-        current = self.design_canvas.current_zoom
-        min_zoom = self.design_canvas.min_zoom
-        max_zoom = self.design_canvas.max_zoom
-        new_zoom = max(min(current * factor, max_zoom), min_zoom)
-
-        # Effective factor after clamping
-        effective = new_zoom / current if current else 1.0
-
-        if effective != 1.0:
-            # Determine the scene position to anchor zoom around
-            mouse_view_pos = self.design_canvas.mapFromGlobal(QCursor.pos())
-            if self.design_canvas.viewport().rect().contains(mouse_view_pos):
-                scene_pos = self.design_canvas.mapToScene(mouse_view_pos)
-            else:
-                scene_pos = self.design_canvas._last_mouse_scene_pos
-
-            view_pt = self.design_canvas.mapFromScene(scene_pos)
-            if not self.design_canvas.viewport().rect().contains(view_pt):
-                scene_pos = self.design_canvas.mapToScene(self.design_canvas.viewport().rect().center())
-                view_pt = self.design_canvas.mapFromScene(scene_pos)
-
-            # Apply scale and translate to keep the anchor under cursor
-            self.design_canvas.scale(effective, effective)
-            new_scene_pos = self.design_canvas.mapToScene(view_pt)
-            delta = scene_pos - new_scene_pos
-            self.design_canvas.translate(delta.x(), delta.y())
-
-        # Update zoom state and related visuals
-        self.design_canvas.current_zoom = new_zoom
-        self.design_canvas._update_shadow_for_zoom()
-        self.design_canvas.update_visible_items()
-        self.zoom_changed.emit(self.get_zoom_percentage())
-
     def zoom_in(self):
-        self._apply_zoom(ZOOM_FACTOR)
+        self.design_canvas.apply_zoom_factor(ZOOM_FACTOR)
 
     def zoom_out(self):
-        self._apply_zoom(1 / ZOOM_FACTOR)
+        self.design_canvas.apply_zoom_factor(1 / ZOOM_FACTOR)

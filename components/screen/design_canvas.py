@@ -80,7 +80,7 @@ class DesignCanvas(QGraphicsView):
     mouse_moved_on_scene = pyqtSignal(QPointF)
     mouse_left_scene = pyqtSignal()
     selection_dragged = pyqtSignal(dict)
-    view_zoomed = pyqtSignal(str)
+    zoom_changed = pyqtSignal(str)
     
     def __init__(self, screen_id, parent=None):
         super().__init__(parent)
@@ -1275,24 +1275,44 @@ class DesignCanvas(QGraphicsView):
 
         super().mouseReleaseEvent(event)
 
+    def apply_zoom_factor(self, factor: float, anchor_pos: QPointF | None = None):
+        """Apply a zoom factor around ``anchor_pos`` and update view state."""
+        # Clamp to allowed zoom range and determine effective factor
+        current = self.current_zoom
+        new_zoom = max(self.min_zoom, min(self.max_zoom, current * factor))
+        effective = new_zoom / current if current else 1.0
+
+        # Determine anchor in scene coordinates if not provided
+        if anchor_pos is None:
+            mouse_view = self.mapFromGlobal(QCursor.pos())
+            if self.viewport().rect().contains(mouse_view):
+                anchor_pos = self.mapToScene(mouse_view)
+            else:
+                anchor_pos = self._last_mouse_scene_pos
+                if not self.viewport().rect().contains(self.mapFromScene(anchor_pos)):
+                    anchor_pos = self.mapToScene(self.viewport().rect().center())
+
+        view_pt = self.mapFromScene(anchor_pos)
+
+        if effective != 1.0:
+            self.scale(effective, effective)
+            new_scene_pos = self.mapToScene(view_pt)
+            delta = anchor_pos - new_scene_pos
+            self.translate(delta.x(), delta.y())
+
+        self.current_zoom = new_zoom
+        self._last_mouse_scene_pos = self._snap_position(anchor_pos)
+        self.zoom_changed.emit(f"{int(self.current_zoom * 100)}%")
+        self._update_shadow_for_zoom()
+        self._schedule_visible_items_update()
+        if self._dimension_item:
+            self._update_dimension_label(self._last_mouse_scene_pos)
+
     def wheelEvent(self, event):
         if event.modifiers() == Qt.KeyboardModifier.ControlModifier:
-            old_pos = self.mapToScene(event.position().toPoint())
+            anchor = self.mapToScene(event.position().toPoint())
             factor = ZOOM_FACTOR if event.angleDelta().y() > 0 else 1 / ZOOM_FACTOR
-            new_zoom = max(self.min_zoom, min(self.max_zoom, self.current_zoom * factor))
-            scale_factor = new_zoom / self.current_zoom
-            if scale_factor != 1.0:
-                self.scale(scale_factor, scale_factor)
-            self.current_zoom = new_zoom
-            new_pos = self.mapToScene(event.position().toPoint())
-            delta = old_pos - new_pos
-            self.translate(delta.x(), delta.y())
-            self._last_mouse_scene_pos = self._snap_position(self.mapToScene(event.position().toPoint()))
-            self.view_zoomed.emit(f"{int(self.current_zoom * 100)}%")
-            self._update_shadow_for_zoom()
-            self._schedule_visible_items_update()
-            if self._dimension_item:
-                self._update_dimension_label(self._last_mouse_scene_pos)
+            self.apply_zoom_factor(factor, anchor)
             event.accept()
         else:
             super().wheelEvent(event)
