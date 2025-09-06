@@ -1301,12 +1301,12 @@ class DesignCanvas(QGraphicsView):
             self.translate(delta.x(), delta.y())
 
         self.current_zoom = new_zoom
-        self._last_mouse_scene_pos = self._snap_position(anchor_pos)
+        self._last_mouse_scene_pos = anchor_pos
         self.zoom_changed.emit(f"{int(self.current_zoom * 100)}%")
         self._update_shadow_for_zoom()
         self._schedule_visible_items_update()
         if self._dimension_item:
-            self._update_dimension_label(self._last_mouse_scene_pos)
+            self._update_dimension_label(self._snap_position(self._last_mouse_scene_pos))
 
     def wheelEvent(self, event):
         if event.modifiers() == Qt.KeyboardModifier.ControlModifier:
