@@ -95,7 +95,13 @@ class ScreenWidget(QWidget):
         self.design_canvas.clear_selection()
 
     def zoom_in(self):
-        self.design_canvas.apply_zoom_factor(ZOOM_FACTOR)
+        center = self.design_canvas.mapToScene(
+            self.design_canvas.viewport().rect().center()
+        )
+        self.design_canvas.apply_zoom_factor(ZOOM_FACTOR, anchor_pos=center)
 
     def zoom_out(self):
-        self.design_canvas.apply_zoom_factor(1 / ZOOM_FACTOR)
+        center = self.design_canvas.mapToScene(
+            self.design_canvas.viewport().rect().center()
+        )
+        self.design_canvas.apply_zoom_factor(1 / ZOOM_FACTOR, anchor_pos=center)
