@@ -31,6 +31,7 @@ from PyQt6.QtWidgets import (
     QToolTip,
     QMessageBox,
     QStyle,
+    QSlider,
 )
 from PyQt6.QtGui import (
     QColor,
@@ -176,31 +177,97 @@ class ConditionalStyleEditorDialog(QDialog):
         self.shape_style_combo.currentTextChanged.connect(self.update_preview)
         style_layout.addWidget(self.shape_style_combo, 1, 1)
 
+        # Toggle-specific: direction of movement
+        self.toggle_dir_label = QLabel("Toggle Direction:")
+        self.toggle_dir_label.setAlignment(
+            Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter
+        )
+        style_layout.addWidget(self.toggle_dir_label, 2, 0)
+        self.toggle_dir_combo = QComboBox()
+        self.toggle_dir_combo.addItems(["Left ➝ Right", "Right ➝ Left"])
+        # Initialize from existing style if present
+        dir_key = (self.style.properties.get("toggle_direction") or "ltr").lower()
+        self.toggle_dir_combo.setCurrentText(
+            "Right ➝ Left" if dir_key in ("rtl", "right_to_left", "r2l") else "Left ➝ Right"
+        )
+        self.toggle_dir_combo.currentTextChanged.connect(self.update_preview)
+        style_layout.addWidget(self.toggle_dir_combo, 2, 1)
+
+        # Selector switch: direction and position
+        self.selector_dir_label = QLabel("Selector Direction:")
+        self.selector_dir_label.setAlignment(
+            Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter
+        )
+        style_layout.addWidget(self.selector_dir_label, 2, 0)
+        self.selector_dir_combo = QComboBox()
+        self.selector_dir_combo.addItems(["Clockwise", "Anti-Clockwise"])
+        sel_dir = (self.style.properties.get("selector_direction") or "cw").lower()
+        self.selector_dir_combo.setCurrentText(
+            "Anti-Clockwise" if sel_dir in ("ccw", "anti", "anti-clockwise") else "Clockwise"
+        )
+        self.selector_dir_combo.currentTextChanged.connect(self.update_preview)
+        style_layout.addWidget(self.selector_dir_combo, 2, 1)
+
+        self.selector_pos_label = QLabel("Selector Position:")
+        self.selector_pos_label.setAlignment(
+            Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter
+        )
+        style_layout.addWidget(self.selector_pos_label, 3, 0)
+        self.selector_pos_spin = QSpinBox()
+        self.selector_pos_spin.setRange(1, 12)
+        self.selector_pos_spin.setValue(int(self.style.properties.get("selector_position", 1) or 1))
+        self.selector_pos_spin.valueChanged.connect(self.update_preview)
+        style_layout.addWidget(self.selector_pos_spin, 3, 1)
+
+        # Tab button: side selection (Top/Right/Bottom/Left)
+        self.tab_side_label = QLabel("Tab Side:")
+        self.tab_side_label.setAlignment(
+            Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter
+        )
+        style_layout.addWidget(self.tab_side_label, 2, 0)
+        self.tab_side_combo = QComboBox()
+        self.tab_side_combo.addItems(["Top", "Right", "Bottom", "Left"])
+        self.tab_side_combo.setCurrentText(str(self.style.properties.get("tab_side", "Top") or "Top").title())
+        self.tab_side_combo.currentTextChanged.connect(self.update_preview)
+        style_layout.addWidget(self.tab_side_combo, 2, 1)
+
+        # Arrow button: 8-direction selector
+        self.arrow_dir_label = QLabel("Arrow Direction:")
+        self.arrow_dir_label.setAlignment(
+            Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter
+        )
+        style_layout.addWidget(self.arrow_dir_label, 2, 0)
+        self.arrow_dir_combo = QComboBox()
+        self.arrow_dir_combo.addItems(["N", "NE", "E", "SE", "S", "SW", "W", "NW"])
+        self.arrow_dir_combo.setCurrentText(str(self.style.properties.get("arrow_direction", "E") or "E").upper())
+        self.arrow_dir_combo.currentTextChanged.connect(self.update_preview)
+        style_layout.addWidget(self.arrow_dir_combo, 2, 1)
+
         bg_type_label = QLabel("Background Type:")
         bg_type_label.setAlignment(
             Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter
         )
-        style_layout.addWidget(bg_type_label, 2, 0)
+        style_layout.addWidget(bg_type_label, 3, 0)
         self.bg_type_combo = QComboBox()
         self.bg_type_combo.addItems(["Solid", "Linear Gradient"])
         self.bg_type_combo.setCurrentText(
             self.style.properties.get("background_type", "Solid")
         )
         self.bg_type_combo.currentTextChanged.connect(self.update_controls_state)
-        style_layout.addWidget(self.bg_type_combo, 2, 1)
+        style_layout.addWidget(self.bg_type_combo, 3, 1)
 
         main_color_label = QLabel("Main Color:")
         main_color_label.setAlignment(
             Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter
         )
-        style_layout.addWidget(main_color_label, 3, 0)
+        style_layout.addWidget(main_color_label, 4, 0)
         self.bg_base_color_combo, self.bg_shade_combo = (
             self.create_color_selection_widgets(
                 self.on_bg_color_changed, emit_initial=False
             )
         )
-        style_layout.addWidget(self.bg_base_color_combo, 3, 1)
-        style_layout.addWidget(self.bg_shade_combo, 4, 1)
+        style_layout.addWidget(self.bg_base_color_combo, 4, 1)
+        style_layout.addWidget(self.bg_shade_combo, 5, 1)
 
         # Hidden coordinate spin boxes used internally to build the QSS gradient
         self.x1_spin = self.create_coord_spinbox(
@@ -222,10 +289,27 @@ class ConditionalStyleEditorDialog(QDialog):
         self.gradient_dir_label.setAlignment(
             Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter
         )
-        style_layout.addWidget(self.gradient_dir_label, 5, 0)
+        style_layout.addWidget(self.gradient_dir_label, 6, 0)
         self.gradient_type_combo = QComboBox()
         self._init_gradient_type_combo()
-        style_layout.addWidget(self.gradient_type_combo, 5, 1)
+        style_layout.addWidget(self.gradient_type_combo, 6, 1)
+
+        # Transparency slider (0 = fully transparent, 100 = fully opaque)
+        self.opacity_label = QLabel("Transparency:")
+        self.opacity_label.setAlignment(
+            Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter
+        )
+        style_layout.addWidget(self.opacity_label, 7, 0)
+        self.bg_opacity_slider = QSlider(Qt.Orientation.Horizontal)
+        self.bg_opacity_slider.setRange(0, 100)
+        self.bg_opacity_slider.setSingleStep(1)
+        self.bg_opacity_slider.setPageStep(5)
+        self.bg_opacity_slider.setValue(
+            int(self.style.properties.get("background_opacity", 100))
+        )
+        self.bg_opacity_slider.setToolTip("Adjust background transparency (0-100)")
+        self.bg_opacity_slider.valueChanged.connect(self.update_preview)
+        style_layout.addWidget(self.bg_opacity_slider, 7, 1)
 
         style_group.setLayout(style_layout)
         main_layout.addWidget(style_group, 1, 0)
@@ -1544,6 +1628,9 @@ class ConditionalStyleEditorDialog(QDialog):
     def update_controls_state(self):
         component_type = self.component_type_combo.currentText()
         is_switch = component_type == "Toggle Switch"
+        is_selector = component_type == "Selector Switch (12)"
+        is_arrow = component_type == "Arrow Button"
+        is_tab = component_type == "Tab Button"
         if is_switch:
             self.preview_stack.setCurrentWidget(self.preview_switch)
             for spin in (
@@ -1560,12 +1647,36 @@ class ConditionalStyleEditorDialog(QDialog):
         # Shape style should be configurable even for toggle switches
         self.shape_style_label.setEnabled(True)
         self.shape_style_combo.setEnabled(True)
+        # Toggle/Selector specific controls
+        self.toggle_dir_label.setVisible(is_switch)
+        self.toggle_dir_combo.setVisible(is_switch)
+        self.toggle_dir_label.setEnabled(is_switch)
+        self.toggle_dir_combo.setEnabled(is_switch)
+        self.selector_dir_label.setVisible(is_selector)
+        self.selector_dir_combo.setVisible(is_selector)
+        self.selector_pos_label.setVisible(is_selector)
+        self.selector_pos_spin.setVisible(is_selector)
+        self.selector_dir_label.setEnabled(is_selector)
+        self.selector_dir_combo.setEnabled(is_selector)
+        self.selector_pos_label.setEnabled(is_selector)
+        self.selector_pos_spin.setEnabled(is_selector)
+        # Tab side control only for Tab Button
+        self.tab_side_label.setVisible(is_tab)
+        self.tab_side_combo.setVisible(is_tab)
+        self.tab_side_label.setEnabled(is_tab)
+        self.tab_side_combo.setEnabled(is_tab)
+        # Arrow direction control only for Arrow Button
+        self.arrow_dir_label.setVisible(is_arrow)
+        self.arrow_dir_combo.setVisible(is_arrow)
+        self.arrow_dir_label.setEnabled(is_arrow)
+        self.arrow_dir_combo.setEnabled(is_arrow)
         self.border_group.setEnabled(not is_switch)
 
-        # Toggle switches do not use text parameters, so disable related controls
-        self._set_state_controls_enabled(self.base_controls, not is_switch)
-        self._set_state_controls_enabled(self.hover_controls, not is_switch)
-        if is_switch:
+        # Toggle/Selector/Arrow do not use text parameters in preview; disable related controls
+        disable_text = is_switch or is_selector or is_arrow
+        self._set_state_controls_enabled(self.base_controls, not disable_text)
+        self._set_state_controls_enabled(self.hover_controls, not disable_text)
+        if disable_text:
             # Re-enable background color controls which are still applicable
             for controls in (self.base_controls, self.hover_controls):
                 for key in ("bg_base_combo", "bg_shade_combo"):
@@ -1574,7 +1685,8 @@ class ConditionalStyleEditorDialog(QDialog):
                         w.setEnabled(True)
 
         is_circle = component_type == "Circle Button"
-        self.corner_frame.setEnabled(not is_circle and not is_switch)
+        # Corner radius not applicable to toggle/selector/arrow
+        self.corner_frame.setEnabled(not (is_circle or is_switch or is_selector or is_arrow))
 
         is_gradient = self.bg_type_combo.currentText() == "Linear Gradient"
         for w in [self.gradient_dir_label, self.gradient_type_combo]:
@@ -1677,6 +1789,25 @@ class ConditionalStyleEditorDialog(QDialog):
             "underline" if self.base_controls["underline_btn"].isChecked() else "none"
         )
 
+        # Determine background alpha percentage (0-100)
+        if props is None:
+            alpha_pct = (
+                int(self.bg_opacity_slider.value())
+                if hasattr(self, "bg_opacity_slider")
+                else 100
+            )
+        else:
+            try:
+                # StyleProperties supports dict-like access for unknown keys
+                alpha_pct = int(props.get("background_opacity", 100))
+            except Exception:
+                alpha_pct = 100
+
+        # Helper to format QColor with alpha for QSS (rgba with 0-255 alpha)
+        def rgba_str(c: QColor, pct: int) -> str:
+            a = max(0, min(255, round(pct * 255 / 100)))
+            return f"rgba({c.red()}, {c.green()}, {c.blue()}, {a})"
+
         if component_type == "Circle Button":
             size = max(width, height)
             radius = size // 2
@@ -1708,7 +1839,8 @@ class ConditionalStyleEditorDialog(QDialog):
         )
 
         if shape_style == "Glass":
-            light_color, dark_color = bg_color.lighter(150).name(), bg_color.name()
+            light_color = rgba_str(bg_color.lighter(150), alpha_pct)
+            dark_color = rgba_str(bg_color, alpha_pct)
             border_c = self._border_color.name()
             main_qss.append(
                 f"background-color: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 {light_color}, stop:1 {dark_color});"
@@ -1716,7 +1848,7 @@ class ConditionalStyleEditorDialog(QDialog):
             main_qss.append(f"border: 1px solid {border_c};")
             hover_qss.extend(
                 [
-                    f"background-color: {hover_bg_color.name()};",
+                    f"background-color: {rgba_str(hover_bg_color, alpha_pct)};",
                     f"color: {hover_text_color};",
                 ]
             )
@@ -1729,7 +1861,7 @@ class ConditionalStyleEditorDialog(QDialog):
                 ]
             )
             if bg_type == "Solid":
-                main_qss.append(f"background-color: {bg_color.name()};")
+                main_qss.append(f"background-color: {rgba_str(bg_color, alpha_pct)};")
             else:
                 x1, y1, x2, y2 = (
                     self.x1_spin.value(),
@@ -1738,11 +1870,11 @@ class ConditionalStyleEditorDialog(QDialog):
                     self.y2_spin.value(),
                 )
                 main_qss.append(
-                    f"background-color: qlineargradient(x1:{x1}, y1:{y1}, x2:{x2}, y2:{y2}, stop:0 {bg_color.name()}, stop:1 {self._bg_color2.name()});"
+                    f"background-color: qlineargradient(x1:{x1}, y1:{y1}, x2:{x2}, y2:{y2}, stop:0 {rgba_str(bg_color, alpha_pct)}, stop:1 {rgba_str(self._bg_color2, alpha_pct)});"
                 )
             hover_qss.extend(
                 [
-                    f"background-color: {hover_bg_color.name()};",
+                    f"background-color: {rgba_str(hover_bg_color, alpha_pct)};",
                     f"color: {hover_text_color};",
                 ]
             )
@@ -1754,9 +1886,11 @@ class ConditionalStyleEditorDialog(QDialog):
                     f"color: {text_color};",
                 ]
             )
+            # Keep hover in outline style as well: transparent fill, update border/text
             hover_qss.extend(
                 [
-                    f"background-color: {hover_bg_color.name()};",
+                    "background-color: transparent;",
+                    f"border: {border_width}px solid {hover_bg_color.name()};",
                     f"color: {hover_text_color};",
                 ]
             )
@@ -1769,7 +1903,7 @@ class ConditionalStyleEditorDialog(QDialog):
                 ]
             )
             if bg_type == "Solid":
-                main_qss.append(f"background-color: {bg_color.name()};")
+                main_qss.append(f"background-color: {rgba_str(bg_color, alpha_pct)};")
             else:
                 x1, y1, x2, y2 = (
                     self.x1_spin.value(),
@@ -1778,11 +1912,11 @@ class ConditionalStyleEditorDialog(QDialog):
                     self.y2_spin.value(),
                 )
                 main_qss.append(
-                    f"background-color: qlineargradient(x1:{x1}, y1:{y1}, x2:{x2}, y2:{y2}, stop:0 {bg_color.name()}, stop:1 {self._bg_color2.name()});"
+                    f"background-color: qlineargradient(x1:{x1}, y1:{y1}, x2:{x2}, y2:{y2}, stop:0 {rgba_str(bg_color, alpha_pct)}, stop:1 {rgba_str(self._bg_color2, alpha_pct)});"
                 )
             hover_qss.extend(
                 [
-                    f"background-color: {hover_bg_color.name()};",
+                    f"background-color: {rgba_str(hover_bg_color, alpha_pct)};",
                     f"color: {hover_text_color};",
                 ]
             )
@@ -1804,6 +1938,15 @@ class ConditionalStyleEditorDialog(QDialog):
         }
         widget = preview_map.get(component_type, self.preview_button)
         widget.setStyleSheet(qss)
+        # Apply toggle alignment for switch preview
+        if component_type == "Toggle Switch":
+            txt = self.toggle_dir_combo.currentText() if hasattr(self, "toggle_dir_combo") else "Left ➝ Right"
+            on_is_left = True if "Right" in txt.split("➝")[0] else False
+            # When on_is_left=True, the 'on' position is on the left
+            try:
+                self.preview_switch.set_alignment(on_is_left)
+            except Exception:
+                pass
         if hasattr(widget, "set_text_colors"):
             base = self._text_color or self.palette().color(
                 QPalette.ColorRole.ButtonText
@@ -1902,6 +2045,19 @@ class ConditionalStyleEditorDialog(QDialog):
         properties = {
             "component_type": self.component_type_combo.currentText(),
             "shape_style": self.shape_style_combo.currentText(),
+            # Toggle switch direction: persist as compact token
+            "toggle_direction": (
+                "rtl" if (hasattr(self, "toggle_dir_combo") and self.toggle_dir_combo.currentText().startswith("Right")) else "ltr"
+            ),
+            # Selector switch support
+            "selector_direction": (
+                "ccw" if (hasattr(self, "selector_dir_combo") and self.selector_dir_combo.currentText().startswith("Anti")) else "cw"
+            ),
+            "selector_position": int(self.selector_pos_spin.value()) if hasattr(self, "selector_pos_spin") else 1,
+            # Tab button side
+            "tab_side": (self.tab_side_combo.currentText() if hasattr(self, "tab_side_combo") else "Top"),
+            # Arrow
+            "arrow_direction": (self.arrow_dir_combo.currentText() if hasattr(self, "arrow_dir_combo") else "E"),
             "background_type": self.bg_type_combo.currentText(),
             "background_color": self._bg_color.name(),
             "background_color2": self._bg_color2.name(),
@@ -1910,6 +2066,7 @@ class ConditionalStyleEditorDialog(QDialog):
             "gradient_y1": self.y1_spin.value(),
             "gradient_x2": self.x2_spin.value(),
             "gradient_y2": self.y2_spin.value(),
+            "background_opacity": int(self.bg_opacity_slider.value()) if hasattr(self, "bg_opacity_slider") else 100,
             "text_color": self._text_color,
             "font_size": self.base_controls["font_size_spin"].value(),
             "font_family": self.base_controls["font_family_combo"].currentText(),

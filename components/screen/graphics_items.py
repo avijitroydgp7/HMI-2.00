@@ -18,6 +18,7 @@ from PyQt6.QtGui import (
 from PyQt6.QtCore import QRectF, Qt, QPointF, QLineF
 from PyQt6.QtSvg import QSvgRenderer
 import os
+import math
 import copy
 import logging
 
@@ -362,9 +363,19 @@ class ButtonItem(BaseGraphicsItem):
             border_radius = h / 2
             br_tl = br_tr = br_br = br_bl = border_radius
             custom_radii = False
+        # Removed special handling for 'Selector Switch (12)' and 'Tab Button'
+        # so they are treated like standard buttons if encountered.
 
         # Secondary background colour (for gradients)
         bg_color2 = QColor(props.get('background_color2', bg_color.name()))
+
+        # Transparency handling (0-100 => 0-255 alpha)
+        try:
+            alpha_pct = int(props.get('background_opacity', 100) or 100)
+        except Exception:
+            alpha_pct = 100
+        alpha_pct = max(0, min(100, alpha_pct))
+        _alpha255 = int(round(alpha_pct * 255 / 100))
 
         # Determine brush
         brush = None
@@ -376,17 +387,26 @@ class ButtonItem(BaseGraphicsItem):
             x2 = float(props.get('gradient_x2', 0)) * w
             y2 = float(props.get('gradient_y2', 1)) * h
             grad = QLinearGradient(x1, y1, x2, y2)
-            grad.setColorAt(0, bg_color)
-            grad.setColorAt(1, bg_color2)
+            c1 = QColor(bg_color)
+            c2 = QColor(bg_color2)
+            c1.setAlpha(_alpha255)
+            c2.setAlpha(_alpha255)
+            grad.setColorAt(0, c1)
+            grad.setColorAt(1, c2)
             brush = grad
         elif shape_style == 'Glass':
             light = QColor(bg_color).lighter(150)
+            base = QColor(bg_color)
+            light.setAlpha(_alpha255)
+            base.setAlpha(_alpha255)
             grad = QLinearGradient(0, 0, 0, h)
             grad.setColorAt(0, light)
-            grad.setColorAt(1, bg_color)
+            grad.setColorAt(1, base)
             brush = grad
         else:
-            brush = bg_color
+            base = QColor(bg_color)
+            base.setAlpha(_alpha255)
+            brush = base
 
         # Pen/brush setup
         if shape_style == 'Outline':
@@ -421,23 +441,18 @@ class ButtonItem(BaseGraphicsItem):
                 painter.drawRoundedRect(rect, border_radius, border_radius)
 
         if component_type == 'Toggle Switch':
-            knob_d = h - 2 * border_width
-            knob_rect = QRectF(border_width, border_width, knob_d, knob_d)
+            # Mirror preview geometry: 10% margins and 80% diameter knob
+            margin = int(h * 0.1)
+            knob_d = int(h * 0.8)
+            # Direction: if 'on' state is on the left, the initial (off) is right
+            toggle_dir = str(props.get('toggle_direction', 'ltr') or 'ltr').lower()
+            on_is_left = bool(props.get('toggle_on_is_left', False)) or toggle_dir in ('rtl', 'right_to_left', 'r2l')
+            off_x = margin if not on_is_left else (w - margin - knob_d)
+            knob_rect = QRectF(off_x, (h - knob_d) / 2, knob_d, knob_d)
             painter.setBrush(text_color)
             painter.setPen(Qt.PenStyle.NoPen)
             painter.drawEllipse(knob_rect)
-            # Restore brush/pen for subsequent drawing
-            painter.setBrush(brush if shape_style != 'Outline' else Qt.BrushStyle.NoBrush)
-            if shape_style == 'Outline':
-                pen = QPen(bg_color, max(1, border_width))
-                _apply_pen_style_from_name(pen, props.get('border_style', 'solid'))
-                painter.setPen(pen)
-            elif border_width > 0:
-                pen = QPen(border_color, border_width)
-                _apply_pen_style_from_name(pen, props.get('border_style', 'solid'))
-                painter.setPen(pen)
-            else:
-                painter.setPen(Qt.PenStyle.NoPen)
+        # Removed 'Selector Switch (12)' pointer rendering
 
         # Draw icon if available
         icon_src = props.get('icon', '')
@@ -566,7 +581,8 @@ class ButtonItem(BaseGraphicsItem):
             if anim_type == 'pulse':
                 # Simple pulse effect by adjusting opacity
                 pulse_factor = 0.8 + 0.2 * intensity
-                bg_color.setAlphaF(min(1.0, pulse_factor))
+                base_alpha = _alpha255 / 255.0
+                bg_color.setAlphaF(min(1.0, base_alpha * pulse_factor))
                 painter.setBrush(bg_color)
                 if shape_path:
                     painter.drawPath(shape_path)
