@@ -30,6 +30,7 @@ from PyQt6.QtWidgets import (
     QComboBox,
     QFormLayout,
     QSizePolicy,
+    QFileDialog,
 )
 
 from utils.icon_manager import IconManager
@@ -89,6 +90,8 @@ class IconPickerDialog(QDialog):
         self._initial_source = source or ""
         self._preview_style = preview_style or {}
         # No per-color editing for SVGs; render as-is
+        # Track current SVG directory for browsing
+        self._svg_dir: str = icons_root
 
         root = QVBoxLayout(self)
 
@@ -537,9 +540,15 @@ class IconPickerDialog(QDialog):
         page = QWidget()
         layout = QVBoxLayout(page)
 
-        # Search
-        search = QLineEdit(); search.setPlaceholderText("Search SVG icons (lib/icon)")
-        layout.addWidget(search)
+        # Search + Browse
+        top_row = QHBoxLayout()
+        search = QLineEdit(); search.setPlaceholderText("Search SVG icons")
+        top_row.addWidget(search, 1)
+        self.svg_browse_btn = QToolButton(); self.svg_browse_btn.setText("Browse…")
+        self.svg_browse_btn.setToolTip("Select a folder that contains SVG icons")
+        self.svg_browse_btn.clicked.connect(self._on_browse_svg_dir)
+        top_row.addWidget(self.svg_browse_btn, 0)
+        layout.addLayout(top_row)
 
         content = QHBoxLayout(); layout.addLayout(content)
 
@@ -554,32 +563,81 @@ class IconPickerDialog(QDialog):
         self.svg_grid_container.installEventFilter(self)
         content.addWidget(scroll, 1)
 
-        # Load SVG files from root
-        files = self._collect_svg_files(self._icons_root)
-        groups = self._group_svg(files)
-        self.svg_groups.addItem("All")
-        for g in groups.keys():
-            self.svg_groups.addItem(g)
-
+        # Load SVG files from current directory
         self._svg_items: List[_ThumbButton] = []
         self._svg_meta: Dict[_ThumbButton, Tuple[str, str]] = {}
-        self._populate_svg_grid(files)
+        self._reload_svg_dir(initial_search=search)
 
         self.svg_groups.currentTextChanged.connect(lambda _: self._apply_svg_filters(search.text()))
         search.textChanged.connect(self._apply_svg_filters)
         return page
 
     def _collect_svg_files(self, root: str) -> List[str]:
+        """Collect all .svg files recursively under root."""
         out: List[str] = []
         try:
-            for name in os.listdir(root):
-                if name.lower().endswith(".svg"):
-                    out.append(os.path.join(root, name))
+            for dirpath, _dirnames, filenames in os.walk(root):
+                for name in filenames:
+                    if name.lower().endswith(".svg"):
+                        out.append(os.path.join(dirpath, name))
         except Exception:
             pass
-        return sorted(out, key=lambda p: os.path.basename(p).lower())
+        return sorted(out, key=lambda p: os.path.relpath(p, root).lower())
+
+    def _list_immediate_subfolders(self, root: str) -> List[str]:
+        """Return names of immediate subfolders within root."""
+        try:
+            return sorted(
+                [
+                    name
+                    for name in os.listdir(root)
+                    if os.path.isdir(os.path.join(root, name))
+                ],
+                key=str.lower,
+            )
+        except Exception:
+            return []
+
+    def _file_category_from_folder(self, root: str, path: str) -> str:
+        """Category is first-level subfolder inside root; root files -> 'Uncategorized'."""
+        try:
+            rel_dir = os.path.relpath(os.path.dirname(path), root)
+        except Exception:
+            rel_dir = os.path.dirname(path)
+        if not rel_dir or rel_dir == ".":
+            return "Uncategorized"
+        # Normalize to first segment
+        first = rel_dir.split(os.sep, 1)[0]
+        return first or "Uncategorized"
+
+    def _reload_svg_dir(self, initial_search: Optional[QLineEdit] = None):
+        """Reload SVG page based on current folder selection."""
+        # Rebuild groups
+        self.svg_groups.clear()
+        self.svg_groups.addItem("All")
+        files = self._collect_svg_files(self._svg_dir)
+        folders = self._list_immediate_subfolders(self._svg_dir)
+        for f in folders:
+            self.svg_groups.addItem(f)
+        # Add 'Uncategorized' if there are root-level icons
+        has_root_icons = any(os.path.dirname(p) == self._svg_dir for p in files)
+        if has_root_icons:
+            # Ensure it's after subfolders for consistency
+            self.svg_groups.addItem("Uncategorized")
+
+        # Populate grid
+        self._populate_svg_grid(files, root=self._svg_dir)
+        # Select first group
+        if self.svg_groups.count() > 0:
+            self.svg_groups.setCurrentRow(0)
+        # Trigger filter refresh
+        if initial_search is not None:
+            self._apply_svg_filters(initial_search.text())
+        else:
+            self._apply_svg_filters("")
 
     def _group_svg(self, files: List[str]) -> Dict[str, List[str]]:
+        """Deprecated: kept for backward compatibility. Not used with folder categories."""
         groups: Dict[str, List[str]] = {}
         for p in files:
             base = os.path.basename(p)
@@ -587,7 +645,7 @@ class IconPickerDialog(QDialog):
             groups.setdefault(key, []).append(p)
         return groups
 
-    def _populate_svg_grid(self, files: List[str]):
+    def _populate_svg_grid(self, files: List[str], root: Optional[str] = None):
         while self.svg_grid.count():
             item = self.svg_grid.takeAt(0)
             w = item.widget()
@@ -603,7 +661,10 @@ class IconPickerDialog(QDialog):
             btn = _ThumbButton(text, icon)
             btn.clicked.connect(lambda _=False, b=btn, v=p: self._on_select("svg", v, b))
             self._svg_items.append(btn)
-            grp = text.split("-", 1)[0] if "-" in text else text[:1].upper()
+            if root:
+                grp = self._file_category_from_folder(root, p)
+            else:
+                grp = text.split("-", 1)[0] if "-" in text else text[:1].upper()
             self._svg_meta[btn] = (grp, p)
             self.svg_grid.addWidget(
                 btn,
@@ -622,11 +683,25 @@ class IconPickerDialog(QDialog):
         for btn in self._svg_items:
             grp, path = self._svg_meta.get(btn, ("", ""))
             base = os.path.basename(path).lower()
-            visible = (group == "All" or grp == group)
+            if group == "All":
+                visible = True
+            elif group == "Uncategorized":
+                # Root-level files only
+                visible = (grp == "Uncategorized")
+            else:
+                visible = (grp == group)
             if text:
                 visible = visible and (text in base)
             btn.setVisible(visible)
         self._arrange_buttons(self.svg_grid, self._svg_items)
+
+    def _on_browse_svg_dir(self):
+        """Open folder picker and reload SVG page."""
+        start_dir = self._svg_dir if os.path.isdir(self._svg_dir) else os.getcwd()
+        path = QFileDialog.getExistingDirectory(self, "Select SVG Icon Folder", start_dir)
+        if path:
+            self._svg_dir = path
+            self._reload_svg_dir()
 
     def _arrange_buttons(self, grid: QGridLayout, items: List[_ThumbButton]):
         cols = self._compute_grid_cols(grid)
