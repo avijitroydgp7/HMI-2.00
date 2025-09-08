@@ -22,11 +22,6 @@ class EditorAdapter:
 
 _EDITOR_DISPATCH = {
     constants.ToolType.BUTTON: ".button_editor",
-    constants.ToolType.LINE: ".line_editor",
-    constants.ToolType.TEXT: ".text_editor",
-    constants.ToolType.POLYGON: ".polygon_editor",
-    constants.ToolType.IMAGE: ".image_editor",
-    constants.ToolType.SCALE: ".scale_editor",
 }
 
 

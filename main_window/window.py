@@ -6,7 +6,7 @@ from PyQt6.QtCore import Qt, pyqtSignal
 from functools import partial
 
 from components.ribbon import Ribbon
-from components.toolbar import QuickAccessToolBar, ToolsToolbar, DrawingToolbar
+from components.toolbar import QuickAccessToolBar, ToolsToolbar
 from components.docks import create_docks
 from components.welcome_widget import WelcomeWidget
 # MODIFIED: Import ScreenWidget to check the type of the current tab
@@ -59,9 +59,6 @@ class MainWindow(QMainWindow):
         self.tools_toolbar = ToolsToolbar(self)
         self.addToolBar(Qt.ToolBarArea.LeftToolBarArea, self.tools_toolbar)
 
-        self.drawing_toolbar = DrawingToolbar(self)
-        self.addToolBar(Qt.ToolBarArea.LeftToolBarArea, self.drawing_toolbar)
-
         self.docks = create_docks(self)
         self.addDockWidget(Qt.DockWidgetArea.LeftDockWidgetArea, self.docks['project'])
         self.addDockWidget(Qt.DockWidgetArea.LeftDockWidgetArea, self.docks['system'])
@@ -100,19 +97,13 @@ class MainWindow(QMainWindow):
 
     def revert_to_select_tool(self):
         self.tools_toolbar.set_active_tool(constants.ToolType.SELECT)
-        self.drawing_toolbar.clear_selection()
         self.set_active_tool(constants.ToolType.SELECT)
         self.docks['properties'].widget().set_active_tool(constants.ToolType.SELECT)
 
     def on_tools_toolbar_tool_changed(self, tool_name: str):
         """Handle selection from the tools toolbar."""
-        self.drawing_toolbar.clear_selection()
         self.set_active_tool(tool_name)
 
-    def set_active_drawing_tool(self, tool_name: str):
-        """Sets the active tool from the drawing toolbar."""
-        self.tools_toolbar.clear_selection()
-        self.set_active_tool(tool_name)
 
     def on_cut(self):
         from . import clipboard
@@ -189,9 +180,7 @@ class MainWindow(QMainWindow):
         # Toolbars and properties linking
         bulk_connect([
             (self.tools_toolbar.tool_changed, self.on_tools_toolbar_tool_changed),
-            (self.drawing_toolbar.tool_changed, self.set_active_drawing_tool),
             (self.tools_toolbar.tool_changed, self.docks['properties'].widget().set_active_tool),
-            (self.drawing_toolbar.tool_changed, self.docks['properties'].widget().set_active_tool),
         ])
 
         # Edit actions

@@ -52,15 +52,6 @@ def setup_view_actions(win):
     win.ribbon.add_view_action(tools_action)
     win.quick_access_toolbar.add_view_action(tools_action)
 
-    drawing_action = win.drawing_toolbar.toggleViewAction()
-    drawing_action.setText("Drawing Toolbar")
-    drawing_anim = IconManager.create_animated_icon('fa5s.pencil-alt')
-    drawing_action.setIcon(drawing_anim.icon)
-    drawing_anim.add_target(drawing_action)
-    drawing_action._animated_icon = drawing_anim
-    win.ribbon.add_view_action(drawing_action)
-    win.quick_access_toolbar.add_view_action(drawing_action)
-
     # Snapping controls
     win.snap_objects_cb = QCheckBox("Snap to Objects")
     win.snap_objects_cb.setChecked(settings_service.get_value("snap_to_objects", True))

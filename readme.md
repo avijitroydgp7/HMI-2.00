@@ -138,14 +138,7 @@ HMI-2.00/
 │  ├─ default_theme/
 │  └─  light_theme/
 ├─ tools/
-│  ├─ button.py
-│  ├─ dxf.py
-│  ├─ image.py
-│  ├─ line.py
-│  ├─ path_edit.py
-│  ├─ polygon.py
-│  ├─ scale.py
-│  └─  text.py
+│  └─ button/
 └─ utils/
    ├─ constants.py
    └─  icon_manager.py

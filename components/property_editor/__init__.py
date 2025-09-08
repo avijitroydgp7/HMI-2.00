@@ -35,11 +35,6 @@ from .factory import get_editor
 
 # Module-level tool imports (dispatch via mapping below)
 from tools import button as button_tool
-from tools import line as line_tool
-from tools import text as text_tool
-from tools import polygon as polygon_tool
-from tools import image as image_tool
-from tools import scale as scale_tool
 
 
 @dataclass(frozen=True)
@@ -123,42 +118,6 @@ class PropertyEditor(QStackedWidget):
                     button_tool.get_default_properties(), incoming
                 ),
                 lambda: get_editor(constants.ToolType.BUTTON).build(self),
-            ),
-            constants.ToolType.LINE: ToolSchema(
-                constants.ToolType.LINE.value,
-                lambda incoming: self._merge_properties(
-                    line_tool.get_default_properties(), incoming
-                ),
-                lambda: get_editor(constants.ToolType.LINE).build(self),
-            ),
-            constants.ToolType.TEXT: ToolSchema(
-                constants.ToolType.TEXT.value,
-                lambda incoming: self._merge_properties(
-                    text_tool.get_default_properties(), incoming
-                ),
-                lambda: get_editor(constants.ToolType.TEXT).build(self),
-            ),
-            constants.ToolType.POLYGON: ToolSchema(
-                constants.ToolType.POLYGON.value,
-                lambda incoming: self._merge_properties(
-                    polygon_tool.get_default_properties(), incoming
-                ),
-                lambda: get_editor(constants.ToolType.POLYGON).build(self),
-            ),
-            constants.ToolType.IMAGE: ToolSchema(
-                constants.ToolType.IMAGE.value,
-                lambda incoming: self._merge_properties(
-                    image_tool.get_default_properties(incoming.get("path", "")),
-                    incoming,
-                ),
-                lambda: get_editor(constants.ToolType.IMAGE).build(self),
-            ),
-            constants.ToolType.SCALE: ToolSchema(
-                constants.ToolType.SCALE.value,
-                lambda incoming: self._merge_properties(
-                    scale_tool.get_default_properties(), incoming
-                ),
-                lambda: get_editor(constants.ToolType.SCALE).build(self),
             ),
         }
 
