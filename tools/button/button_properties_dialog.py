@@ -104,7 +104,6 @@ class ButtonPropertiesWidget(QWidget):
         updated_props["actions"] = self.properties.get("actions", [])
         # Save label and text color fallback
         updated_props["label"] = self.properties.get("label", "Button")
-        updated_props["text_color"] = self.properties.get("text_color", "#ffffff")
 
         # Serialize conditional styles and construct default style block
         style_data = self.style_manager.to_dict()
@@ -153,6 +152,8 @@ class ButtonPropertiesWidget(QWidget):
 
         # Flatten default style for canvas/runtime consumption
         updated_props.update(default_style.get("properties", {}))
+        updated_props.pop("background_color", None)
+        updated_props.pop("text_color", None)
         if default_style.get("hover_properties"):
             updated_props["hover_properties"] = default_style["hover_properties"]
         else:

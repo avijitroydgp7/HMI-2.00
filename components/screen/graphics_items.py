@@ -215,7 +215,8 @@ class ButtonItem(BaseGraphicsItem):
                 'component_type': props.get('component_type', 'Standard Button'),
                 'shape_style': props.get('shape_style', 'Flat'),
                 'background_type': props.get('background_type', 'Solid'),
-                'background_color': props.get('background_color', '#5a6270'),
+                'background_color': props.get('background_color')
+                or props.get('default_style', {}).get('background_color', '#5a6270'),
                 # Extras supported by the editor (stored via StyleProperties.extra)
                 'background_color2': props.get('background_color2', '#5a6270'),
                 'gradient_x1': props.get('gradient_x1', 0),
@@ -225,7 +226,8 @@ class ButtonItem(BaseGraphicsItem):
                 # Text
                 'text_type': props.get('text_type', 'Text'),
                 'text_value': props.get('text_value', props.get('label', 'Button')),
-                'text_color': props.get('text_color', '#ffffff'),
+                'text_color': props.get('text_color')
+                or props.get('default_style', {}).get('text_color', '#ffffff'),
                 'font_family': props.get('font_family', ''),
                 'font_size': props.get('font_size', 18),
                 'bold': props.get('bold', False),
@@ -306,8 +308,16 @@ class ButtonItem(BaseGraphicsItem):
         background_type = props.get('background_type', 'Solid')
 
         # Apply style properties converting percentages to absolute values
-        bg_color = QColor(props.get('background_color') or '#5a6270')
-        text_color = QColor(props.get('text_color') or '#ffffff')
+        bg_color = QColor(
+            props.get('background_color')
+            or props.get('default_style', {}).get('background_color')
+            or '#5a6270'
+        )
+        text_color = QColor(
+            props.get('text_color')
+            or props.get('default_style', {}).get('text_color')
+            or '#ffffff'
+        )
         # Prefer Conditional Style "text_value"; fallback to legacy "label"
         label = props.get('text_value', props.get('label', 'Button'))
         try:

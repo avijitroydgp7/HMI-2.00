@@ -3,9 +3,7 @@ from __future__ import annotations
 import copy
 from typing import Dict, Any
 
-from PyQt6.QtCore import pyqtSignal
-from PyQt6.QtWidgets import QWidget, QFormLayout, QLineEdit, QPushButton
-from PyQt6.QtGui import QDoubleValidator
+from PyQt6.QtWidgets import QWidget
 
 from services.command_history_service import command_history_service
 from services.commands import (
@@ -15,174 +13,7 @@ from services.commands import (
 from services.screen_data_service import screen_service
 
 from tools import button as button_tool
-from tools.button.button_properties_dialog import (
-    value_to_percent,
-    ButtonPropertiesDialog,
-)
-
-
-class SimpleButtonEditor(QWidget):
-    """Minimal button property editor used in the property panel."""
-
-    properties_changed = pyqtSignal(dict)
-
-    def __init__(self, props: Dict[str, Any], open_dialog_cb=None):
-        super().__init__()
-        layout = QFormLayout(self)
-        self._open_dialog_cb = open_dialog_cb
-
-        self.label_edit = QLineEdit()
-        self.label_edit.setObjectName("label")
-        layout.addRow("Label", self.label_edit)
-
-        self.bg_color_edit = QLineEdit()
-        self.bg_color_edit.setObjectName("default_style.background_color")
-        layout.addRow("Background", self.bg_color_edit)
-
-        self.text_color_edit = QLineEdit()
-        self.text_color_edit.setObjectName("default_style.text_color")
-        layout.addRow("Text Color", self.text_color_edit)
-
-        self.pos_x_edit = QLineEdit()
-        self.pos_x_edit.setObjectName("position.x")
-        layout.addRow("X", self.pos_x_edit)
-
-        self.pos_y_edit = QLineEdit()
-        self.pos_y_edit.setObjectName("position.y")
-        layout.addRow("Y", self.pos_y_edit)
-
-        self.width_edit = QLineEdit()
-        self.width_edit.setObjectName("size.width")
-        layout.addRow("Width", self.width_edit)
-
-        self.height_edit = QLineEdit()
-        self.height_edit.setObjectName("size.height")
-        layout.addRow("Height", self.height_edit)
-
-        for edit in (
-            self.pos_x_edit,
-            self.pos_y_edit,
-            self.width_edit,
-            self.height_edit,
-        ):
-            validator = QDoubleValidator()
-            validator.setDecimals(2)
-            edit.setValidator(validator)
-
-        self.advanced_button = QPushButton("Actions && Style…")
-        self.advanced_button.setObjectName("advanced")
-        layout.addRow(self.advanced_button)
-        self.advanced_button.clicked.connect(self._open_dialog)
-
-        # Populate initial values
-        self.set_properties(props)
-
-        # Emit properties when editing finishes
-        for edit in (
-            self.label_edit,
-            self.bg_color_edit,
-            self.text_color_edit,
-            self.pos_x_edit,
-            self.pos_y_edit,
-            self.width_edit,
-            self.height_edit,
-        ):
-            edit.editingFinished.connect(self._emit_change)
-
-    # --- helpers -----------------------------------------------------
-    def _emit_change(self) -> None:
-        def _to_float(text: str) -> Any:
-            try:
-                return float(text)
-            except Exception:
-                return None
-
-        bg = self.bg_color_edit.text() or None
-        fg = self.text_color_edit.text() or None
-        props = {
-            "label": self.label_edit.text() or None,
-            "background_color": bg,
-            "text_color": fg,
-            "default_style": {
-                "background_color": bg,
-                "text_color": fg,
-            },
-            "position": {
-                "x": _to_float(self.pos_x_edit.text()),
-                "y": _to_float(self.pos_y_edit.text()),
-            },
-            "size": {
-                "width": _to_float(self.width_edit.text()),
-                "height": _to_float(self.height_edit.text()),
-            },
-        }
-        self.properties_changed.emit(props)
-
-    def _open_dialog(self) -> None:
-        if self._open_dialog_cb:
-            self._open_dialog_cb()
-
-    def set_properties(self, props: Dict[str, Any]) -> None:
-        def _get(path: str) -> Any:
-            parts = path.split(".")
-            value: Any = props
-            for part in parts:
-                if not isinstance(value, dict):
-                    return None
-                value = value.get(part)
-                if value is None:
-                    return None
-            return value
-
-        fields = [
-            (self.label_edit, ["label"]),
-            (
-                self.bg_color_edit,
-                ["default_style.background_color", "background_color"],
-            ),
-            (
-                self.text_color_edit,
-                ["default_style.text_color", "text_color"],
-            ),
-            (self.pos_x_edit, ["position.x"]),
-            (self.pos_y_edit, ["position.y"]),
-            (self.width_edit, ["size.width"]),
-            (self.height_edit, ["size.height"]),
-        ]
-        for edit, paths in fields:
-            val = None
-            for path in paths:
-                val = _get(path)
-                if val is not None:
-                    break
-            edit.blockSignals(True)
-            edit.setText("" if val is None else str(val))
-            edit.blockSignals(False)
-
-
-def _ensure_percentage_props(props: Dict) -> Dict:
-    """Ensure numeric style properties are stored as percentages."""
-    p = copy.deepcopy(props)
-    size = p.get("size", {})
-    w = size.get("width", 100)
-    h = size.get("height", 40)
-    min_dim = min(w, h)
-
-    def conv(key, base):
-        val = p.get(key)
-        if val is None:
-            return
-        # Values greater than 100 are assumed to be absolute pixels
-        if isinstance(val, (int, float)) and val > 100:
-            p[key] = value_to_percent(val, base)
-
-    conv("font_size", h)
-    conv("border_radius", min_dim)
-    conv("border_width", min_dim)
-    conv("icon_size", min_dim)
-    for k in ("border_radius_tl", "border_radius_tr", "border_radius_br", "border_radius_bl"):
-        conv(k, min_dim)
-    return p
+from tools.button.button_properties_dialog import ButtonPropertiesWidget
 
 
 def _merge_into(base: Dict[str, Any], inc: Dict[str, Any]) -> Dict[str, Any]:
@@ -197,22 +28,34 @@ def _merge_into(base: Dict[str, Any], inc: Dict[str, Any]) -> Dict[str, Any]:
     return base
 
 
+def _expand_style_props(props: Dict[str, Any]) -> Dict[str, Any]:
+    """Expose style properties at the root level for widget consumption."""
+    p = copy.deepcopy(props)
+    style = p.get("default_style", {})
+    if isinstance(style, dict):
+        style_props = style.get("properties", style)
+        for key in ("background_color", "text_color"):
+            if key not in p and key in style_props:
+                p[key] = style_props[key]
+        for key in ("hover_properties", "pressed_properties", "disabled_properties"):
+            if key not in p and key in style:
+                p[key] = style[key]
+        p.update(style_props)
+    return p
+
+
 def build(host) -> QWidget:
-    """Build the simplified button property editor."""
+    """Build the full-featured button property editor."""
 
-    widget = SimpleButtonEditor(_ensure_percentage_props(host.current_properties))
+    widget = ButtonPropertiesWidget(_expand_style_props(host.current_properties))
 
-    def _open_full_dialog():
-        dlg = ButtonPropertiesDialog(host.current_properties, widget)
-        if dlg.exec():
-            widget.properties_changed.emit(dlg.get_data())
-
-    widget._open_dialog_cb = _open_full_dialog
-
-    def _on_props_changed(new_props: Dict) -> None:
+    def _on_props_changed(new_props: Dict[str, Any]) -> None:
         guard = host._begin_edit()
         try:
-            processed = _ensure_percentage_props(new_props)
+            # Drop top-level duplicates emitted for compatibility
+            new_props.pop("background_color", None)
+            new_props.pop("text_color", None)
+            processed = new_props
             if processed != host.current_properties:
                 if host.current_object_id:
                     if isinstance(host.current_object_id, list):
@@ -261,8 +104,7 @@ def build(host) -> QWidget:
     return widget
 
 
-def update_fields(editor: SimpleButtonEditor, props: dict) -> None:
+def update_fields(editor: ButtonPropertiesWidget, props: dict) -> None:
     """Refresh the editor from ``props``. Fields with ``None`` are cleared."""
 
-    editor.set_properties(props)
-
+    editor.set_properties(_expand_style_props(props))

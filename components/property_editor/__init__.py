@@ -431,7 +431,16 @@ class PropertyEditor(QStackedWidget):
         - We perform a shallow overlay; nested dicts are replaced if provided
           by incoming, matching prior behavior.
         """
-        merged = defaults.copy() if isinstance(defaults, dict) else dict(defaults or {})
-        if incoming:
-            merged.update(incoming)
+        merged = copy.deepcopy(defaults) if isinstance(defaults, dict) else dict(defaults or {})
+        if not incoming:
+            return merged
+
+        def _recurse(base: dict, inc: dict):
+            for k, v in inc.items():
+                if isinstance(v, dict) and isinstance(base.get(k), dict):
+                    _recurse(base[k], v)
+                else:
+                    base[k] = copy.deepcopy(v)
+
+        _recurse(merged, incoming)
         return merged

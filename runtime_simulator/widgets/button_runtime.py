@@ -142,8 +142,12 @@ class ButtonRuntimeController(QObject):
         key = self._compute_style_key(props, state)
         cached = self._style_cache.get(key)
         if cached is None:
-            bg = props.get("background_color", "#5a6270")
-            fg = props.get("text_color", "#ffffff")
+            bg = props.get("background_color") or props.get("default_style", {}).get(
+                "background_color", "#5a6270"
+            )
+            fg = props.get("text_color") or props.get("default_style", {}).get(
+                "text_color", "#ffffff"
+            )
             bw = percent_to_value(props.get("border_width", 0) or 0, min_dim)
             bc = props.get("border_color", "#000000")
 
