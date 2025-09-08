@@ -25,7 +25,6 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtCore import pyqtSlot
 from dataclasses import dataclass
 from typing import Callable, Dict
-from contextlib import contextmanager
 import copy
 from services.screen_data_service import screen_service
 from services.data_context import data_context
@@ -121,15 +120,6 @@ class PropertyEditor(QStackedWidget):
             ),
         }
 
-    @contextmanager
-    def _editing_context(self):
-        """Backward-compatible contextmanager using the explicit EditingGuard."""
-        guard = self._begin_edit()
-        try:
-            yield guard.mark_changed
-        finally:
-            guard.end()
-
     @pyqtSlot(str)
     def _on_screen_modified(self, screen_id: str):
         """Refresh the editor when the parent screen's data changes."""
@@ -139,19 +129,41 @@ class PropertyEditor(QStackedWidget):
         if screen_id != self.current_parent_id:
             return
         if self.current_object_id:
-            instance = screen_service.get_child_instance(
-                self.current_parent_id, self.current_object_id
-            )
-            if instance is not None:
-                # Pass only minimal fields and deep copy properties to avoid shared mutations
-                minimal = {
-                    "instance_id": instance.get("instance_id"),
-                    "tool_type": instance.get("tool_type"),
-                    "properties": copy.deepcopy(instance.get("properties") or {}),
-                }
-                self.set_current_object(self.current_parent_id, minimal)
+            if isinstance(self.current_object_id, list):
+                selection = []
+                for iid in self.current_object_id:
+                    instance = screen_service.get_child_instance(
+                        self.current_parent_id, iid
+                    )
+                    if instance is not None:
+                        selection.append(
+                            {
+                                "instance_id": instance.get("instance_id"),
+                                "tool_type": instance.get("tool_type"),
+                                "properties": copy.deepcopy(
+                                    instance.get("properties") or {}
+                                ),
+                            }
+                        )
+                if selection:
+                    self.set_current_object(self.current_parent_id, selection)
+                else:
+                    self.set_current_object(None, None)
             else:
-                self.set_current_object(None, None)
+                instance = screen_service.get_child_instance(
+                    self.current_parent_id, self.current_object_id
+                )
+                if instance is not None:
+                    minimal = {
+                        "instance_id": instance.get("instance_id"),
+                        "tool_type": instance.get("tool_type"),
+                        "properties": copy.deepcopy(
+                            instance.get("properties") or {}
+                        ),
+                    }
+                    self.set_current_object(self.current_parent_id, minimal)
+                else:
+                    self.set_current_object(None, None)
 
     def set_active_tool(self, tool_id):
         """Update the active tool."""
@@ -173,7 +185,7 @@ class PropertyEditor(QStackedWidget):
             return
 
         if isinstance(selection_data, list):
-            if self._handle_multi_select(selection_data):
+            if self._handle_multi_select(parent_id, selection_data):
                 return
             elif len(selection_data) == 1:
                 selection_data = selection_data[0]
@@ -284,21 +296,81 @@ class PropertyEditor(QStackedWidget):
             old_widget.deleteLater()
         self.setCurrentWidget(self.blank_page)
 
-    def _handle_multi_select(self, selection_list) -> bool:
-        if len(selection_list) > 1:
-            # Multi-select; show dedicated page and clear tracking
+    def _handle_multi_select(self, parent_id, selection_list) -> bool:
+        if len(selection_list) <= 1:
+            return False
+
+        tool_types = {
+            constants.tool_type_from_str(sel.get("tool_type"))
+            for sel in selection_list
+            if sel.get("tool_type")
+        }
+        if len(tool_types) != 1:
+            # Different tool types; show placeholder
             self.setCurrentWidget(self.multi_select_page)
             self.current_object_id = None
             self.current_parent_id = None
             self.current_properties = {}
             self.current_tool_type = None
-            # Clear editor widget if it exists
             if self.count() > 2:
                 old_widget = self.widget(2)
                 self.removeWidget(old_widget)
                 old_widget.deleteLater()
             return True
-        return False
+
+        tool_type = next(iter(tool_types))
+        schema = self._schemas.get(tool_type)
+        if schema is None:
+            self.setCurrentWidget(self.multi_select_page)
+            self.current_object_id = None
+            self.current_parent_id = None
+            self.current_properties = {}
+            self.current_tool_type = None
+            if self.count() > 2:
+                old_widget = self.widget(2)
+                self.removeWidget(old_widget)
+                old_widget.deleteLater()
+            return True
+
+        ids = [sel.get("instance_id") for sel in selection_list if sel.get("instance_id")]
+        props_list = [
+            schema.defaults_fn(sel.get("properties") or {}) for sel in selection_list
+        ]
+
+        def _merge(dicts):
+            keys = set().union(*(d.keys() for d in dicts))
+            merged = {}
+            for k in keys:
+                values = [d.get(k) for d in dicts]
+                first = values[0]
+                if all(v == first for v in values):
+                    if isinstance(first, dict):
+                        merged[k] = _merge(values)  # type: ignore[arg-type]
+                    else:
+                        merged[k] = copy.deepcopy(first)
+                else:
+                    if None not in values and all(
+                        isinstance(v, dict) for v in values
+                    ):
+                        merged[k] = _merge(values)  # type: ignore[arg-type]
+                    else:
+                        merged[k] = None
+            return merged
+
+        merged_props = _merge(props_list)
+
+        # Replace existing editor if present
+        if self.count() > 2:
+            old_widget = self.widget(2)
+            self.removeWidget(old_widget)
+            old_widget.deleteLater()
+
+        self.current_object_id = ids
+        self.current_parent_id = parent_id
+        self.current_tool_type = tool_type
+
+        self._build_editor(tool_type, merged_props)
+        return True
 
     def _build_editor(
         self, tool_type, incoming_props: dict, restore_name=None, restore_cursor=None
@@ -346,7 +418,7 @@ class PropertyEditor(QStackedWidget):
             return
         adapter = get_editor(tool_type)
         if adapter is not None:
-            adapter.update_fields(editor, props)
+            adapter.update_fields(editor, props or {})
         # If adapter is None, do nothing (unknown tool)
 
     # --- Property merging helper ---

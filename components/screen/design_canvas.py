@@ -652,20 +652,18 @@ class DesignCanvas(QGraphicsView):
         
         # Emit real-time size and position updates during resize
         if self.scene.selectedItems():
-            first_item = self.scene.selectedItems()[0]
-            if isinstance(first_item, BaseGraphicsItem):
-                # Get current size from the updated item data
-                size_data = first_item.instance_data.get('properties', {}).get('size', {})
-                pos_data = {'x': int(first_item.pos().x()), 'y': int(first_item.pos().y())}
-                
-                # Create a combined update signal with both position and size
-                update_data = {
-                    'position': pos_data,
-                    'size': {'width': int(size_data.get('width', 0)), 'height': int(size_data.get('height', 0))}
+            selection_data = []
+            for item in self.scene.selectedItems():
+                if not isinstance(item, BaseGraphicsItem):
+                    continue
+                data = copy.deepcopy(item.instance_data)
+                props = data.setdefault('properties', {})
+                props['position'] = {
+                    'x': int(item.pos().x()),
+                    'y': int(item.pos().y()),
                 }
-                
-                # Emit selection changed to update status bar with new size
-                selection_data = [dict(first_item.instance_data)]
+                selection_data.append(data)
+            if selection_data:
                 self.selection_changed.emit(self.screen_id, selection_data)
 
     def mouseReleaseEvent(self, event: QMouseEvent):
@@ -956,6 +954,8 @@ class DesignCanvas(QGraphicsView):
                     continue
                 data = dict(item.instance_data)
                 selection_data.append(data)
+
+        self.selection_changed.emit(self.screen_id, selection_data)
 
     def set_active_tool(self, tool_name):
         self.active_tool = constants.tool_type_from_str(tool_name) or tool_name
