@@ -42,7 +42,7 @@ from .graphics_items import (
     EmbeddedScreenItem,
     BaseGraphicsItem,
 )
-from ..selection_overlay import SelectionOverlay
+from ..transform_handler import TransformHandler, HandleItem
 from utils import constants
 
 # View scaling via zoom is not supported in this application
@@ -65,7 +65,7 @@ class DesignCanvas(QGraphicsView):
         self.screen_data = None
         self.active_tool = constants.ToolType.SELECT
         self._item_map = {}
-        self.selection_overlay = SelectionOverlay()
+        self.transform_handler = TransformHandler()
 
         # Zoom is disabled; keep view scale fixed at 1.0
         self._rubber_band_origin = None
@@ -102,6 +102,10 @@ class DesignCanvas(QGraphicsView):
 
         self.page_item.setZValue(-1)
         self.scene.addItem(self.page_item)
+
+        # Selection transform handler
+        self.transform_handler.setZValue(999)
+        self.scene.addItem(self.transform_handler)
 
         # Object snapping configuration
         self.snap_to_objects = settings_service.get_value("snap_to_objects", True)
@@ -174,24 +178,23 @@ class DesignCanvas(QGraphicsView):
             self._frame_timer.restart()
             pos = event.position().toPoint()
             self._last_mouse_scene_pos = self._snap_position(self.mapToScene(pos))
-            if self.scene.selectedItems():
-                handle = self.get_handle_at(pos)
-                if handle:
-                    self._set_cursor_for_handle(handle)
-                else:
-                    self.viewport().setCursor(QCursor(Qt.CursorShape.ArrowCursor))
+            item = self.itemAt(pos)
+            if isinstance(item, HandleItem):
+                # Show the handle's cursor while hovering over a corner
+                self.viewport().setCursor(item.cursor())
+            else:
+                self.viewport().setCursor(QCursor(Qt.CursorShape.ArrowCursor))
         elif event.type() == QEvent.Type.MouseMove and event.buttons() == Qt.MouseButton.NoButton:
             if self._frame_timer.isValid() and self._frame_timer.elapsed() < 16:
                 return False
             self._frame_timer.restart()
             pos = event.pos()
             self._last_mouse_scene_pos = self._snap_position(self.mapToScene(pos))
-            if self.scene.selectedItems():
-                handle = self.get_handle_at(pos)
-                if handle:
-                    self._set_cursor_for_handle(handle)
-                else:
-                    self.viewport().setCursor(QCursor(Qt.CursorShape.ArrowCursor))
+            item = self.itemAt(pos)
+            if isinstance(item, HandleItem):
+                self.viewport().setCursor(item.cursor())
+            else:
+                self.viewport().setCursor(QCursor(Qt.CursorShape.ArrowCursor))
         return False
 
 
@@ -315,20 +318,6 @@ class DesignCanvas(QGraphicsView):
             painter.drawRect(self._rubber_band_rect.normalized())
             painter.restore()
 
-        selected_items = self.scene.selectedItems()
-        if not selected_items:
-            return
-
-        current_scale = self.transform().m11()
-        group_rect = self.get_group_bounding_rect()
-
-        if len(selected_items) > 1:
-            for item in selected_items:
-                self.selection_overlay.paint(painter, item.sceneBoundingRect(), current_scale, draw_handles=False)
-        
-        if group_rect:
-            self.selection_overlay.paint(painter, group_rect, current_scale, draw_handles=True)
-
     def get_group_bounding_rect(self):
         group_rect = None
         for item in self.scene.selectedItems():
@@ -338,45 +327,6 @@ class DesignCanvas(QGraphicsView):
             else:
                 group_rect = group_rect.united(item_rect)
         return group_rect
-
-    def get_handle_at(self, pos: QPoint):
-        group_rect = self.get_group_bounding_rect()
-        if not group_rect:
-            return None
-
-        current_scale = self.transform().m11()
-        handle_size = self.selection_overlay.handle_size / current_scale
-        half_handle = handle_size / 2.0
-        
-        handle_positions = {
-            'top_left': QRectF(group_rect.left() - half_handle, group_rect.top() - half_handle, handle_size, handle_size),
-            'top_right': QRectF(group_rect.right() - half_handle, group_rect.top() - half_handle, handle_size, handle_size),
-            'bottom_left': QRectF(group_rect.left() - half_handle, group_rect.bottom() - half_handle, handle_size, handle_size),
-            'bottom_right': QRectF(group_rect.right() - half_handle, group_rect.bottom() - half_handle, handle_size, handle_size),
-            'top': QRectF(group_rect.center().x() - half_handle, group_rect.top() - half_handle, handle_size, handle_size),
-            'bottom': QRectF(group_rect.center().x() - half_handle, group_rect.bottom() - half_handle, handle_size, handle_size),
-            'left': QRectF(group_rect.left() - half_handle, group_rect.center().y() - half_handle, handle_size, handle_size),
-            'right': QRectF(group_rect.right() - half_handle, group_rect.center().y() - half_handle, handle_size, handle_size),
-        }
-
-        scene_pos = self.mapToScene(pos)
-        for handle, rect in handle_positions.items():
-            if rect.contains(scene_pos):
-                return handle
-        return None
-
-    def _set_cursor_for_handle(self, handle: str):
-        """Set the appropriate cursor based on the resize handle."""
-        if handle in {"top_left", "bottom_right"}:
-            self.viewport().setCursor(QCursor(Qt.CursorShape.SizeFDiagCursor))
-        elif handle in {"top_right", "bottom_left"}:
-            self.viewport().setCursor(QCursor(Qt.CursorShape.SizeBDiagCursor))
-        elif handle in {"top", "bottom"}:
-            self.viewport().setCursor(QCursor(Qt.CursorShape.SizeVerCursor))
-        elif handle in {"left", "right"}:
-            self.viewport().setCursor(QCursor(Qt.CursorShape.SizeHorCursor))
-        else:
-            self.viewport().setCursor(QCursor(Qt.CursorShape.ArrowCursor))
 
     def resizeEvent(self, event):
         super().resizeEvent(event)
@@ -403,22 +353,32 @@ class DesignCanvas(QGraphicsView):
             self._last_mouse_scene_pos = self._snap_position(self._raw_last_scene_pos)
             
             # Priority 1: Check for resize handle click
-            self._resize_handle = self.get_handle_at(event.pos())
-            if self._resize_handle:
+            item = self.itemAt(event.pos())
+            if isinstance(item, HandleItem):
+                self._resize_handle = item.role
                 self._drag_mode = 'resize'
-                self._set_cursor_for_handle(self._resize_handle)
                 self._start_selection_states.clear()
-                for item in self.scene.selectedItems():
-                    if isinstance(item, BaseGraphicsItem):
-                        self._start_selection_states[item.get_instance_id()] = {
-                            'rect': item.sceneBoundingRect(),
-                            'properties': copy.deepcopy(item.instance_data.get('properties', {}))
+                for sel in self.scene.selectedItems():
+                    if isinstance(sel, BaseGraphicsItem):
+                        self._start_selection_states[sel.get_instance_id()] = {
+                            'rect': sel.sceneBoundingRect(),
+                            'properties': copy.deepcopy(sel.instance_data.get('properties', {}))
                         }
                 event.accept()
                 return
 
-            # Priority 2: Check if clicking on an item for selection/multi-selection
-            clicked_item = self.itemAt(event.pos())
+            # Priority 2: Click inside existing selection box to move
+            if item is self.transform_handler:
+                self._drag_mode = 'move'
+                self._start_selection_states.clear()
+                for sel in self.scene.selectedItems():
+                    if isinstance(sel, BaseGraphicsItem):
+                        self._start_selection_states[sel.get_instance_id()] = sel.pos()
+                event.accept()
+                return
+
+            # Priority 3: Check if clicking on an item for selection/multi-selection
+            clicked_item = item
             if isinstance(clicked_item, BaseGraphicsItem):
                 # Handle multi-selection with modifier keys
                 if event.modifiers() == Qt.KeyboardModifier.ControlModifier:
@@ -473,20 +433,14 @@ class DesignCanvas(QGraphicsView):
 
         if self._drag_mode == 'resize':
             self._perform_group_resize(delta)
-            self._set_cursor_for_handle(self._resize_handle)
         elif self._drag_mode == 'move':
             self._perform_group_move(delta)
         elif self._drag_mode == 'rubberband':
             self._rubber_band_rect.setBottomRight(event.pos())
             self.viewport().update()
         else:
-            if self.scene.selectedItems():
-                handle = self.get_handle_at(event.pos())
-                if handle:
-                    self._set_cursor_for_handle(handle)
-                else:
-                    self.viewport().setCursor(QCursor(Qt.CursorShape.ArrowCursor))
-            else:
+            item = self.itemAt(event.pos())
+            if not isinstance(item, HandleItem):
                 self.viewport().setCursor(QCursor(Qt.CursorShape.ArrowCursor))
 
         self._raw_last_scene_pos = raw_scene_pos
@@ -517,6 +471,7 @@ class DesignCanvas(QGraphicsView):
             if isinstance(first_item, BaseGraphicsItem):
                 pos_dict = {'x': int(first_item.pos().x()), 'y': int(first_item.pos().y())}
                 self.selection_dragged.emit(pos_dict)
+        self.transform_handler.update_geometry()
 
     def _perform_group_resize(self, delta: QPointF):
         if not self._start_selection_states: return
@@ -665,6 +620,7 @@ class DesignCanvas(QGraphicsView):
                 selection_data.append(data)
             if selection_data:
                 self.selection_changed.emit(self.screen_id, selection_data)
+        self.transform_handler.update_geometry()
 
     def mouseReleaseEvent(self, event: QMouseEvent):
         if event.button() == Qt.MouseButton.LeftButton:
@@ -714,6 +670,7 @@ class DesignCanvas(QGraphicsView):
                 self.scene.setSelectionArea(selection_path, selection_op, Qt.ItemSelectionMode.ContainsItemBoundingRect)
             if self._drag_mode in ('move', 'resize'):
                 self.viewport().update()
+                self.transform_handler.update_geometry()
             self._drag_mode = None
             self._resize_handle = None
             self._rubber_band_origin = None
@@ -945,9 +902,12 @@ class DesignCanvas(QGraphicsView):
         command_history_service.add_command(command)
 
     def _on_selection_changed(self):
+        items = [i for i in self.scene.selectedItems() if isinstance(i, QGraphicsItem)]
+        self.transform_handler.set_targets(items)
         self.viewport().update()
+
         selection_data = []
-        for item in self.scene.selectedItems():
+        for item in items:
             if isinstance(item, BaseGraphicsItem):
                 instance_id = item.get_instance_id()
                 if instance_id is None:
@@ -964,11 +924,13 @@ class DesignCanvas(QGraphicsView):
         self._update_cursor()
 
     def mouseDoubleClickEvent(self, event: QMouseEvent):
-        item = self.itemAt(event.pos())
-        if isinstance(item, ButtonItem):
-            self._open_button_properties(item.instance_data)
-        else:
-            super().mouseDoubleClickEvent(event)
+        for item in self.items(event.pos()):
+            if isinstance(item, ButtonItem):
+                self._open_button_properties(item.instance_data)
+                return
+            if isinstance(item, HandleItem) or item is self.transform_handler:
+                continue
+        super().mouseDoubleClickEvent(event)
     def contextMenuEvent(self, event):
         item = self.itemAt(event.pos())
         if not isinstance(item, BaseGraphicsItem):
