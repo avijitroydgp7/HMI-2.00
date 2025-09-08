@@ -60,7 +60,7 @@ class TagDataService(QObject):
         """Checks if a tag database name is unique across the project."""
         return name not in self._db_name_index
 
-    # MODIFIED: Added a helper method to find a DB by its name.
+    # Helper method to find a database ID by its name.
     def find_db_id_by_name(self, db_name: str) -> Optional[str]:
         """Finds a database ID by its unique name."""
         return self._db_name_index.get(db_name)

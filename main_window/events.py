@@ -1,7 +1,6 @@
 # main_window/events.py
 from PyQt6.QtWidgets import QApplication
 from components.docks import ProjectDock
-# MODIFIED: Direct import
 from components.screen.screen_widget import ScreenWidget
 from components.tag_editor_widget import TagEditorWidget
 from components.comment_table_widget import CommentTableWidget

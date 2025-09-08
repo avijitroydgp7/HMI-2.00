@@ -1,5 +1,5 @@
 # components/selection_overlay.py
-# MODIFIED: Can now draw different styles for group vs. individual selection.
+# Can draw different styles for group vs. individual selection.
 
 from PyQt6.QtCore import QRectF, Qt
 from PyQt6.QtGui import QPainter, QColor, QPen, QBrush
@@ -19,7 +19,7 @@ class SelectionOverlay:
         self.handle_pen = QPen(QColor("#2c313c"), 1)
         self.handle_pen.setCosmetic(True)
 
-        # MODIFIED: New pen for individual item outlines in a group selection.
+        # Pen for individual item outlines in a group selection.
         self.individual_pen = QPen(QColor(82, 139, 255, 150), 1.5, Qt.PenStyle.DotLine)
         self.individual_pen.setCosmetic(True)
 

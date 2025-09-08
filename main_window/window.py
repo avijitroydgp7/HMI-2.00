@@ -9,7 +9,7 @@ from components.ribbon import Ribbon
 from components.toolbar import QuickAccessToolBar, ToolsToolbar
 from components.docks import create_docks
 from components.welcome_widget import WelcomeWidget
-# MODIFIED: Import ScreenWidget to check the type of the current tab
+# Import ScreenWidget to check the type of the current tab
 from components.screen.screen_widget import ScreenWidget
 from services.project_service import project_service
 from services.command_history_service import command_history_service
@@ -38,7 +38,7 @@ class MainWindow(QMainWindow):
 
         ui_setup.setup_window(self)
 
-        
+
         self.central_stacked_widget = QStackedWidget()
         self.welcome_widget = WelcomeWidget()
         self.tab_widget = QTabWidget()
@@ -90,7 +90,7 @@ class MainWindow(QMainWindow):
         Sets the active tool for the application and informs the current canvas.
         """
         self.active_tool = tool_name
-        # MODIFIED: This logic is necessary to inform the active canvas about the tool change.
+        # Inform the active canvas about the tool change.
         current_widget = self.tab_widget.currentWidget()
         if isinstance(current_widget, ScreenWidget):
             current_widget.set_active_tool(tool_name)

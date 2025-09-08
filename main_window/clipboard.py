@@ -1,5 +1,5 @@
 # --- main_window/clipboard.py ---
-# MODIFIED: Removed local imports and calls to actions.update_edit_actions
+# Removed local imports and calls to actions.update_edit_actions
 # The main window will now be responsible for updating the action states.
 
 def cut_item(win):

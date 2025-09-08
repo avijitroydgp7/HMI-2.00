@@ -1,5 +1,5 @@
 # components/screen/design_canvas.py
-# MODIFIED: Overhauled mouse event logic to correctly handle multi-selection.
+# Overhauled mouse event logic to correctly handle multi-selection.
 
 from PyQt6.QtWidgets import (
     QGraphicsView,

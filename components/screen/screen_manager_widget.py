@@ -1,5 +1,5 @@
 # components/screen/screen_manager_widget.py
-# MODIFIED: Fixed a critical bug where editing screen properties deleted all child objects.
+# Fixed a critical bug where editing screen properties deleted all child objects.
 
 from PyQt6.QtWidgets import QWidget, QVBoxLayout, QMenu, QMessageBox
 from PyQt6.QtCore import Qt, pyqtSignal, pyqtSlot
@@ -213,20 +213,19 @@ class ScreenManagerWidget(QWidget):
         
         dialog = ScreenPropertiesDialog(old_data['type'], self, edit_data=old_data)
         if dialog.exec():
-            # --- MODIFIED: The critical fix is here ---
+            # Critical fix: preserve child objects when editing screen properties
             # 1. Get the partial data from the dialog
             partial_new_data = dialog.get_data()
-            
+
             # 2. Create a full copy of the old data to preserve fields like 'children'
             full_new_data = copy.deepcopy(old_data)
-            
+
             # 3. Update the full copy with the partial changes
             full_new_data.update(partial_new_data)
-            
+
             # 4. Create the command with the complete "before" and "after" states
             command = UpdateScreenPropertiesCommand(screen_id, full_new_data, old_data)
             command_history_service.add_command(command)
-            # --- End of modification ---
 
     def handle_rename_key_press(self):
         item = self.tree.currentItem()

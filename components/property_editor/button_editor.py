@@ -36,11 +36,11 @@ class SimpleButtonEditor(QWidget):
         layout.addRow("Label", self.label_edit)
 
         self.bg_color_edit = QLineEdit()
-        self.bg_color_edit.setObjectName("default_style.background")
+        self.bg_color_edit.setObjectName("default_style.background_color")
         layout.addRow("Background", self.bg_color_edit)
 
         self.text_color_edit = QLineEdit()
-        self.text_color_edit.setObjectName("default_style.color")
+        self.text_color_edit.setObjectName("default_style.text_color")
         layout.addRow("Text Color", self.text_color_edit)
 
         self.pos_x_edit = QLineEdit()
@@ -97,11 +97,15 @@ class SimpleButtonEditor(QWidget):
             except Exception:
                 return None
 
+        bg = self.bg_color_edit.text() or None
+        fg = self.text_color_edit.text() or None
         props = {
             "label": self.label_edit.text() or None,
+            "background_color": bg,
+            "text_color": fg,
             "default_style": {
-                "background": self.bg_color_edit.text() or None,
-                "color": self.text_color_edit.text() or None,
+                "background_color": bg,
+                "text_color": fg,
             },
             "position": {
                 "x": _to_float(self.pos_x_edit.text()),
@@ -131,16 +135,26 @@ class SimpleButtonEditor(QWidget):
             return value
 
         fields = [
-            (self.label_edit, "label"),
-            (self.bg_color_edit, "default_style.background"),
-            (self.text_color_edit, "default_style.color"),
-            (self.pos_x_edit, "position.x"),
-            (self.pos_y_edit, "position.y"),
-            (self.width_edit, "size.width"),
-            (self.height_edit, "size.height"),
+            (self.label_edit, ["label"]),
+            (
+                self.bg_color_edit,
+                ["default_style.background_color", "background_color"],
+            ),
+            (
+                self.text_color_edit,
+                ["default_style.text_color", "text_color"],
+            ),
+            (self.pos_x_edit, ["position.x"]),
+            (self.pos_y_edit, ["position.y"]),
+            (self.width_edit, ["size.width"]),
+            (self.height_edit, ["size.height"]),
         ]
-        for edit, path in fields:
-            val = _get(path)
+        for edit, paths in fields:
+            val = None
+            for path in paths:
+                val = _get(path)
+                if val is not None:
+                    break
             edit.blockSignals(True)
             edit.setText("" if val is None else str(val))
             edit.blockSignals(False)

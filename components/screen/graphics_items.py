@@ -1,5 +1,5 @@
 # components/screen/graphics_items.py
-# MODIFIED: All mouse event logic has been removed and moved to the DesignCanvas.
+# Mouse event logic moved to the DesignCanvas.
 
 from typing import Optional
 from PyQt6.QtWidgets import QGraphicsObject, QGraphicsItem

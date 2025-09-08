@@ -1,5 +1,5 @@
 # components/screen/screen_widget.py
-# MODIFIED: Removed zoom-related signals and helpers.
+# Removed zoom-related signals and helpers.
 
 from PyQt6.QtWidgets import QWidget, QLabel, QVBoxLayout
 from PyQt6.QtCore import pyqtSignal, pyqtSlot, QPointF

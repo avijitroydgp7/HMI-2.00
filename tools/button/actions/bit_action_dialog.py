@@ -81,7 +81,7 @@ class BitActionDialog(QDialog):
         main_group.setObjectName("CardGroup")
         layout = QVBoxLayout(main_group)
         
-        # MODIFIED: Use TagSelector and set it to fixed "Tag" mode
+        # Use TagSelector and set it to fixed "Tag" mode
         self.target_tag_selector = TagSelector()
         self.target_tag_selector.set_allowed_tag_types(["BOOL"])
         self.target_tag_selector.main_tag_selector.set_mode_fixed("Tag")

@@ -48,8 +48,7 @@ def update_drag_position_status(win, pos_dict):
 
 def update_selection_status(win, selection_data, is_tree_item=False):
     """
-    MODIFIED: Correctly updates all status bar labels (pos, size, name)
-    based on the current selection.
+    Correctly updates all status bar labels (pos, size, name) based on the current selection.
     """
     if not selection_data:
         win.object_pos_label.setText("X ----, Y ----")

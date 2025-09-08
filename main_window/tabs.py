@@ -1,5 +1,5 @@
 # main_window/tabs.py
-# MODIFIED: Ensures the active tool is set when a tab is changed.
+# Ensures the active tool is set when a tab is changed.
 
 from PyQt6.QtWidgets import QMenu, QMessageBox, QDockWidget
 from PyQt6.QtCore import Qt

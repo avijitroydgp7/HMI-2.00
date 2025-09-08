@@ -147,6 +147,8 @@ class ButtonPropertiesWidget(QWidget):
                 self.properties.get("default_style", {}).get("disabled_properties", {}),
             ),
         }
+        # Expose key properties alongside the nested dict for compatibility
+        default_style.update(default_style.get("properties", {}))
         updated_props["default_style"] = default_style
 
         # Flatten default style for canvas/runtime consumption

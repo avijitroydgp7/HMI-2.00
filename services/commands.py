@@ -172,7 +172,7 @@ class RemoveChildCommand(Command):
     def notify(self) -> None:
         screen_service.screen_modified.emit(self.parent_id)
 
-# MODIFIED: Re-added the missing MoveChildCommand
+# Re-added the missing MoveChildCommand
 class MoveChildCommand(Command):
     """Moves a child to a new position; undo restores the previous position."""
 

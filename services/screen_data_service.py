@@ -1,5 +1,5 @@
 # services/screen_data_service.py
-# MODIFIED: Centralized the notification logic for parent screen updates.
+# Centralized the notification logic for parent screen updates.
 
 import uuid
 import copy
@@ -205,7 +205,7 @@ class ScreenDataService(QObject):
         
     def _perform_update_screen(self, screen_id, new_data):
         """
-        MODIFIED: This method now ONLY updates the data.
+        This method now only updates the data.
         Notification is handled by the command via notify_screen_update.
         """
         if screen_id in self._screens:
