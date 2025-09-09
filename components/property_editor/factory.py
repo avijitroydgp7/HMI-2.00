@@ -22,6 +22,8 @@ class EditorAdapter:
 
 _EDITOR_DISPATCH = {
     constants.ToolType.BUTTON: ".button_editor",
+    # Generic tree-based editor used by simpler tools
+    constants.ToolType.TEXT: ".tree_editor",
 }
 
 

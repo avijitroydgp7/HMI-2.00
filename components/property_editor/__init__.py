@@ -8,6 +8,8 @@ from PyQt6.QtWidgets import (
     QStackedWidget,
     QLabel,
     QLineEdit,
+    QFormLayout,
+    QSpinBox,
 )
 from PyQt6.QtCore import pyqtSlot
 from dataclasses import dataclass
@@ -17,6 +19,8 @@ from services.screen_data_service import screen_service
 from services.data_context import data_context
 from utils import constants
 from utils.editing_guard import EditingGuard
+from services.command_history_service import command_history_service
+from services.commands import MoveChildCommand, UpdateChildPropertiesCommand
 from .factory import get_editor
 
 # Module-level tool imports (dispatch via mapping below)
@@ -31,7 +35,7 @@ class ToolSchema:
     editor_builder: Callable[[], QWidget]  # bound method that builds the editor widget
 
 
-class PropertyEditor(QStackedWidget):
+class PropertyEditor(QWidget):
     """Property panel that displays and edits object properties by tool type."""
 
     def __init__(self, parent=None):
@@ -41,10 +45,44 @@ class PropertyEditor(QStackedWidget):
         self.current_properties = {}
         self.current_tool_type = None
         self.active_tool = constants.ToolType.SELECT
+        # Track current geometry for command emission
+        self.current_position = {"x": 0, "y": 0}
+        self.current_size = {"width": 0, "height": 0}
         # Guard to avoid refresh loops while applying edits
         self._is_editing = False
         # Tool schema registry
         self._schemas: Dict[object, ToolSchema] = {}
+
+        # Layout wrapper around the stacked widget so we can place a geometry form above
+        root_layout = QVBoxLayout(self)
+
+        # --- Geometry Form ---
+        form_layout = QFormLayout()
+        self.x_spin = QSpinBox()
+        self.y_spin = QSpinBox()
+        self.width_spin = QSpinBox()
+        self.height_spin = QSpinBox()
+        for sb in (self.x_spin, self.y_spin):
+            sb.setRange(-100000, 100000)
+        for sb in (self.width_spin, self.height_spin):
+            sb.setRange(0, 100000)
+        form_layout.addRow("X", self.x_spin)
+        form_layout.addRow("Y", self.y_spin)
+        form_layout.addRow("W", self.width_spin)
+        form_layout.addRow("H", self.height_spin)
+        self.geometry_form = QWidget()
+        self.geometry_form.setLayout(form_layout)
+        root_layout.addWidget(self.geometry_form)
+
+        # Connect geometry edits
+        self.x_spin.valueChanged.connect(lambda v: self._on_position_changed("x", v))
+        self.y_spin.valueChanged.connect(lambda v: self._on_position_changed("y", v))
+        self.width_spin.valueChanged.connect(lambda v: self._on_size_changed("width", v))
+        self.height_spin.valueChanged.connect(lambda v: self._on_size_changed("height", v))
+
+        # --- Stacked Widget for tool-specific editors ---
+        self.stack = QStackedWidget()
+        root_layout.addWidget(self.stack)
 
         # --- Create Pages ---
         self.blank_page = QWidget()
@@ -59,12 +97,115 @@ class PropertyEditor(QStackedWidget):
         self.addWidget(self.multi_select_page)
 
         self.setCurrentWidget(self.blank_page)
+        self._update_geometry_fields(None)
 
         # Refresh properties when the underlying screen data changes
         data_context.screens_changed.connect(self._handle_screen_event)
 
         # Initialize tool schema registry
         self._init_schemas()
+
+    # --- Geometry helpers ---
+    def _block_geometry_signals(self, block: bool) -> None:
+        for sb in (self.x_spin, self.y_spin, self.width_spin, self.height_spin):
+            sb.blockSignals(block)
+
+    def _update_geometry_fields(self, selection_data):
+        """Refresh the geometry spin boxes based on selection_data.
+
+        If selection_data is None or represents multi-selection, the fields are disabled.
+        """
+        if not selection_data or isinstance(selection_data, list):
+            self._block_geometry_signals(True)
+            self.x_spin.setValue(0)
+            self.y_spin.setValue(0)
+            self.width_spin.setValue(0)
+            self.height_spin.setValue(0)
+            self._block_geometry_signals(False)
+            self.geometry_form.setDisabled(True)
+            self.current_position = {"x": 0, "y": 0}
+            self.current_size = {"width": 0, "height": 0}
+            return
+
+        pos = selection_data.get("position") or selection_data.get("properties", {}).get("position", {})
+        size = selection_data.get("properties", {}).get("size", {})
+
+        x = int(pos.get("x", 0) or 0)
+        y = int(pos.get("y", 0) or 0)
+        w = int(size.get("width", 0) or 0)
+        h = int(size.get("height", 0) or 0)
+
+        self.geometry_form.setDisabled(False)
+        self._block_geometry_signals(True)
+        self.x_spin.setValue(x)
+        self.y_spin.setValue(y)
+        self.width_spin.setValue(w)
+        self.height_spin.setValue(h)
+        self._block_geometry_signals(False)
+        self.current_position = {"x": x, "y": y}
+        self.current_size = {"width": w, "height": h}
+
+    def _on_position_changed(self, key: str, value: int) -> None:
+        if not self.current_object_id or isinstance(self.current_object_id, list):
+            return
+        old_pos = dict(self.current_position)
+        if old_pos.get(key) == value:
+            return
+        new_pos = dict(old_pos)
+        new_pos[key] = value
+        guard = self._begin_edit()
+        try:
+            command = MoveChildCommand(
+                self.current_parent_id,
+                self.current_object_id,
+                new_pos,
+                old_pos,
+            )
+            command_history_service.add_command(command)
+            guard.mark_changed()
+            self.current_position = new_pos
+        finally:
+            guard.end()
+
+    def _on_size_changed(self, key: str, value: int) -> None:
+        if not self.current_object_id or isinstance(self.current_object_id, list):
+            return
+        old_props = copy.deepcopy(self.current_properties)
+        new_props = copy.deepcopy(self.current_properties)
+        size = new_props.setdefault("size", {})
+        if size.get(key) == value:
+            return
+        size[key] = value
+        guard = self._begin_edit()
+        try:
+            command = UpdateChildPropertiesCommand(
+                self.current_parent_id,
+                self.current_object_id,
+                new_props,
+                old_props,
+            )
+            command_history_service.add_command(command)
+            guard.mark_changed()
+            self.current_properties = new_props
+            self.current_size = size
+        finally:
+            guard.end()
+
+    # --- Proxies to mimic QStackedWidget API ---
+    def addWidget(self, widget):
+        return self.stack.addWidget(widget)
+
+    def removeWidget(self, widget):
+        self.stack.removeWidget(widget)
+
+    def setCurrentWidget(self, widget):
+        self.stack.setCurrentWidget(widget)
+
+    def widget(self, index):
+        return self.stack.widget(index)
+
+    def count(self):
+        return self.stack.count()
 
     # --- Utility: explicit begin/end edit guard ---
     def _active_canvas_widget(self):
@@ -180,6 +321,9 @@ class PropertyEditor(QStackedWidget):
                 self.set_current_object(None, None)
                 return
 
+        # Update geometry fields for the single selection
+        self._update_geometry_fields(selection_data)
+
         # Extract targets
         new_instance_id = selection_data.get("instance_id")
         new_parent_id = parent_id
@@ -245,6 +389,8 @@ class PropertyEditor(QStackedWidget):
                             target.setCursorPosition(pos)
                         except Exception:
                             pass
+            # Ensure geometry reflects latest selection
+            self._update_geometry_fields(selection_data)
             return
 
         # Selection changed or it's a screen: rebuild editor view accordingly
@@ -263,12 +409,14 @@ class PropertyEditor(QStackedWidget):
             # Show placeholder for screens or unknown types
             self.current_properties = {}
             self.setCurrentWidget(self.blank_page)
+            self._update_geometry_fields(selection_data)
             return
 
         # Build editor using schema
         self._build_editor(
             new_tool_type, incoming_props, restore_name, restore_cursor
         )
+        self._update_geometry_fields(selection_data)
 
     # --- Helpers extracted from set_current_object ---
     def _clear_selection(self) -> None:
@@ -276,6 +424,7 @@ class PropertyEditor(QStackedWidget):
         self.current_parent_id = None
         self.current_properties = {}
         self.current_tool_type = None
+        self._update_geometry_fields(None)
         # Clear editor widget if it exists
         if self.count() > 2:
             old_widget = self.widget(2)
@@ -299,6 +448,7 @@ class PropertyEditor(QStackedWidget):
             self.current_parent_id = None
             self.current_properties = {}
             self.current_tool_type = None
+            self._update_geometry_fields(None)
             if self.count() > 2:
                 old_widget = self.widget(2)
                 self.removeWidget(old_widget)
@@ -313,6 +463,7 @@ class PropertyEditor(QStackedWidget):
             self.current_parent_id = None
             self.current_properties = {}
             self.current_tool_type = None
+            self._update_geometry_fields(None)
             if self.count() > 2:
                 old_widget = self.widget(2)
                 self.removeWidget(old_widget)
@@ -355,7 +506,7 @@ class PropertyEditor(QStackedWidget):
         self.current_object_id = ids
         self.current_parent_id = parent_id
         self.current_tool_type = tool_type
-
+        self._update_geometry_fields(None)
         self._build_editor(tool_type, merged_props)
         return True
 
