@@ -21,7 +21,10 @@ class EditorAdapter:
 
 
 _EDITOR_DISPATCH = {
-    constants.ToolType.BUTTON: ".button_editor",
+    # The button tool now uses the tree-based property editor which provides
+    # a lightweight, generic interface for editing properties and launching
+    # auxiliary dialogs (word/bit actions, conditional style, etc.).
+    constants.ToolType.BUTTON: ".tree_editor",
 }
 
 

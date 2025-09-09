@@ -21,6 +21,8 @@ from PyQt6.QtWidgets import (
     QStackedWidget,
     QLabel,
     QLineEdit,
+    QFormLayout,
+    QSpinBox,
 )
 from PyQt6.QtCore import pyqtSlot
 from dataclasses import dataclass
@@ -52,6 +54,7 @@ class PropertyEditor(QStackedWidget):
         self.current_object_id = None
         self.current_parent_id = None
         self.current_properties = {}
+        self.current_position = {}
         self.current_tool_type = None
         self.active_tool = constants.ToolType.SELECT
         # Guard to avoid refresh loops while applying edits
@@ -143,6 +146,10 @@ class PropertyEditor(QStackedWidget):
                                 "properties": copy.deepcopy(
                                     instance.get("properties") or {}
                                 ),
+                                "position": copy.deepcopy(
+                                    instance.get("position")
+                                    or instance.get("properties", {}).get("position", {})
+                                ),
                             }
                         )
                 if selection:
@@ -159,6 +166,10 @@ class PropertyEditor(QStackedWidget):
                         "tool_type": instance.get("tool_type"),
                         "properties": copy.deepcopy(
                             instance.get("properties") or {}
+                        ),
+                        "position": copy.deepcopy(
+                            instance.get("position")
+                            or instance.get("properties", {}).get("position", {})
                         ),
                     }
                     self.set_current_object(self.current_parent_id, minimal)
@@ -209,12 +220,13 @@ class PropertyEditor(QStackedWidget):
             or new_tool_type != self.current_tool_type
         )
 
-        # Properties from selection (raw)
+        # Properties and position from selection (raw)
         incoming_props = (
             selection_data.get("properties", {})
             if new_tool_type and new_tool_type != "screen"
             else {}
         )
+        incoming_pos = selection_data.get("position", {})
 
         # Capture currently focused line edit so we can restore caret after rebuild/update
         restore_name = None
@@ -239,11 +251,13 @@ class PropertyEditor(QStackedWidget):
             if schema is not None:
                 merged = schema.defaults_fn(incoming_props)
                 self.current_properties = merged
+                self.current_position = copy.deepcopy(incoming_pos)
                 # Update existing input widgets without rebuilding
                 self._update_editor_fields(new_tool_type, merged)
             else:
                 # Fallback to incoming properties if unknown type
                 self.current_properties = incoming_props or {}
+                self.current_position = copy.deepcopy(incoming_pos)
 
             # Attempt to restore caret position in focused line edit
             if restore_name:
@@ -271,6 +285,7 @@ class PropertyEditor(QStackedWidget):
         self.current_object_id = new_instance_id
         self.current_parent_id = new_parent_id
         self.current_tool_type = new_tool_type
+        self.current_position = copy.deepcopy(incoming_pos)
 
         if new_tool_type == "screen" or not new_tool_type:
             # Show placeholder for screens or unknown types
@@ -288,7 +303,10 @@ class PropertyEditor(QStackedWidget):
         self.current_object_id = None
         self.current_parent_id = None
         self.current_properties = {}
+        self.current_position = {}
         self.current_tool_type = None
+        self._pos_x_spin = self._pos_y_spin = None
+        self._width_spin = self._height_spin = None
         # Clear editor widget if it exists
         if self.count() > 2:
             old_widget = self.widget(2)
@@ -368,6 +386,7 @@ class PropertyEditor(QStackedWidget):
         self.current_object_id = ids
         self.current_parent_id = parent_id
         self.current_tool_type = tool_type
+        self.current_position = {}
 
         self._build_editor(tool_type, merged_props)
         return True
@@ -384,23 +403,122 @@ class PropertyEditor(QStackedWidget):
         self.current_properties = props
         editor = schema.editor_builder()
         if editor:
-            self.addWidget(editor)
-            self.setCurrentWidget(editor)
-            # Try to restore focus to the same logical field
+            editor.setObjectName("tool_editor")
+            container = QWidget()
+            vbox = QVBoxLayout(container)
+
+            geo_widget = QWidget()
+            form = QFormLayout(geo_widget)
+            self._pos_x_spin = QSpinBox(objectName="pos_x_spin")
+            self._pos_y_spin = QSpinBox(objectName="pos_y_spin")
+            self._width_spin = QSpinBox(objectName="width_spin")
+            self._height_spin = QSpinBox(objectName="height_spin")
+            for sp in (self._pos_x_spin, self._pos_y_spin, self._width_spin, self._height_spin):
+                sp.setRange(-10000, 10000)
+
+            self._pos_x_spin.setValue(int(self.current_position.get("x", 0)))
+            self._pos_y_spin.setValue(int(self.current_position.get("y", 0)))
+            size = self.current_properties.get("size", {})
+            self._width_spin.setValue(int(size.get("width", 0)))
+            self._height_spin.setValue(int(size.get("height", 0)))
+
+            form.addRow("X", self._pos_x_spin)
+            form.addRow("Y", self._pos_y_spin)
+            form.addRow("Width", self._width_spin)
+            form.addRow("Height", self._height_spin)
+            vbox.addWidget(geo_widget)
+            vbox.addWidget(editor)
+
+            def _emit_pos():
+                if isinstance(self.current_object_id, list):
+                    return
+                guard = self._begin_edit()
+                try:
+                    new_pos = {
+                        "x": int(self._pos_x_spin.value()),
+                        "y": int(self._pos_y_spin.value()),
+                    }
+                    instance = screen_service.get_child_instance(
+                        self.current_parent_id, self.current_object_id
+                    )
+                    if instance is None:
+                        return
+                    old_pos = copy.deepcopy(
+                        instance.get("position")
+                        or instance.get("properties", {}).get("position", {})
+                    )
+                    if new_pos != old_pos:
+                        from services.commands import MoveChildCommand
+                        from services.command_history_service import (
+                            command_history_service,
+                        )
+
+                        cmd = MoveChildCommand(
+                            self.current_parent_id,
+                            self.current_object_id,
+                            new_pos,
+                            old_pos,
+                        )
+                        command_history_service.add_command(cmd)
+                        guard.mark_changed()
+                        self.current_position = new_pos
+                finally:
+                    guard.end()
+
+            def _emit_size():
+                if isinstance(self.current_object_id, list):
+                    return
+                guard = self._begin_edit()
+                try:
+                    instance = screen_service.get_child_instance(
+                        self.current_parent_id, self.current_object_id
+                    )
+                    if instance is None:
+                        return
+                    new_props = copy.deepcopy(instance.get("properties", {}))
+                    old_props = copy.deepcopy(new_props)
+                    size_dict = new_props.setdefault("size", {})
+                    size_dict["width"] = int(self._width_spin.value())
+                    size_dict["height"] = int(self._height_spin.value())
+                    if new_props != old_props:
+                        from services.commands import UpdateChildPropertiesCommand
+                        from services.command_history_service import (
+                            command_history_service,
+                        )
+
+                        cmd = UpdateChildPropertiesCommand(
+                            self.current_parent_id,
+                            self.current_object_id,
+                            new_props,
+                            old_props,
+                        )
+                        command_history_service.add_command(cmd)
+                        guard.mark_changed()
+                        self.current_properties = new_props
+                finally:
+                    guard.end()
+
+            self._pos_x_spin.valueChanged.connect(_emit_pos)
+            self._pos_y_spin.valueChanged.connect(_emit_pos)
+            self._width_spin.valueChanged.connect(_emit_size)
+            self._height_spin.valueChanged.connect(_emit_size)
+
+            self.addWidget(container)
+            self.setCurrentWidget(container)
+
             if restore_name:
                 from PyQt6.QtWidgets import QLineEdit as _QLineEdit
 
-                target = editor.findChild(_QLineEdit, restore_name)
+                target = container.findChild(_QLineEdit, restore_name)
                 if target is not None:
                     target.setFocus()
                     if restore_cursor is not None:
                         try:
-                            # Clamp cursor to current text length
                             pos = min(restore_cursor, len(target.text()))
                             target.setCursorPosition(pos)
                         except Exception:
                             pass
-            return editor
+            return container
         self.setCurrentWidget(self.blank_page)
         return None
 
@@ -413,12 +531,35 @@ class PropertyEditor(QStackedWidget):
         """Update existing editor widgets in place based on new props.
         Signals are blocked during programmatic updates to avoid feedback loops.
         """
-        editor = self.widget(2) if self.count() > 2 else None
-        if editor is None:
+        container = self.widget(2) if self.count() > 2 else None
+        if container is None:
             return
+        inner = container.findChild(QWidget, "tool_editor") or container
         adapter = get_editor(tool_type)
         if adapter is not None:
-            adapter.update_fields(editor, props or {})
+            adapter.update_fields(inner, props or {})
+        # Update geometry inputs
+        try:
+            if hasattr(self, "_pos_x_spin") and self._pos_x_spin is not None:
+                for sp, val in [
+                    (self._pos_x_spin, int(self.current_position.get("x", 0))),
+                    (self._pos_y_spin, int(self.current_position.get("y", 0))),
+                ]:
+                    sp.blockSignals(True)
+                    sp.setValue(val)
+                    sp.blockSignals(False)
+            size = props.get("size", {}) if isinstance(props, dict) else {}
+            for sp, key in [
+                (self._width_spin, "width"),
+                (self._height_spin, "height"),
+            ]:
+                if sp is None:
+                    continue
+                sp.blockSignals(True)
+                sp.setValue(int(size.get(key, 0)))
+                sp.blockSignals(False)
+        except Exception:
+            pass
         # If adapter is None, do nothing (unknown tool)
 
     # --- Property merging helper ---

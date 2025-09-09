@@ -17,3 +17,17 @@ Notes
 - Editors call back into `PropertyEditor` via the passed `host` to use the
   editing guard and command history. This keeps command emission consistent.
 - Editors must assign `objectName` on inputs so `update_fields` can find them.
+
+Tree-based property tab
+-----------------------
+
+The default editor for the button tool is a lightweight tree widget that groups
+properties into sections such as *Common Information*. The top of the panel
+exposes generic geometry fields (X, Y, Width, Height) which apply to all
+objects. Inline edits emit undoable commands so changes propagate immediately.
+
+Special entries – **Word Action**, **Bit Action** and **Conditional Style** –
+launch their respective dialogs when activated. To register additional tree
+editors, implement `components/property_editor/<tool>_editor.py` exposing
+`build()` and `update_fields()`, then add the module to
+`factory._EDITOR_DISPATCH`.
