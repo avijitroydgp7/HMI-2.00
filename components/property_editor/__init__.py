@@ -1,18 +1,5 @@
 """
 Property Editor package
-
-This package hosts the main `PropertyEditor` widget and a set of
-tool-specific editor helpers under this directory. Each tool editor
-exposes two functions:
-
-- build(host): returns a QWidget for editing that tool's properties.
-- update_fields(widget, props): updates the widget's inputs from props
-  with signals blocked to avoid feedback loops.
-
-Factory mapping in `factory.py` selects the correct helper based on
-`utils.constants.ToolType`. To add a new tool editor, create a
-`<tool>_editor.py` here with `build` and `update_fields`, and register it
-in `factory.get_editor`.
 """
 
 from PyQt6.QtWidgets import (
