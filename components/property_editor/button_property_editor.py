@@ -44,7 +44,7 @@ class InlinePropertyEditor:
         current_value = item.text(1)
         
         # Determine property type
-        if property_path in ["x", "y", "width", "height", "border_width", "font_size", "icon_size"]:
+        if property_path in ["x", "y", "width", "height", "w", "h", "border_width", "font_size", "icon_size"]:
             self._edit_int_property(item, property_path, current_value)
         elif property_path in ["component_type"]:
             options = ["Standard Button", "Toggle Switch", "Selector", "Toggle Button", "Tab Button", "Arrow Button"]
@@ -319,7 +319,19 @@ class ButtonTreePropertyEditor(QWidget):
         self.property_tree = QTreeWidget()
         self.property_tree.setHeaderLabels(["Property", "Value"])
         self.property_tree.setColumnWidth(0, 180)
-        self.property_tree.setAlternatingRowColors(True)
+        # Remove alternating row colors to eliminate blue lines
+        self.property_tree.setAlternatingRowColors(False)
+        # Set stylesheet to ensure consistent appearance
+        self.property_tree.setStyleSheet("""
+            QTreeWidget {
+                background-color: transparent;
+                border: none;
+            }
+            QTreeWidget::item {
+                border-bottom: 1px solid #2a2a2a;
+                padding: 2px 0;
+            }
+        """)
         self.property_tree.itemChanged.connect(self._on_item_changed)
         
         # Set up inline property editor
@@ -334,56 +346,39 @@ class ButtonTreePropertyEditor(QWidget):
         """Populate the property tree with categories and properties."""
         self.property_tree.clear()
         
-        # Basic properties category
-        basic_category = self._add_category("Basic Properties")
-        self._add_property(basic_category, "X", "x")
-        self._add_property(basic_category, "Y", "y")
-        self._add_property(basic_category, "Width", "width")
-        self._add_property(basic_category, "Height", "height")
-        self._add_property(basic_category, "Text", "text")
-        self._add_property(basic_category, "Tooltip", "tooltip")
+        # Position category (with X, Y, W, H)
+        position_category = self._add_category("Position")
+        self._add_property(position_category, "X", "x")
+        self._add_property(position_category, "Y", "y")
+        self._add_property(position_category, "W", "width")
+        self._add_property(position_category, "H", "height")
         
-        # Style properties category
-        style_category = self._add_category("Style Properties")
-        
-        component_style = self._add_expandable_property(style_category, "Component Style", "component_style")
-        self._add_property(component_style, "Component Type", "component_type")
-        self._add_property(component_style, "Shape Style", "shape_style")
-        
-        background = self._add_expandable_property(style_category, "Background", "background")
-        self._add_property(background, "Background Type", "background_type")
-        self._add_property(background, "Background Color", "background_color")
-        
-        border = self._add_expandable_property(style_category, "Border", "border")
-        self._add_property(border, "Border Width", "border_width")
-        self._add_property(border, "Border Style", "border_style")
-        self._add_property(border, "Border Color", "border_color")
-        
-        font = self._add_expandable_property(style_category, "Font", "font")
-        self._add_property(font, "Text Color", "text_color")
-        self._add_property(font, "Font Size", "font_size")
-        self._add_property(font, "Font Family", "font_family")
-        self._add_property(font, "Bold", "font_bold")
-        self._add_property(font, "Italic", "font_italic")
-        self._add_property(font, "Underline", "font_underline")
-        
-        # Icon properties category
-        icon_category = self._add_expandable_property(style_category, "Icon", "icon_props")
-        self._add_property(icon_category, "Icon", "icon")
-        self._add_property(icon_category, "Icon Size", "icon_size")
-        self._add_property(icon_category, "Icon Color", "icon_color")
-        self._add_property(icon_category, "Icon Alignment", "icon_align")
-        
-        # Conditional styles category - create expandable structure
-        conditional_category = self._add_category("Conditional Styles")
-        self._populate_conditional_styles(conditional_category)
-        
-        # Action properties category - create expandable structure
-        action_category = self._add_category("Actions")
+        # Action category with dynamically numbered items
+        action_category = self._add_category("action")
         self._populate_actions(action_category)
         
-        # Expand basic properties by default
-        basic_category.setExpanded(True)
+        # Style category with dynamically numbered items
+        style_category = self._add_category("style")
+        self._populate_conditional_styles(style_category)
+        
+        # Add default style if no conditional styles exist
+        if not self.current_properties.get("conditional_styles"):
+            # Style 1
+            style1 = self._add_expandable_property(style_category, "1", "style1")
+            self._add_property(style1, "tooltip", "tooltip")
+            
+            # Component style & background
+            comp_style = self._add_expandable_property(style1, "component style & background...", "component_style")
+            self._add_property(comp_style, "component type", "component_type")
+            self._add_property(comp_style, "shape type", "shape_style")
+            self._add_property(comp_style, "background type", "background_type")
+            self._add_property(comp_style, "etc...", "comp_style_etc")
+            
+            # Style option
+            style_option = self._add_expandable_property(style1, "style option", "style_option")
+        
+        # Expand position by default
+        position_category.setExpanded(True)
     
     def _populate_conditional_styles(self, parent: QTreeWidgetItem) -> None:
         """Populate the conditional styles section of the tree."""
@@ -397,9 +392,10 @@ class ButtonTreePropertyEditor(QWidget):
         if not styles:
             return
             
-        # Add each conditional style as an expandable item
+        # Add each conditional style as an expandable item with simple numbered display
         for i, style in enumerate(styles):
-            style_item = self._add_expandable_property(parent, f"Style {i+1}", f"conditional_styles.{i}")
+            # Just use the index number as the display label
+            style_item = self._add_expandable_property(parent, f"{i+1}", f"conditional_styles.{i}")
             
             # Add style properties
             tag_path = style.get("tag_path", "")
@@ -410,14 +406,21 @@ class ButtonTreePropertyEditor(QWidget):
             self._add_property(style_item, "Condition", f"conditional_styles.{i}.condition")
             self._add_property(style_item, "Value", f"conditional_styles.{i}.value")
             
-            # Add style properties as a nested expandable
-            style_props = self._add_expandable_property(style_item, "Style", f"conditional_styles.{i}.style")
+            # Component style & background
+            comp_style = self._add_expandable_property(style_item, "component style & background...", f"conditional_styles.{i}.component_style")
+            self._add_property(comp_style, "component type", f"conditional_styles.{i}.style.component_type")
+            self._add_property(comp_style, "shape type", f"conditional_styles.{i}.style.shape_style")
+            self._add_property(comp_style, "background type", f"conditional_styles.{i}.style.background_type")
+            
+            # Style option
+            style_option = self._add_expandable_property(style_item, "style option", f"conditional_styles.{i}.style_option")
             
             # Add all style properties that are available
             style_data = style.get("style", {})
             for prop_name, prop_value in style_data.items():
-                display_name = prop_name.replace("_", " ").title()
-                self._add_property(style_props, display_name, f"conditional_styles.{i}.style.{prop_name}")
+                if prop_name not in ["component_type", "shape_style", "background_type"]:
+                    display_name = prop_name.replace("_", " ").title()
+                    self._add_property(style_option, display_name, f"conditional_styles.{i}.style.{prop_name}")
     
     def _populate_actions(self, parent: QTreeWidgetItem) -> None:
         """Populate the actions section of the tree."""
@@ -434,13 +437,22 @@ class ButtonTreePropertyEditor(QWidget):
         if not actions:
             return
             
-        # Add each action as an expandable item
+        # Add each action as an expandable item with simple numbered display
         for i, action in enumerate(actions):
             action_type = action.get("type", "bit")
+            
+            # Just use the index number as the display label
             action_item = self._add_expandable_property(
-                parent, 
-                f"{action_type.title()} Action {i+1}", 
+                parent,
+                f"{i+1}",
                 f"actions.{i}"
+            )
+            
+            # Add action type as an expandable property
+            action_type_item = self._add_expandable_property(
+                action_item,
+                f"{action_type.title()} main action",
+                f"actions.{i}.main_action"
             )
             
             # Add common action properties
@@ -448,13 +460,28 @@ class ButtonTreePropertyEditor(QWidget):
             
             # Add type-specific properties
             if action_type == "bit":
-                self._add_property(action_item, "Tag", f"actions.{i}.tag")
-                self._add_property(action_item, "When Pressed", f"actions.{i}.when_pressed")
-                self._add_property(action_item, "When Released", f"actions.{i}.when_released")
+                target_tag = self._add_expandable_property(action_type_item, "target tag", f"actions.{i}.target_tag")
+                self._add_property(target_tag, "index 1", f"actions.{i}.tag_index1")
+                self._add_property(target_tag, "index 2", f"actions.{i}.tag_index2")
+                
+                self._add_property(action_item, "0 momentary 0 Alternet 0...", f"actions.{i}.momentary_action")
+                
+                trigger = self._add_expandable_property(action_item, "Trigger", f"actions.{i}.trigger")
+                self._add_property(trigger, "Ordinary", f"actions.{i}.trigger_type")
+                
             elif action_type == "word":
-                self._add_property(action_item, "Tag", f"actions.{i}.tag")
-                self._add_property(action_item, "Operation", f"actions.{i}.operation")
-                self._add_property(action_item, "Value", f"actions.{i}.value")
+                target_tag = self._add_expandable_property(action_type_item, "target tag", f"actions.{i}.target_tag")
+                self._add_property(target_tag, "index 1", f"actions.{i}.tag_index1")
+                self._add_property(target_tag, "index 2", f"actions.{i}.tag_index2")
+                
+                self._add_property(action_item, "Action Mode", f"actions.{i}.action_mode")
+                self._add_property(action_item, "Value to add", f"actions.{i}.value_to_add")
+                
+                trigger = self._add_expandable_property(action_item, "Trigger", f"actions.{i}.trigger")
+                self._add_property(trigger, "Ordinary", f"actions.{i}.trigger_type")
+                self._add_property(trigger, "Conditional reset", f"actions.{i}.conditional_reset")
+                self._add_property(trigger, "etc", f"actions.{i}.trigger_etc")
+                
             elif action_type == "navigate":
                 self._add_property(action_item, "Screen", f"actions.{i}.screen")
             
@@ -490,6 +517,9 @@ class ButtonTreePropertyEditor(QWidget):
         font = item.font(0)
         font.setBold(True)
         item.setFont(0, font)
+        
+        # Make it expanded by default
+        item.setExpanded(True)
         
         return item
     
@@ -530,11 +560,18 @@ class ButtonTreePropertyEditor(QWidget):
                 except ValueError:
                     pass  # Ignore invalid values
                     
-            # Handle size properties (width, height)
-            elif property_name in ["width", "height"]:
+            # Handle size properties (width, height, w, h)
+            elif property_name in ["width", "height", "w", "h"]:
                 try:
+                    # Map w to width and h to height
+                    key = property_name
+                    if property_name == "w":
+                        key = "width"
+                    elif property_name == "h":
+                        key = "height"
+                    
                     value = int(value)
-                    self._on_size_changed(property_name, value)
+                    self._on_size_changed(key, value)
                 except ValueError:
                     pass  # Ignore invalid values
                     
@@ -773,33 +810,32 @@ class ButtonTreePropertyEditor(QWidget):
                 # Skip special items
                 if property_path in ["add_conditional_style", "add_bit_action", "add_word_action"]:
                     continue
+                
+                # Add visual styling for all group headers
+                if item.childCount() > 0:
+                    # This is a group header
+                    font = item.font(0)
+                    font.setBold(True)
+                    item.setFont(0, font)
                     
                 # Handle regular properties
                 if "." not in property_path:
                     if property_path in ["x", "y"]:
                         value = str(self.current_position.get(property_path, 0))
-                    elif property_path in ["width", "height"]:
-                        value = str(self.current_size.get(property_path, 0))
+                    elif property_path in ["width", "height", "w", "h"]:
+                        # Map w to width and h to height
+                        prop = property_path
+                        if property_path == "w":
+                            prop = "width"
+                        elif property_path == "h":
+                            prop = "height"
+                        value = str(self.current_size.get(prop, 0))
                     else:
                         value = str(self.current_properties.get(property_path, ""))
                     item.setText(1, value)
                     
-                    # Color property special handling for display
-                    if property_path in ["background_color", "text_color", "border_color", "icon_color"]:
-                        try:
-                            color = QColor(value)
-                            if color.isValid():
-                                item.setBackground(1, QBrush(color))
-                                # Use contrasting text color
-                                brightness = (0.299 * color.red() + 0.587 * color.green() + 0.114 * color.blue()) / 255
-                                if brightness > 0.5:
-                                    item.setForeground(1, QBrush(Qt.GlobalColor.black))
-                                else:
-                                    item.setForeground(1, QBrush(Qt.GlobalColor.white))
-                        except Exception:
-                            # Reset background if not a valid color
-                            item.setBackground(1, QBrush())
-                            item.setForeground(1, QBrush())
+                    # Apply color handling for all color properties
+                    self._apply_color_styling(item, property_path, value)
                     
                     # Boolean property special handling for display
                     if property_path in ["font_bold", "font_italic", "font_underline"]:
@@ -824,10 +860,35 @@ class ButtonTreePropertyEditor(QWidget):
         except Exception as e:
             print(f"Error updating tree values: {e}")
     
+    def _apply_color_styling(self, item: QTreeWidgetItem, property_path: str, value: str) -> None:
+        """Apply color styling to properties that represent colors."""
+        # Handle all color properties with consistent styling
+        if "_color" in property_path:
+            try:
+                color = QColor(value)
+                if color.isValid():
+                    item.setBackground(1, QBrush(color))
+                    # Use contrasting text color
+                    brightness = (0.299 * color.red() + 0.587 * color.green() + 0.114 * color.blue()) / 255
+                    if brightness > 0.5:
+                        item.setForeground(1, QBrush(Qt.GlobalColor.black))
+                    else:
+                        item.setForeground(1, QBrush(Qt.GlobalColor.white))
+            except Exception:
+                # Reset background if not a valid color
+                item.setBackground(1, QBrush())
+                item.setForeground(1, QBrush())
+
     def _update_nested_value(self, item: QTreeWidgetItem, property_path: str) -> None:
         """Update value for a nested property based on its path."""
         parts = property_path.split('.')
         
+        # Special handling for style number and graphics
+        if property_path == "style_number":
+            # Display style number (this could be retrieved from current properties)
+            item.setText(1, str(self.current_properties.get("style_number", "1")))
+            return
+            
         # Navigate to the correct nested property
         current = self.current_properties
         for i, part in enumerate(parts):
@@ -848,7 +909,11 @@ class ButtonTreePropertyEditor(QWidget):
                 current = current[part]
         
         # Set the item text
-        item.setText(1, str(current) if current is not None else "")
+        value = str(current) if current is not None else ""
+        item.setText(1, value)
+        
+        # Apply color styling to all nested color properties too
+        self._apply_color_styling(item, property_path, value)
     
     def _on_position_changed(self, key: str, value: int) -> None:
         """Handle position property changes."""
@@ -962,19 +1027,29 @@ class ButtonTreePropertyEditor(QWidget):
             self._on_screen_modified(event.get("screen_id", ""))
     
     def _on_screen_modified(self, screen_id: str) -> None:
-        if self._is_editing or screen_id != self.current_parent_id or not self.current_object_id:
+        # Clear selection if editing is happening or screen ID doesn't match
+        if self._is_editing or screen_id != self.current_parent_id:
             return
+            
+        # Check if we have a current object ID
+        if not self.current_object_id:
+            self._clear_selection()
+            return
+            
+        # Try to get the instance from the screen service
         instance = screen_service.get_child_instance(
             self.current_parent_id, self.current_object_id
         )
+        
+        # If instance exists, update properties
         if instance is not None:
             selection = {
                 "instance_id": instance.get("instance_id"),
                 "properties": copy.deepcopy(instance.get("properties") or {}),
                 # Store a top-level position for convenience, regardless of schema
                 "position": (instance.get("position")
-                              or instance.get("properties", {}).get("position", {})
-                              or {}),
+                               or instance.get("properties", {}).get("position", {})
+                               or {}),
             }
             self.current_properties = selection.get("properties", {})
             # Read position from either top-level or nested under properties
@@ -986,15 +1061,25 @@ class ButtonTreePropertyEditor(QWidget):
             self.current_size = {"width": int(size.get("width", 0) or 0), "height": int(size.get("height", 0) or 0)}
             self._update_property_values()
         else:
+            # Clear selection if instance doesn't exist anymore
             self._clear_selection()
     
     def _clear_selection(self) -> None:
+        """Completely clear the selection and reset the property editor."""
         self.current_object_id = None
         self.current_parent_id = None
         self.current_properties = {}
         self.current_position = {"x": 0, "y": 0}
         self.current_size = {"width": 0, "height": 0}
-        self._update_property_values()
+        
+        # Completely clear the tree widget
+        self.property_tree.clear()
+        
+        # Force immediate visual update
+        self.property_tree.update()
+        
+        # Important: Do not repopulate property tree categories
+        # This ensures properties will be completely gone when nothing is selected
     
     @pyqtSlot(str, object)
     def set_current_object(self, parent_id: str, selection_data: object) -> None:
@@ -1002,19 +1087,21 @@ class ButtonTreePropertyEditor(QWidget):
         if self._is_editing:
             return
         
+        # First, ensure we clear any existing selection to prevent properties from persisting
+        self._clear_selection()
+        
+        # If no selection data, we're already cleared
+        if not selection_data:
+            return
+        
         self._blocked = True
         try:
-            if not selection_data:
-                self._clear_selection()
-                return
-                
             # Convert selection_data to dict if it's a list with a single item
             if isinstance(selection_data, list):
                 if len(selection_data) == 1:
                     selection_data = selection_data[0]
                 else:
-                    self._clear_selection()
-                    return
+                    return  # Multiple selections not supported
             
             # Handle selection_data safely
             if isinstance(selection_data, dict):
@@ -1034,7 +1121,6 @@ class ButtonTreePropertyEditor(QWidget):
                     if hasattr(selection_data, "position"):
                         selection_dict["position"] = getattr(selection_data, "position")
                 except Exception:
-                    self._clear_selection()
                     return
                     
             # Check if selection is a button (support both legacy 'tool_id' and enum 'tool_type')
@@ -1046,8 +1132,7 @@ class ButtonTreePropertyEditor(QWidget):
                 or (tool_type == constants.ToolType.BUTTON)
             )
             if not is_button:
-                self._clear_selection()
-                return
+                return  # Not a button, we should remain cleared
                 
             self.current_object_id = selection_dict.get("instance_id")
             self.current_parent_id = parent_id
