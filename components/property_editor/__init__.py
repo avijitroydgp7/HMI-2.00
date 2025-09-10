@@ -1,21 +1,35 @@
-"""Simplified property editor showing only geometry fields."""
+"""Property editors for HMI objects.
+
+This module provides property editors for HMI objects:
+- PropertyEditor: Basic property editor showing geometry fields
+- ButtonTreePropertyEditor: Advanced tree-based property editor with inline editing capabilities
+"""
 
 from __future__ import annotations
 
 import copy
 
 from PyQt6.QtCore import pyqtSlot
-from PyQt6.QtWidgets import QFormLayout, QSpinBox, QVBoxLayout, QWidget
+from PyQt6.QtWidgets import (
+    QFormLayout, QSpinBox, QVBoxLayout, QWidget,
+    QStackedWidget
+)
 
 from services.command_history_service import command_history_service
 from services.commands import MoveChildCommand, UpdateChildPropertiesCommand
 from services.data_context import data_context
 from services.screen_data_service import screen_service
 from utils.editing_guard import EditingGuard
+from utils import constants
 
 
 class PropertyEditor(QWidget):
-    """Property panel that only manages X, Y, Width and Height."""
+    """Property editor that uses specialized editors for different object types.
+    
+    This editor automatically switches between:
+    - Basic geometry editor for standard objects
+    - Specialized button editor for button objects
+    """
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
@@ -26,7 +40,17 @@ class PropertyEditor(QWidget):
         self.current_size = {"width": 0, "height": 0}
         self._is_editing = False
 
+        # Create main layout
         layout = QVBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+        
+        # Create editor stack to switch between different editors
+        self.editor_stack = QStackedWidget(self)
+        layout.addWidget(self.editor_stack)
+        
+        # Create basic geometry editor
+        self.basic_editor = QWidget()
+        basic_layout = QVBoxLayout(self.basic_editor)
         form_layout = QFormLayout()
         self.x_spin = QSpinBox()
         self.y_spin = QSpinBox()
@@ -42,8 +66,20 @@ class PropertyEditor(QWidget):
         form_layout.addRow("H", self.height_spin)
         self.geometry_form = QWidget()
         self.geometry_form.setLayout(form_layout)
-        layout.addWidget(self.geometry_form)
+        basic_layout.addWidget(self.geometry_form)
+        
+        # Create tree editor (will be created later to avoid circular imports)
+        self.button_editor = None
+        
+        # Add basic editor to stack
+        self.editor_stack.addWidget(self.basic_editor)
+        
+        # Set initial editor
+        self.editor_stack.setCurrentWidget(self.basic_editor)
+        
+        # We'll add the button editor later after initialization
 
+        # Connect signals
         self.x_spin.valueChanged.connect(lambda v: self._on_position_changed("x", v))
         self.y_spin.valueChanged.connect(lambda v: self._on_position_changed("y", v))
         self.width_spin.valueChanged.connect(lambda v: self._on_size_changed("width", v))
@@ -99,7 +135,7 @@ class PropertyEditor(QWidget):
         guard = self._begin_edit()
         try:
             command = MoveChildCommand(
-                self.current_parent_id,
+                str(self.current_parent_id) if self.current_parent_id else "",
                 self.current_object_id,
                 new_pos,
                 old_pos,
@@ -122,7 +158,7 @@ class PropertyEditor(QWidget):
         guard = self._begin_edit()
         try:
             command = UpdateChildPropertiesCommand(
-                self.current_parent_id,
+                str(self.current_parent_id) if self.current_parent_id else "",
                 self.current_object_id,
                 new_props,
                 old_props,
@@ -139,10 +175,12 @@ class PropertyEditor(QWidget):
     def _active_canvas_widget(self):
         try:
             win = self.window()
-            if hasattr(win, "tab_widget"):
-                return win.tab_widget.currentWidget()
+            if win and hasattr(win, "tab_widget"):
+                tab_widget = getattr(win, "tab_widget")
+                if tab_widget:
+                    return tab_widget.currentWidget()
         except Exception:
-            return None
+            pass
         return None
 
     def _begin_edit(self) -> EditingGuard:
@@ -201,10 +239,74 @@ class PropertyEditor(QWidget):
             else:
                 self._clear_selection()
                 return
-        self.current_object_id = selection_data.get("instance_id")
-        self.current_parent_id = parent_id
-        self.current_properties = copy.deepcopy(selection_data.get("properties") or {})
-        self._update_geometry_fields(selection_data)
+                
+        # Store basic info using safer approach
+        try:
+            # Try dictionary access first
+            if isinstance(selection_data, dict):
+                self.current_object_id = selection_data.get("instance_id")
+                props = selection_data.get("properties", {})
+                self.current_properties = copy.deepcopy(props) if props else {}
+            # Fall back to attribute access
+            elif hasattr(selection_data, "instance_id"):
+                self.current_object_id = getattr(selection_data, "instance_id")
+                if hasattr(selection_data, "properties"):
+                    props = getattr(selection_data, "properties") or {}
+                    self.current_properties = copy.deepcopy(props)
+                else:
+                    self.current_properties = {}
+            else:
+                self.current_object_id = None
+                self.current_properties = {}
+                
+            self.current_parent_id = parent_id
+        except Exception:
+            self.current_object_id = None
+            self.current_parent_id = parent_id
+            self.current_properties = {}
+        
+        # Convert to dictionary for safer handling
+        selection_dict = {}
+        if isinstance(selection_data, dict):
+            selection_dict = selection_data
+        else:
+            # Try to extract attributes if it's an object
+            try:
+                if hasattr(selection_data, "instance_id"):
+                    selection_dict["instance_id"] = getattr(selection_data, "instance_id")
+                if hasattr(selection_data, "tool_id"):
+                    selection_dict["tool_id"] = getattr(selection_data, "tool_id")
+                if hasattr(selection_data, "tool_type"):
+                    selection_dict["tool_type"] = getattr(selection_data, "tool_type")
+                if hasattr(selection_data, "properties"):
+                    selection_dict["properties"] = getattr(selection_data, "properties")
+            except Exception:
+                pass
+                
+        # Check if this is a button (support both legacy 'tool_id' and enum 'tool_type')
+        tool_id = selection_dict.get("tool_id", "")
+        tool_type_val = selection_dict.get("tool_type")
+        tool_type = constants.tool_type_from_str(tool_type_val) if tool_type_val is not None else None
+        is_button = (
+            (isinstance(tool_id, str) and tool_id.startswith("button"))
+            or (tool_type == constants.ToolType.BUTTON)
+        )
+        
+        # Initialize tree editor if needed
+        if is_button and self.button_editor is None:
+            # Import here to avoid circular imports
+            from .button_property_editor import ButtonTreePropertyEditor
+            self.button_editor = ButtonTreePropertyEditor(self)
+            self.editor_stack.addWidget(self.button_editor)
+        
+        if is_button and self.button_editor is not None:
+            # Use specialized tree editor
+            self.editor_stack.setCurrentWidget(self.button_editor)
+            self.button_editor.set_current_object(parent_id, selection_data)
+        else:
+            # Use basic geometry editor
+            self.editor_stack.setCurrentWidget(self.basic_editor)
+            self._update_geometry_fields(selection_data)
 
     def set_active_tool(self, tool_id) -> None:  # compatibility stub
         pass
