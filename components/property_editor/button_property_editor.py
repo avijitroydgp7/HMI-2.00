@@ -13,6 +13,8 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtGui import QColor, QBrush, QFont, QPainter, QIcon
 
+from dialogs.widgets import TagSelector
+
 from services.command_history_service import command_history_service
 from services.commands import UpdateChildPropertiesCommand, MoveChildCommand
 from services.data_context import data_context
@@ -41,7 +43,9 @@ class InlinePropertyEditor:
         if not property_path:
             return
             
-        current_value = item.text(1)
+        current_value = item.data(1, Qt.ItemDataRole.UserRole)
+        if current_value is None:
+            current_value = item.text(1)
         
         # Determine property type
         if property_path in ["x", "y", "width", "height", "w", "h", "border_width", "font_size", "icon_size"]:
@@ -68,6 +72,8 @@ class InlinePropertyEditor:
             self._edit_bool_property(item, property_path, current_value)
         elif property_path in ["background_color", "text_color", "border_color", "icon_color"]:
             self._edit_color_property(item, property_path, current_value)
+        elif property_path.split('.')[-1] in ["tag", "tag_path", "target_tag"]:
+            self._edit_tag_property(item, property_path, current_value)
         else:
             # Default to text editor
             self._edit_text_property(item, property_path, current_value)
@@ -198,6 +204,67 @@ class InlinePropertyEditor:
         ok_button.clicked.connect(apply_value)
         cancel_button.clicked.connect(cancel_edit)
         combo.activated.connect(apply_value)  # Apply when user selects an item
+
+    def _format_tag_display(self, data: Optional[Dict[str, Any]]) -> str:
+        """Create a string representation for tag selector data."""
+        if not data:
+            return ""
+        main_tag = data.get("main_tag", {})
+        main_val = main_tag.get("value") if isinstance(main_tag, dict) else None
+        display = ""
+        if isinstance(main_val, dict):
+            db = main_val.get("db_name", "")
+            tag = main_val.get("tag_name", "")
+            display = f"[{db}]::{tag}"
+        else:
+            display = str(main_val) if main_val is not None else ""
+        for idx in data.get("indices", []):
+            val = idx.get("value") if isinstance(idx, dict) else None
+            if isinstance(val, dict):
+                db = val.get("db_name", "")
+                tag = val.get("tag_name", "")
+                display += f"[{db}]::{tag}"
+            else:
+                display += f"[{val}]" if val is not None else "[]"
+        return display
+
+    def _edit_tag_property(self, item: QTreeWidgetItem, property_path: str, current_value: Any):
+        """Show TagSelector editor for tag properties."""
+        container = QWidget()
+        layout = QHBoxLayout(container)
+        layout.setContentsMargins(0, 0, 0, 0)
+
+        selector = TagSelector(container)
+        layout.addWidget(selector)
+
+        if isinstance(current_value, dict):
+            try:
+                selector.set_data(current_value)
+            except Exception:
+                pass
+
+        ok_button = QPushButton("OK", container)
+        ok_button.setFixedWidth(40)
+        layout.addWidget(ok_button)
+
+        cancel_button = QPushButton("Cancel", container)
+        cancel_button.setFixedWidth(60)
+        layout.addWidget(cancel_button)
+
+        self.tree_widget.setItemWidget(item, 1, container)
+
+        def apply_value():
+            data = selector.get_data()
+            self.tree_widget.setItemWidget(item, 1, None)
+            item.setText(1, self._format_tag_display(data))
+            item.setData(1, Qt.ItemDataRole.UserRole, data)
+            self.tree_widget.itemChanged.emit(item, 1)
+
+        def cancel_edit():
+            self.tree_widget.setItemWidget(item, 1, None)
+
+        ok_button.clicked.connect(apply_value)
+        cancel_button.clicked.connect(cancel_edit)
     
     def _edit_bool_property(self, item: QTreeWidgetItem, property_path: str, current_value: str):
         """Show checkbox editor for boolean properties."""
@@ -532,7 +599,9 @@ class ButtonTreePropertyEditor(QWidget):
         if not property_path:
             return
             
-        value = item.text(1)
+        value = item.data(1, Qt.ItemDataRole.UserRole)
+        if value is None:
+            value = item.text(1)
         
         # Handle special property paths
         if property_path == "add_conditional_style":
@@ -831,8 +900,14 @@ class ButtonTreePropertyEditor(QWidget):
                             prop = "height"
                         value = str(self.current_size.get(prop, 0))
                     else:
-                        value = str(self.current_properties.get(property_path, ""))
-                    item.setText(1, value)
+                        value = self.current_properties.get(property_path, "")
+                    if isinstance(value, dict) and "main_tag" in value:
+                        display = self.inline_editor._format_tag_display(value) if hasattr(self, 'inline_editor') else str(value)
+                        item.setText(1, display)
+                        item.setData(1, Qt.ItemDataRole.UserRole, value)
+                    else:
+                        item.setText(1, str(value))
+                        item.setData(1, Qt.ItemDataRole.UserRole, None)
                     
                     # Apply color handling for all color properties
                     self._apply_color_styling(item, property_path, value)
@@ -909,8 +984,14 @@ class ButtonTreePropertyEditor(QWidget):
                 current = current[part]
         
         # Set the item text
-        value = str(current) if current is not None else ""
-        item.setText(1, value)
+        value = current
+        if isinstance(value, dict) and "main_tag" in value:
+            display = self.inline_editor._format_tag_display(value) if hasattr(self, 'inline_editor') else str(value)
+            item.setText(1, display)
+            item.setData(1, Qt.ItemDataRole.UserRole, value)
+        else:
+            item.setText(1, str(value) if value is not None else "")
+            item.setData(1, Qt.ItemDataRole.UserRole, None)
         
         # Apply color styling to all nested color properties too
         self._apply_color_styling(item, property_path, value)
