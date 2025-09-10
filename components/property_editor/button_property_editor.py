@@ -474,7 +474,11 @@ class ButtonTreePropertyEditor(QWidget):
             self._add_property(style_item, "Value", f"conditional_styles.{i}.value")
             
             # Component style & background
-            comp_style = self._add_expandable_property(style_item, "component style & background...", f"conditional_styles.{i}.component_style")
+            comp_style = self._add_expandable_property(
+                style_item,
+                "component style & background...",
+                f"conditional_styles.{i}.style",
+            )
             self._add_property(comp_style, "component type", f"conditional_styles.{i}.style.component_type")
             self._add_property(comp_style, "shape type", f"conditional_styles.{i}.style.shape_style")
             self._add_property(comp_style, "background type", f"conditional_styles.{i}.style.background_type")
@@ -489,72 +493,150 @@ class ButtonTreePropertyEditor(QWidget):
                     display_name = prop_name.replace("_", " ").title()
                     self._add_property(style_option, display_name, f"conditional_styles.{i}.style.{prop_name}")
     
+    def _migrate_actions(self) -> None:
+        """Normalize any legacy action dictionaries to the current schema."""
+        actions = self.current_properties.get("actions", [])
+        changed = False
+        for action in actions:
+            if "tag" in action:
+                action["target_tag"] = action.pop("tag")
+                changed = True
+            if action.get("type") == "bit":
+                if "when_pressed" in action:
+                    action["momentary_action"] = action.pop("when_pressed")
+                    changed = True
+                if "when_released" in action:
+                    action["trigger_type"] = action.pop("when_released")
+                    changed = True
+                action.setdefault("tag_index1", 0)
+                action.setdefault("tag_index2", 0)
+                action.setdefault("momentary_action", "toggle")
+                action.setdefault("trigger", {})
+                action.setdefault("trigger_type", "ordinary")
+            elif action.get("type") == "word":
+                if "operation" in action:
+                    action["action_mode"] = action.pop("operation")
+                    changed = True
+                if "value" in action:
+                    try:
+                        action["value_to_add"] = int(action.pop("value"))
+                    except ValueError:
+                        action["value_to_add"] = action.pop("value")
+                    changed = True
+                if "when_pressed" in action:
+                    action["action_mode"] = action.pop("when_pressed")
+                    changed = True
+                if "when_released" in action:
+                    action["trigger_type"] = action.pop("when_released")
+                    changed = True
+                action.setdefault("tag_index1", 0)
+                action.setdefault("tag_index2", 0)
+                action.setdefault("action_mode", "set")
+                action.setdefault("value_to_add", 0)
+                action.setdefault("trigger", {})
+                action.setdefault("trigger_type", "ordinary")
+                action.setdefault("conditional_reset", "")
+                action.setdefault("trigger_etc", "")
+        if changed:
+            self.current_properties["actions"] = actions
+
     def _populate_actions(self, parent: QTreeWidgetItem) -> None:
         """Populate the actions section of the tree."""
+        self._migrate_actions()
         actions = self.current_properties.get("actions", [])
-        
+
         # Add "Add Action" items
         bit_action_item = QTreeWidgetItem(parent, ["Add Bit Action", ""])
         bit_action_item.setData(0, Qt.ItemDataRole.UserRole, "add_bit_action")
-        
+
         word_action_item = QTreeWidgetItem(parent, ["Add Word Action", ""])
         word_action_item.setData(0, Qt.ItemDataRole.UserRole, "add_word_action")
-        
+
         # If there are no actions, just show the add buttons
         if not actions:
             return
-            
+
         # Add each action as an expandable item with simple numbered display
         for i, action in enumerate(actions):
             action_type = action.get("type", "bit")
-            
+
             # Just use the index number as the display label
             action_item = self._add_expandable_property(
                 parent,
                 f"{i+1}",
                 f"actions.{i}"
             )
-            
+
             # Add action type as an expandable property
             action_type_item = self._add_expandable_property(
                 action_item,
                 f"{action_type.title()} main action",
                 f"actions.{i}.main_action"
             )
-            
+
             # Add common action properties
             self._add_property(action_item, "Type", f"actions.{i}.type")
-            
+
             # Add type-specific properties
             if action_type == "bit":
-                target_tag = self._add_expandable_property(action_type_item, "target tag", f"actions.{i}.target_tag")
-                self._add_property(target_tag, "index 1", f"actions.{i}.tag_index1")
-                self._add_property(target_tag, "index 2", f"actions.{i}.tag_index2")
-                
-                self._add_property(action_item, "0 momentary 0 Alternet 0...", f"actions.{i}.momentary_action")
-                
-                trigger = self._add_expandable_property(action_item, "Trigger", f"actions.{i}.trigger")
-                self._add_property(trigger, "Ordinary", f"actions.{i}.trigger_type")
-                
+                target_tag = self._add_expandable_property(
+                    action_type_item,
+                    "Target Tag",
+                    f"actions.{i}.target_tag",
+                )
+                self._add_property(target_tag, "Tag Index 1", f"actions.{i}.tag_index1")
+                self._add_property(target_tag, "Tag Index 2", f"actions.{i}.tag_index2")
+
+                self._add_property(
+                    action_item,
+                    "Momentary Mode",
+                    f"actions.{i}.momentary_action",
+                )
+
+                trigger = self._add_expandable_property(
+                    action_item,
+                    "Trigger",
+                    f"actions.{i}.trigger",
+                )
+                self._add_property(trigger, "Trigger Type", f"actions.{i}.trigger_type")
+
             elif action_type == "word":
-                target_tag = self._add_expandable_property(action_type_item, "target tag", f"actions.{i}.target_tag")
-                self._add_property(target_tag, "index 1", f"actions.{i}.tag_index1")
-                self._add_property(target_tag, "index 2", f"actions.{i}.tag_index2")
-                
+                target_tag = self._add_expandable_property(
+                    action_type_item,
+                    "Target Tag",
+                    f"actions.{i}.target_tag",
+                )
+                self._add_property(target_tag, "Tag Index 1", f"actions.{i}.tag_index1")
+                self._add_property(target_tag, "Tag Index 2", f"actions.{i}.tag_index2")
+
                 self._add_property(action_item, "Action Mode", f"actions.{i}.action_mode")
-                self._add_property(action_item, "Value to add", f"actions.{i}.value_to_add")
-                
+                self._add_property(action_item, "Value to Add", f"actions.{i}.value_to_add")
+
                 trigger = self._add_expandable_property(action_item, "Trigger", f"actions.{i}.trigger")
-                self._add_property(trigger, "Ordinary", f"actions.{i}.trigger_type")
-                self._add_property(trigger, "Conditional reset", f"actions.{i}.conditional_reset")
-                self._add_property(trigger, "etc", f"actions.{i}.trigger_etc")
-                
+                self._add_property(trigger, "Trigger Type", f"actions.{i}.trigger_type")
+                self._add_property(trigger, "Conditional Reset", f"actions.{i}.conditional_reset")
+                self._add_property(trigger, "Etc", f"actions.{i}.trigger_etc")
+
             elif action_type == "navigate":
                 self._add_property(action_item, "Screen", f"actions.{i}.screen")
-            
+
             # Add any other properties that might be in the action
+            exclude_keys = {
+                "type",
+                "target_tag",
+                "tag_index1",
+                "tag_index2",
+                "momentary_action",
+                "trigger",
+                "trigger_type",
+                "action_mode",
+                "value_to_add",
+                "conditional_reset",
+                "trigger_etc",
+                "screen",
+            }
             for prop_name, prop_value in action.items():
-                if prop_name not in ["type", "tag", "when_pressed", "when_released", "operation", "value", "screen"]:
+                if prop_name not in exclude_keys:
                     display_name = prop_name.replace("_", " ").title()
                     self._add_property(action_item, display_name, f"actions.{i}.{prop_name}")
     
@@ -688,7 +770,14 @@ class ButtonTreePropertyEditor(QWidget):
         # Convert value based on property type (hardcoding some known types)
         if last_part in ["font_bold", "font_italic", "font_underline"]:
             value = value.lower() == "true"
-        elif last_part in ["border_width", "font_size", "icon_size"]:
+        elif last_part in [
+            "border_width",
+            "font_size",
+            "icon_size",
+            "tag_index1",
+            "tag_index2",
+            "value_to_add",
+        ]:
             try:
                 value = int(value)
             except ValueError:
@@ -775,16 +864,25 @@ class ButtonTreePropertyEditor(QWidget):
         if action_type == "bit":
             new_action = {
                 "type": "bit",
-                "tag": "",
-                "when_pressed": "toggle",
-                "when_released": "none"
+                "target_tag": "",
+                "tag_index1": 0,
+                "tag_index2": 0,
+                "momentary_action": "toggle",
+                "trigger": {},
+                "trigger_type": "ordinary",
             }
         elif action_type == "word":
             new_action = {
                 "type": "word",
-                "tag": "",
-                "operation": "set",
-                "value": "0"
+                "target_tag": "",
+                "tag_index1": 0,
+                "tag_index2": 0,
+                "action_mode": "set",
+                "value_to_add": 0,
+                "trigger": {},
+                "trigger_type": "ordinary",
+                "conditional_reset": "",
+                "trigger_etc": "",
             }
         else:
             return
@@ -914,7 +1012,7 @@ class ButtonTreePropertyEditor(QWidget):
                     
                     # Boolean property special handling for display
                     if property_path in ["font_bold", "font_italic", "font_underline"]:
-                        if value.lower() == "true":
+                        if str(value).lower() == "true":
                             item.setText(1, "True")
                             font = item.font(1)
                             if property_path == "font_bold":
